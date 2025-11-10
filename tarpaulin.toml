@@ -1,0 +1,18 @@
+# Tarpaulin configuration for code coverage
+# https://github.com/xd009642/tarpaulin
+
+[report]
+# Output formats
+out-type = ["Html", "Lcov"]
+
+[run]
+# Timeout for test execution (in seconds)
+timeout = "300s"
+
+# Note: Module re-export files (mod.rs, lib.rs with only pub mod/pub use)
+# are automatically excluded by tarpaulin as they contain no executable code.
+#
+# Current coverage baseline (as of Nov 2025):
+# - Total measurable lines: 144
+# - Fully tested modules: models.rs (11/11), tools/tool.rs (2/2), gateway.rs (1/1)
+# - Priority for testing: broker.rs (49 lines), ollama.rs (81 lines)
