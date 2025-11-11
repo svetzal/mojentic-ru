@@ -1,28 +1,7 @@
 # Clippy configuration for strict code quality checks
 # Run with: cargo clippy --all-targets --all-features -- -D warnings
 
-# Pedantic lints - enable most pedantic checks
-# These catch common mistakes and enforce best practices
-pedantic = { level = "warn" }
-
 # Complexity checks
 too-many-arguments-threshold = 7
 type-complexity-threshold = 250
 cognitive-complexity-threshold = 25
-
-# Deny specific lint groups for strict checking
-[lints]
-# Correctness lints (catch actual bugs)
-clippy.correctness = "deny"
-
-# Suspicious code patterns
-clippy.suspicious = "deny"
-
-# Performance issues
-clippy.perf = "warn"
-
-# Complexity issues
-clippy.complexity = "warn"
-
-# Style consistency
-clippy.style = "warn"
