@@ -32,10 +32,8 @@ impl LlmBroker {
         let current_messages = messages.to_vec();
 
         // Make initial LLM call
-        let response = self
-            .gateway
-            .complete(&self.model, &current_messages, tools, &config)
-            .await?;
+        let response =
+            self.gateway.complete(&self.model, &current_messages, tools, &config).await?;
 
         // Handle tool calls if present
         if !response.tool_calls.is_empty() {
@@ -85,9 +83,7 @@ impl LlmBroker {
                     });
 
                     // Recursively call generate with updated messages
-                    return self
-                        .generate(&messages, Some(tools), Some(config.clone()))
-                        .await;
+                    return self.generate(&messages, Some(tools), Some(config.clone())).await;
                 } else {
                     warn!("Tool not found: {}", tool_call.name);
                 }
@@ -112,10 +108,8 @@ impl LlmBroker {
         let schema = serde_json::to_value(schemars::schema_for!(T))?;
 
         // Call the gateway with the schema
-        let json_response = self
-            .gateway
-            .complete_json(&self.model, messages, schema, &config)
-            .await?;
+        let json_response =
+            self.gateway.complete_json(&self.model, messages, schema, &config).await?;
 
         // Deserialize the JSON into the target type
         let object: T = serde_json::from_value(json_response)?;
@@ -268,10 +262,7 @@ mod tests {
         };
 
         let messages = vec![LlmMessage::user("Hi")];
-        let result = broker
-            .generate(&messages, None, Some(config))
-            .await
-            .unwrap();
+        let result = broker.generate(&messages, None, Some(config)).await.unwrap();
 
         assert_eq!(result, "Response");
     }
@@ -324,10 +315,7 @@ mod tests {
         let tools: Vec<Box<dyn LlmTool>> = vec![Box::new(tool)];
 
         let messages = vec![LlmMessage::user("Use the tool")];
-        let result = broker
-            .generate(&messages, Some(&tools), None)
-            .await
-            .unwrap();
+        let result = broker.generate(&messages, Some(&tools), None).await.unwrap();
 
         assert_eq!(result, "After tool execution");
     }
@@ -389,10 +377,7 @@ mod tests {
         };
 
         let messages = vec![LlmMessage::user("Generate")];
-        let result: TestData = broker
-            .generate_object(&messages, Some(config))
-            .await
-            .unwrap();
+        let result: TestData = broker.generate_object(&messages, Some(config)).await.unwrap();
 
         assert_eq!(result.test, "value");
     }

@@ -89,42 +89,21 @@ mod tests {
 
     #[test]
     fn test_message_role_serialization() {
-        assert_eq!(
-            serde_json::to_string(&MessageRole::System).unwrap(),
-            "\"system\""
-        );
-        assert_eq!(
-            serde_json::to_string(&MessageRole::User).unwrap(),
-            "\"user\""
-        );
-        assert_eq!(
-            serde_json::to_string(&MessageRole::Assistant).unwrap(),
-            "\"assistant\""
-        );
-        assert_eq!(
-            serde_json::to_string(&MessageRole::Tool).unwrap(),
-            "\"tool\""
-        );
+        assert_eq!(serde_json::to_string(&MessageRole::System).unwrap(), "\"system\"");
+        assert_eq!(serde_json::to_string(&MessageRole::User).unwrap(), "\"user\"");
+        assert_eq!(serde_json::to_string(&MessageRole::Assistant).unwrap(), "\"assistant\"");
+        assert_eq!(serde_json::to_string(&MessageRole::Tool).unwrap(), "\"tool\"");
     }
 
     #[test]
     fn test_message_role_deserialization() {
-        assert_eq!(
-            serde_json::from_str::<MessageRole>("\"system\"").unwrap(),
-            MessageRole::System
-        );
-        assert_eq!(
-            serde_json::from_str::<MessageRole>("\"user\"").unwrap(),
-            MessageRole::User
-        );
+        assert_eq!(serde_json::from_str::<MessageRole>("\"system\"").unwrap(), MessageRole::System);
+        assert_eq!(serde_json::from_str::<MessageRole>("\"user\"").unwrap(), MessageRole::User);
         assert_eq!(
             serde_json::from_str::<MessageRole>("\"assistant\"").unwrap(),
             MessageRole::Assistant
         );
-        assert_eq!(
-            serde_json::from_str::<MessageRole>("\"tool\"").unwrap(),
-            MessageRole::Tool
-        );
+        assert_eq!(serde_json::from_str::<MessageRole>("\"tool\"").unwrap(), MessageRole::Tool);
     }
 
     #[test]
@@ -160,10 +139,7 @@ mod tests {
             .with_images(vec!["/path/to/image.jpg".to_string()]);
         assert_eq!(msg.role, MessageRole::User);
         assert_eq!(msg.content, Some("Describe this image".to_string()));
-        assert_eq!(
-            msg.image_paths,
-            Some(vec!["/path/to/image.jpg".to_string()])
-        );
+        assert_eq!(msg.image_paths, Some(vec!["/path/to/image.jpg".to_string()]));
     }
 
     #[test]

@@ -8,10 +8,7 @@ struct GetWeatherTool;
 
 impl LlmTool for GetWeatherTool {
     fn run(&self, args: &HashMap<String, Value>) -> mojentic::Result<Value> {
-        let location = args
-            .get("location")
-            .and_then(|v| v.as_str())
-            .unwrap_or("unknown");
+        let location = args.get("location").and_then(|v| v.as_str()).unwrap_or("unknown");
 
         // In a real implementation, you would call a weather API here
         Ok(json!({

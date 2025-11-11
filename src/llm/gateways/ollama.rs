@@ -140,9 +140,7 @@ impl LlmGateway for OllamaGateway {
         let response_body: Value = response.json().await?;
 
         // Parse content
-        let content = response_body["message"]["content"]
-            .as_str()
-            .map(String::from);
+        let content = response_body["message"]["content"].as_str().map(String::from);
 
         // Parse tool calls if present
         let tool_calls = if let Some(calls) = response_body["message"]["tool_calls"].as_array() {
@@ -221,11 +219,7 @@ impl LlmGateway for OllamaGateway {
     async fn get_available_models(&self) -> Result<Vec<String>> {
         debug!("Fetching available Ollama models");
 
-        let response = self
-            .client
-            .get(format!("{}/api/tags", self.config.host))
-            .send()
-            .await?;
+        let response = self.client.get(format!("{}/api/tags", self.config.host)).send().await?;
 
         if !response.status().is_success() {
             return Err(MojenticError::GatewayError(format!(
@@ -467,10 +461,7 @@ mod tests {
         assert_eq!(result.len(), 1);
         assert_eq!(result[0]["role"], "assistant");
         assert_eq!(result[0]["tool_calls"][0]["type"], "function");
-        assert_eq!(
-            result[0]["tool_calls"][0]["function"]["name"],
-            "test_function"
-        );
+        assert_eq!(result[0]["tool_calls"][0]["function"]["name"], "test_function");
     }
 
     #[test]
@@ -661,9 +652,7 @@ mod tests {
         }
 
         let tools: Vec<Box<dyn LlmTool>> = vec![Box::new(MockTool)];
-        let result = gateway
-            .complete("llama2", &messages, Some(&tools), &config)
-            .await;
+        let result = gateway.complete("llama2", &messages, Some(&tools), &config).await;
 
         mock.assert();
         assert!(result.is_ok());
@@ -698,9 +687,7 @@ mod tests {
         let schema = serde_json::json!({"type": "object"});
         let config = CompletionConfig::default();
 
-        let result = gateway
-            .complete_json("llama2", &messages, schema, &config)
-            .await;
+        let result = gateway.complete_json("llama2", &messages, schema, &config).await;
 
         mock.assert();
         assert!(result.is_ok());
@@ -762,9 +749,7 @@ mod tests {
             .create();
 
         let gateway = OllamaGateway::with_host(server.url());
-        let result = gateway
-            .calculate_embeddings("test", Some("custom-embed"))
-            .await;
+        let result = gateway.calculate_embeddings("test", Some("custom-embed")).await;
 
         mock.assert();
         assert!(result.is_ok());
