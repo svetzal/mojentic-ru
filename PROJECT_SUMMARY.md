@@ -127,7 +127,7 @@ Key dependencies chosen for quality and maturity:
 # Download from https://ollama.ai
 
 # Pull a model
-ollama pull llama3.2
+ollama pull qwen3:32b
 
 # Verify
 ollama list
@@ -162,7 +162,7 @@ use std::sync::Arc;
 #[tokio::main]
 async fn main() -> Result<()> {
     let gateway = OllamaGateway::new();
-    let broker = LlmBroker::new("llama3.2", Arc::new(gateway));
+    let broker = LlmBroker::new("qwen3:32b", Arc::new(gateway));
 
     let messages = vec![LlmMessage::user("Hello!")];
     let response = broker.generate(&messages, None, None).await?;

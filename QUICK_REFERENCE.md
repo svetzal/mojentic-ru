@@ -21,7 +21,7 @@ use std::sync::Arc;
 ### Create a broker
 ```rust
 let gateway = OllamaGateway::new();
-let broker = LlmBroker::new("llama3.2", Arc::new(gateway));
+let broker = LlmBroker::new("qwen3:32b", Arc::new(gateway));
 ```
 
 ### Simple text generation
@@ -171,7 +171,7 @@ use mojentic::Result;
 
 async fn my_function() -> Result<String> {
     let gateway = OllamaGateway::new();
-    let broker = LlmBroker::new("llama3.2", Arc::new(gateway));
+    let broker = LlmBroker::new("qwen3:32b", Arc::new(gateway));
 
     let messages = vec![LlmMessage::user("Hello")];
 
@@ -237,7 +237,7 @@ let gateway = OllamaGateway::new();
 let models = gateway.get_available_models().await?;
 
 // Pull a model
-gateway.pull_model("llama3.2").await?;
+gateway.pull_model("qwen3:32b").await?;
 
 // Calculate embeddings
 let embedding = gateway.calculate_embeddings(
@@ -289,7 +289,7 @@ async fn main() -> Result<()> {
     tracing_subscriber::fmt::init();
 
     let gateway = OllamaGateway::new();
-    let broker = LlmBroker::new("llama3.2", Arc::new(gateway));
+    let broker = LlmBroker::new("qwen3:32b", Arc::new(gateway));
 
     let config = CompletionConfig {
         temperature: 0.7,

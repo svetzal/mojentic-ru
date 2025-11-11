@@ -1,0 +1,5 @@
+[book]
+authors = ["Stacey Vetzal"]
+language = "en"
+src = "src"
+title = "Mojentic for Rust"

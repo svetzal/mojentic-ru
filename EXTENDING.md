@@ -199,7 +199,7 @@ impl LlmTool for CalculatorTool {
 #[tokio::main]
 async fn main() -> mojentic::Result<()> {
     let gateway = OllamaGateway::new();
-    let broker = LlmBroker::new("llama3.2", Arc::new(gateway));
+    let broker = LlmBroker::new("qwen3:32b", Arc::new(gateway));
 
     // Add your tool to the tools list
     let tools: Vec<Box<dyn LlmTool>> = vec![
@@ -263,7 +263,7 @@ struct ProductReview {
 #[tokio::main]
 async fn main() -> mojentic::Result<()> {
     let gateway = OllamaGateway::new();
-    let broker = LlmBroker::new("llama3.2", Arc::new(gateway));
+    let broker = LlmBroker::new("qwen3:32b", Arc::new(gateway));
 
     let messages = vec![
         LlmMessage::user(

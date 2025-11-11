@@ -30,7 +30,7 @@ use std::sync::Arc;
 #[tokio::main]
 async fn main() -> Result<()> {
     let gateway = OllamaGateway::new();
-    let broker = LlmBroker::new("llama3.2", Arc::new(gateway));
+    let broker = LlmBroker::new("qwen3:32b", Arc::new(gateway));
 
     let messages = vec![
         LlmMessage::user("What is the capital of France?"),
@@ -48,7 +48,7 @@ async fn main() -> Result<()> {
 To use Mojentic with local models, you need to have Ollama installed and running:
 
 1. Install Ollama from [ollama.ai](https://ollama.ai)
-2. Pull a model: `ollama pull llama3.2`
+2. Pull a model: `ollama pull qwen3:32b`
 3. Verify it's running: `ollama list`
 
 ## Examples
