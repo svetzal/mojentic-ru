@@ -55,7 +55,7 @@ jobs:
       - name: Fetch dependencies
         run: cargo fetch
 
-  validate:
+  format-check:
     runs-on: ubuntu-latest
     needs: setup
     # Skip job if actor is github-actions[bot] to ensure agent safety
@@ -67,7 +67,7 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
-          components: rustfmt, clippy
+          components: rustfmt
 
       - name: Restore cargo registry cache
         uses: actions/cache/restore@v3
@@ -96,14 +96,163 @@ jobs:
       - name: Check formatting
         run: cargo fmt -- --check
 
+  clippy:
+    runs-on: ubuntu-latest
+    needs: setup
+    # Skip job if actor is github-actions[bot] to ensure agent safety
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: clippy
+
+      - name: Restore cargo registry cache
+        uses: actions/cache/restore@v3
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
+
+      - name: Restore cargo index cache
+        uses: actions/cache/restore@v3
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-git-
+
+      - name: Restore cargo build cache
+        uses: actions/cache/restore@v3
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-build-
+
       - name: Run clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
+
+  build:
+    runs-on: ubuntu-latest
+    needs: setup
+    # Skip job if actor is github-actions[bot] to ensure agent safety
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Restore cargo registry cache
+        uses: actions/cache/restore@v3
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
+
+      - name: Restore cargo index cache
+        uses: actions/cache/restore@v3
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-git-
+
+      - name: Restore cargo build cache
+        uses: actions/cache/restore@v3
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-build-
 
       - name: Build
         run: cargo build --verbose --all-features
 
+  test:
+    runs-on: ubuntu-latest
+    needs: setup
+    # Skip job if actor is github-actions[bot] to ensure agent safety
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Restore cargo registry cache
+        uses: actions/cache/restore@v3
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
+
+      - name: Restore cargo index cache
+        uses: actions/cache/restore@v3
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-git-
+
+      - name: Restore cargo build cache
+        uses: actions/cache/restore@v3
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-build-
+
       - name: Run tests
         run: cargo test --verbose --all-features
+
+  security-audit:
+    runs-on: ubuntu-latest
+    needs: setup
+    # Skip job if actor is github-actions[bot] to ensure agent safety
+    if: ${{ github.actor != 'github-actions[bot]' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Restore cargo registry cache
+        uses: actions/cache/restore@v3
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-registry-
+
+      - name: Restore cargo index cache
+        uses: actions/cache/restore@v3
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-git-
+
+      - name: Restore cargo build cache
+        uses: actions/cache/restore@v3
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-build-
 
       - name: Install cargo-audit
         run: cargo install cargo-audit --quiet 2>&1 | grep -E "(Installed|already installed)" || echo "Installing cargo-audit..."
@@ -113,7 +262,7 @@ jobs:
 
   release-build:
     runs-on: ubuntu-latest
-    needs: validate
+    needs: [format-check, clippy, build, test, security-audit]
     # Only run on release publish events
     if: github.event_name == 'release' && github.event.action == 'published'
     steps:
