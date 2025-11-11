@@ -61,7 +61,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Generate text
     let messages = vec![Message::user("What is Rust?")];
     let response = broker.generate(&messages, None).await?;
-    
+
     println!("{}", response);
     Ok(())
 }

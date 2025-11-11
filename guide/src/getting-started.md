@@ -44,13 +44,13 @@ use mojentic::llm::gateways::OllamaGateway;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create gateway
     let gateway = OllamaGateway::default();
-    
+
     // Create broker
     let broker = Broker::new("phi4:14b", gateway);
-    
+
     // Create messages
     let messages = vec![Message::user("What is the capital of France?")];
-    
+
     // Generate response
     match broker.generate(&messages, None).await {
         Ok(response) => {
@@ -60,7 +60,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             eprintln!("Error: {}", e);
         }
     }
-    
+
     Ok(())
 }
 ```
@@ -264,11 +264,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let handle1 = tokio::spawn(async {
         // Task 1
     });
-    
+
     let handle2 = tokio::spawn(async {
         // Task 2
     });
-    
+
     let _ = tokio::try_join!(handle1, handle2)?;
     Ok(())
 }
@@ -316,20 +316,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         gateway,
         "request-001"
     );
-    
+
     // Configure
     let config = CompletionConfig {
         temperature: 0.7,
         max_tokens: Some(500),
         ..Default::default()
     };
-    
+
     // Create conversation
     let messages = vec![
         Message::system("You are a helpful Rust expert"),
         Message::user("Explain ownership in Rust"),
     ];
-    
+
     // Generate
     match broker.generate(&messages, Some(config)).await {
         Ok(response) => {
@@ -343,7 +343,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             std::process::exit(1);
         }
     }
-    
+
     Ok(())
 }
 ```
