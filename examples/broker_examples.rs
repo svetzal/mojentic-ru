@@ -105,12 +105,14 @@ async fn main() -> Result<()> {
 
     println!("Testing structured output with schema...");
 
-    let messages = vec![LlmMessage::user("I love this product! It's amazing and works perfectly.")];
+    let messages = vec![LlmMessage::user(
+        "I love this product! It's amazing and works perfectly.",
+    )];
 
     match text_broker.generate_object::<SentimentAnalysis>(&messages, None).await {
         Ok(result) => print_result(
             "Structured output",
-            Ok(format!("label: {}, confidence: {}", result.label, result.confidence))
+            Ok(format!("label: {}, confidence: {}", result.label, result.confidence)),
         ),
         Err(e) => print_result("Structured output", Err(e)),
     }
@@ -146,10 +148,10 @@ async fn main() -> Result<()> {
         println!("Testing image analysis with model: qwen3-vl:30b");
         println!("Image path: {}", image_path.display());
 
-        let messages = vec![
-            LlmMessage::user("What text is visible in this image? Please extract all readable text.")
-                .with_images(vec![image_path.to_string_lossy().to_string()])
-        ];
+        let messages = vec![LlmMessage::user(
+            "What text is visible in this image? Please extract all readable text.",
+        )
+        .with_images(vec![image_path.to_string_lossy().to_string()])];
 
         match vision_broker.generate(&messages, None, None).await {
             Ok(response) => print_result("Image analysis", Ok(response)),
@@ -165,7 +167,8 @@ async fn main() -> Result<()> {
     // ============================================================================
     print_section("Summary");
 
-    println!(r#"
+    println!(
+        r#"
 All broker feature tests completed!
 
 Features demonstrated:
@@ -179,7 +182,8 @@ For more detailed examples, see:
 - examples/structured_output.rs
 - examples/tool_usage.rs
 - examples/image_analysis.rs
-"#);
+"#
+    );
 
     Ok(())
 }

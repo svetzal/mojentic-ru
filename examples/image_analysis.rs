@@ -10,7 +10,6 @@
 ///   - Ollama running locally (default: http://localhost:11434)
 ///   - A vision-capable model pulled (e.g., ollama pull qwen3-vl:30b)
 ///   - Test image at examples/images/flash_rom.jpg
-
 use mojentic::prelude::*;
 use std::path::PathBuf;
 use std::sync::Arc;
