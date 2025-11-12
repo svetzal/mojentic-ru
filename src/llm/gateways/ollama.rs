@@ -303,7 +303,12 @@ fn adapt_messages_to_ollama(messages: &[LlmMessage]) -> Result<Vec<Value>> {
                                     path, e
                                 ))
                             })
-                            .map(|bytes| base64::Engine::encode(&base64::engine::general_purpose::STANDARD, bytes))
+                            .map(|bytes| {
+                                base64::Engine::encode(
+                                    &base64::engine::general_purpose::STANDARD,
+                                    bytes,
+                                )
+                            })
                     })
                     .collect();
 
