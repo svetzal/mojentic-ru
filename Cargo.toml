@@ -21,6 +21,9 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 schemars = "0.8"  # For JSON schema generation (Ollama structured output)
 
+# Base64 encoding for images
+base64 = "0.22"
+
 # Error handling
 thiserror = "1.0"
 anyhow = "1.0"
@@ -41,6 +44,7 @@ dotenv = "0.15"
 [dev-dependencies]
 mockito = "1.0"
 tokio-test = "0.4"
+tempfile = "3.0"
 
 [features]
 default = ["ollama"]

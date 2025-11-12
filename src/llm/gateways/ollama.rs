@@ -291,9 +291,23 @@ fn adapt_messages_to_ollama(messages: &[LlmMessage]) -> Result<Vec<Value>> {
                 "content": msg.content.as_deref().unwrap_or("")
             });
 
-            // Add images for user messages
+            // Add images for user messages - Ollama requires base64-encoded images
             if let Some(image_paths) = &msg.image_paths {
-                ollama_msg["images"] = serde_json::to_value(image_paths)?;
+                let encoded_images: Result<Vec<String>> = image_paths
+                    .iter()
+                    .map(|path| {
+                        std::fs::read(path)
+                            .map_err(|e| {
+                                MojenticError::GatewayError(format!(
+                                    "Failed to read image file {}: {}",
+                                    path, e
+                                ))
+                            })
+                            .map(|bytes| base64::Engine::encode(&base64::engine::general_purpose::STANDARD, bytes))
+                    })
+                    .collect();
+
+                ollama_msg["images"] = serde_json::to_value(encoded_images?)?;
             }
 
             // Add tool calls for assistant messages
@@ -424,17 +438,38 @@ mod tests {
 
     #[test]
     fn test_adapt_messages_with_images() {
-        let messages = vec![LlmMessage::user("Describe this").with_images(vec![
-            "/path/to/image.jpg".to_string(),
-            "/path/to/image2.png".to_string(),
-        ])];
+        use std::io::Write;
+        use tempfile::NamedTempFile;
+
+        // Create temporary test image files
+        let mut temp_file1 = NamedTempFile::new().unwrap();
+        let mut temp_file2 = NamedTempFile::new().unwrap();
+        temp_file1.write_all(b"fake_image_data_1").unwrap();
+        temp_file2.write_all(b"fake_image_data_2").unwrap();
+
+        // Get paths as strings
+        let path1 = temp_file1.path().to_string_lossy().to_string();
+        let path2 = temp_file2.path().to_string_lossy().to_string();
+
+        // Expected base64 encodings
+        let expected_base64_1 = base64::Engine::encode(
+            &base64::engine::general_purpose::STANDARD,
+            b"fake_image_data_1",
+        );
+        let expected_base64_2 = base64::Engine::encode(
+            &base64::engine::general_purpose::STANDARD,
+            b"fake_image_data_2",
+        );
+
+        let messages = vec![LlmMessage::user("Describe this").with_images(vec![path1, path2])];
 
         let result = adapt_messages_to_ollama(&messages).unwrap();
 
         assert_eq!(result.len(), 1);
         assert_eq!(result[0]["role"], "user");
-        assert_eq!(result[0]["images"][0], "/path/to/image.jpg");
-        assert_eq!(result[0]["images"][1], "/path/to/image2.png");
+        // Images should be base64-encoded
+        assert_eq!(result[0]["images"][0], expected_base64_1);
+        assert_eq!(result[0]["images"][1], expected_base64_2);
     }
 
     #[test]
