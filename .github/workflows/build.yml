@@ -273,6 +273,10 @@ jobs:
         with:
           toolchain: stable
 
+      - name: Install mdBook
+        run: |
+          cargo install mdbook --quiet 2>&1 | grep -E "(Installed|already installed)" || echo "Installing mdBook..."
+
       - name: Restore cargo registry cache
         uses: actions/cache/restore@v3
         with:
@@ -297,18 +301,24 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-build-
 
-      - name: Build documentation
+      - name: Build Rust API documentation
         run: cargo doc --no-deps --all-features
 
-      - name: Prepare documentation for GitHub Pages
+      - name: Build mdBook site
+        run: mdbook build book
+
+      - name: Prepare combined documentation site
         run: |
-          echo '<meta http-equiv="refresh" content="0; url=mojentic">' > target/doc/index.html
+          rm -rf site
+          mkdir -p site/api
+          cp -R target/doc/* site/api/
+          cp -R book/book/* site/
 
       - name: Upload documentation site
         uses: actions/upload-artifact@v4
         with:
           name: documentation-site
-          path: target/doc/
+          path: site/
           retention-days: 1
 
   deploy-docs:

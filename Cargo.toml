@@ -38,6 +38,9 @@ uuid = { version = "1.0", features = ["v4", "serde"] }
 # Date/time handling
 chrono = "0.4"
 
+# Tokenization
+tiktoken-rs = "0.5"
+
 # Environment variables
 dotenv = "0.15"
 

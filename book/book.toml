@@ -1,0 +1,24 @@
+[book]
+title = "Mojentic (Rust)"
+author = "Mojentic Contributors"
+description = "Agentic framework in Rust: asynchronous pubsub architecture for orchestrating LLM-powered agents."
+language = "en"
+multilingual = false
+src = "src"
+
+[output.html]
+default-theme = "light"
+preferred-dark-theme = "navy"
+additional-css = ["theme/custom.css"]
+no-section-label = true
+
+[preprocessor.links]
+# (placeholder for future link checker or custom preprocessors)
+
+[build]
+rustdoc = true
+create-missing = true
+
+[output.html.search]
+use-boolean-and = true
+truncate-long-entries = true

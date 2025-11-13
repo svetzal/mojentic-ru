@@ -2,6 +2,23 @@
 
 Mojentic is a modern LLM integration framework for Rust that provides a clean abstraction over multiple LLM providers with tool support, structured output generation, and an event-driven agent system.
 
+## Documentation
+
+End-user documentation is published as an mdBook, with the Rust API reference included under `/api/`.
+
+- Live site (on release): GitHub Pages for this repository
+- Build locally:
+
+```bash
+# Build API docs
+cargo doc --no-deps --all-features
+# Build the mdBook
+mdbook build book
+# Open the book
+open book/book/index.html
+# API docs are at target/doc/ (served under /api/ in the published site)
+```
+
 ## Features
 
 - **Multi-Provider Support**: Works with OpenAI, Ollama, and Anthropic (in development)
