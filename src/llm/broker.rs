@@ -1,8 +1,10 @@
 use crate::error::Result;
-use crate::llm::gateway::{CompletionConfig, LlmGateway};
+use crate::llm::gateway::{CompletionConfig, LlmGateway, StreamChunk};
 use crate::llm::models::{LlmGatewayResponse, LlmMessage, MessageRole};
 use crate::llm::tools::LlmTool;
+use futures::stream::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
+use std::pin::Pin;
 use std::sync::Arc;
 use tracing::{info, warn};
 
@@ -116,6 +118,127 @@ impl LlmBroker {
 
         Ok(object)
     }
+
+    /// Generate streaming text response from LLM
+    ///
+    /// Returns a stream that yields content chunks as they arrive. When tool calls
+    /// are detected, the broker executes them and recursively streams the LLM's
+    /// follow-up response.
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// use futures::stream::StreamExt;
+    ///
+    /// let broker = LlmBroker::new("qwen3:32b", gateway);
+    /// let messages = vec![LlmMessage::user("Tell me a story")];
+    ///
+    /// let mut stream = broker.generate_stream(&messages, None, None);
+    /// while let Some(result) = stream.next().await {
+    ///     match result {
+    ///         Ok(chunk) => print!("{}", chunk),
+    ///         Err(e) => eprintln!("Error: {}", e),
+    ///     }
+    /// }
+    /// ```
+    pub fn generate_stream<'a>(
+        &'a self,
+        messages: &'a [LlmMessage],
+        tools: Option<&'a [Box<dyn LlmTool>]>,
+        config: Option<CompletionConfig>,
+    ) -> Pin<Box<dyn Stream<Item = Result<String>> + 'a>> {
+        let config = config.unwrap_or_default();
+        let current_messages = messages.to_vec();
+
+        Box::pin(async_stream::stream! {
+            let mut accumulated_content = String::new();
+            let mut accumulated_tool_calls = Vec::new();
+
+            // Stream from gateway
+            let mut stream = self.gateway.complete_stream(
+                &self.model,
+                &current_messages,
+                tools,
+                &config,
+            );
+
+            while let Some(chunk_result) = stream.next().await {
+                match chunk_result {
+                    Ok(StreamChunk::Content(content)) => {
+                        accumulated_content.push_str(&content);
+                        yield Ok(content);
+                    }
+                    Ok(StreamChunk::ToolCalls(tool_calls)) => {
+                        accumulated_tool_calls = tool_calls;
+                    }
+                    Err(e) => {
+                        yield Err(e);
+                        return;
+                    }
+                }
+            }
+
+            // Handle tool calls if present
+            if !accumulated_tool_calls.is_empty() {
+                if let Some(tools) = tools {
+                    info!("Processing {} tool call(s) in stream", accumulated_tool_calls.len());
+
+                    // Build new messages with tool results
+                    let mut new_messages = current_messages.clone();
+
+                    // Add assistant message with tool calls
+                    new_messages.push(LlmMessage {
+                        role: MessageRole::Assistant,
+                        content: Some(accumulated_content),
+                        tool_calls: Some(accumulated_tool_calls.clone()),
+                        image_paths: None,
+                    });
+
+                    // Execute tools and add results
+                    for tool_call in &accumulated_tool_calls {
+                        if let Some(tool) = tools.iter().find(|t| t.matches(&tool_call.name)) {
+                            info!("Executing tool: {}", tool_call.name);
+
+                            match tool.run(&tool_call.arguments) {
+                                Ok(output) => {
+                                    let output_str = match serde_json::to_string(&output) {
+                                        Ok(s) => s,
+                                        Err(e) => {
+                                            yield Err(e.into());
+                                            return;
+                                        }
+                                    };
+
+                                    new_messages.push(LlmMessage {
+                                        role: MessageRole::Tool,
+                                        content: Some(output_str),
+                                        tool_calls: Some(vec![tool_call.clone()]),
+                                        image_paths: None,
+                                    });
+                                }
+                                Err(e) => {
+                                    warn!("Tool execution failed: {}", e);
+                                    yield Err(e);
+                                    return;
+                                }
+                            }
+                        } else {
+                            warn!("Tool not found: {}", tool_call.name);
+                        }
+                    }
+
+                    // Recursively stream with updated messages
+                    let mut recursive_stream = self.generate_stream(&new_messages, Some(tools), Some(config.clone()));
+
+                    while let Some(result) = recursive_stream.next().await {
+                        yield result;
+                    }
+                } else {
+                    warn!("LLM requested tool calls but no tools provided");
+                }
+            }
+        })
+    }
 }
 
 #[cfg(test)]
@@ -186,6 +309,17 @@ mod tests {
             _model: Option<&str>,
         ) -> Result<Vec<f32>> {
             Ok(vec![0.1, 0.2, 0.3])
+        }
+
+        fn complete_stream<'a>(
+            &'a self,
+            _model: &'a str,
+            _messages: &'a [LlmMessage],
+            _tools: Option<&'a [Box<dyn LlmTool>]>,
+            _config: &'a CompletionConfig,
+        ) -> Pin<Box<dyn Stream<Item = Result<StreamChunk>> + Send + 'a>> {
+            use futures::stream;
+            Box::pin(stream::iter(vec![Ok(StreamChunk::Content("test".to_string()))]))
         }
     }
 
@@ -402,5 +536,261 @@ mod tests {
 
         let result = broker.generate(&messages, None, None).await.unwrap();
         assert_eq!(result, "Response to conversation");
+    }
+
+    #[tokio::test]
+    async fn test_generate_stream_basic() {
+        use futures::stream;
+
+        // Mock gateway that returns a simple stream
+        struct StreamingMockGateway;
+
+        #[async_trait::async_trait]
+        impl LlmGateway for StreamingMockGateway {
+            async fn complete(
+                &self,
+                _model: &str,
+                _messages: &[LlmMessage],
+                _tools: Option<&[Box<dyn LlmTool>]>,
+                _config: &CompletionConfig,
+            ) -> Result<LlmGatewayResponse> {
+                Ok(LlmGatewayResponse {
+                    content: Some("test".to_string()),
+                    object: None,
+                    tool_calls: vec![],
+                })
+            }
+
+            async fn complete_json(
+                &self,
+                _model: &str,
+                _messages: &[LlmMessage],
+                _schema: Value,
+                _config: &CompletionConfig,
+            ) -> Result<Value> {
+                Ok(serde_json::json!({}))
+            }
+
+            async fn get_available_models(&self) -> Result<Vec<String>> {
+                Ok(vec![])
+            }
+
+            async fn calculate_embeddings(
+                &self,
+                _text: &str,
+                _model: Option<&str>,
+            ) -> Result<Vec<f32>> {
+                Ok(vec![])
+            }
+
+            fn complete_stream<'a>(
+                &'a self,
+                _model: &'a str,
+                _messages: &'a [LlmMessage],
+                _tools: Option<&'a [Box<dyn LlmTool>]>,
+                _config: &'a CompletionConfig,
+            ) -> Pin<Box<dyn Stream<Item = Result<StreamChunk>> + Send + 'a>> {
+                Box::pin(stream::iter(vec![
+                    Ok(StreamChunk::Content("Hello".to_string())),
+                    Ok(StreamChunk::Content(" ".to_string())),
+                    Ok(StreamChunk::Content("World".to_string())),
+                ]))
+            }
+        }
+
+        let gateway = Arc::new(StreamingMockGateway);
+        let broker = LlmBroker::new("test-model", gateway);
+        let messages = vec![LlmMessage::user("Hello")];
+
+        let mut stream = broker.generate_stream(&messages, None, None);
+        let mut result = String::new();
+
+        while let Some(chunk) = stream.next().await {
+            result.push_str(&chunk.unwrap());
+        }
+
+        assert_eq!(result, "Hello World");
+    }
+
+    #[tokio::test]
+    async fn test_generate_stream_with_tool_calls() {
+        use futures::stream;
+
+        // Mock gateway that returns tool calls
+        struct ToolCallMockGateway {
+            call_count: std::sync::Mutex<usize>,
+        }
+
+        impl ToolCallMockGateway {
+            fn new() -> Self {
+                Self {
+                    call_count: std::sync::Mutex::new(0),
+                }
+            }
+        }
+
+        #[async_trait::async_trait]
+        impl LlmGateway for ToolCallMockGateway {
+            async fn complete(
+                &self,
+                _model: &str,
+                _messages: &[LlmMessage],
+                _tools: Option<&[Box<dyn LlmTool>]>,
+                _config: &CompletionConfig,
+            ) -> Result<LlmGatewayResponse> {
+                Ok(LlmGatewayResponse {
+                    content: Some("test".to_string()),
+                    object: None,
+                    tool_calls: vec![],
+                })
+            }
+
+            async fn complete_json(
+                &self,
+                _model: &str,
+                _messages: &[LlmMessage],
+                _schema: Value,
+                _config: &CompletionConfig,
+            ) -> Result<Value> {
+                Ok(serde_json::json!({}))
+            }
+
+            async fn get_available_models(&self) -> Result<Vec<String>> {
+                Ok(vec![])
+            }
+
+            async fn calculate_embeddings(
+                &self,
+                _text: &str,
+                _model: Option<&str>,
+            ) -> Result<Vec<f32>> {
+                Ok(vec![])
+            }
+
+            fn complete_stream<'a>(
+                &'a self,
+                _model: &'a str,
+                _messages: &'a [LlmMessage],
+                _tools: Option<&'a [Box<dyn LlmTool>]>,
+                _config: &'a CompletionConfig,
+            ) -> Pin<Box<dyn Stream<Item = Result<StreamChunk>> + Send + 'a>> {
+                let mut count = self.call_count.lock().unwrap();
+                let call_num = *count;
+                *count += 1;
+
+                if call_num == 0 {
+                    // First call: return content with tool call
+                    Box::pin(stream::iter(vec![
+                        Ok(StreamChunk::Content("Initial ".to_string())),
+                        Ok(StreamChunk::Content("response".to_string())),
+                        Ok(StreamChunk::ToolCalls(vec![LlmToolCall {
+                            id: Some("call_1".to_string()),
+                            name: "test_tool".to_string(),
+                            arguments: HashMap::new(),
+                        }])),
+                    ]))
+                } else {
+                    // Second call (after tool execution): return final content
+                    Box::pin(stream::iter(vec![
+                        Ok(StreamChunk::Content("After ".to_string())),
+                        Ok(StreamChunk::Content("tool".to_string())),
+                    ]))
+                }
+            }
+        }
+
+        let gateway = Arc::new(ToolCallMockGateway::new());
+        let broker = LlmBroker::new("test-model", gateway);
+
+        let tool = MockTool {
+            name: "test_tool".to_string(),
+            result: serde_json::json!({"result": "success"}),
+        };
+        let tools: Vec<Box<dyn LlmTool>> = vec![Box::new(tool)];
+
+        let messages = vec![LlmMessage::user("Use the tool")];
+        let mut stream = broker.generate_stream(&messages, Some(&tools), None);
+
+        let mut result = String::new();
+        while let Some(chunk) = stream.next().await {
+            result.push_str(&chunk.unwrap());
+        }
+
+        // Should contain both initial response and post-tool response
+        assert!(result.contains("Initial response"));
+        assert!(result.contains("After tool"));
+    }
+
+    #[tokio::test]
+    async fn test_generate_stream_without_tools() {
+        use futures::stream;
+
+        struct SimpleStreamGateway;
+
+        #[async_trait::async_trait]
+        impl LlmGateway for SimpleStreamGateway {
+            async fn complete(
+                &self,
+                _model: &str,
+                _messages: &[LlmMessage],
+                _tools: Option<&[Box<dyn LlmTool>]>,
+                _config: &CompletionConfig,
+            ) -> Result<LlmGatewayResponse> {
+                Ok(LlmGatewayResponse {
+                    content: Some("test".to_string()),
+                    object: None,
+                    tool_calls: vec![],
+                })
+            }
+
+            async fn complete_json(
+                &self,
+                _model: &str,
+                _messages: &[LlmMessage],
+                _schema: Value,
+                _config: &CompletionConfig,
+            ) -> Result<Value> {
+                Ok(serde_json::json!({}))
+            }
+
+            async fn get_available_models(&self) -> Result<Vec<String>> {
+                Ok(vec![])
+            }
+
+            async fn calculate_embeddings(
+                &self,
+                _text: &str,
+                _model: Option<&str>,
+            ) -> Result<Vec<f32>> {
+                Ok(vec![])
+            }
+
+            fn complete_stream<'a>(
+                &'a self,
+                _model: &'a str,
+                _messages: &'a [LlmMessage],
+                _tools: Option<&'a [Box<dyn LlmTool>]>,
+                _config: &'a CompletionConfig,
+            ) -> Pin<Box<dyn Stream<Item = Result<StreamChunk>> + Send + 'a>> {
+                // Simple stream with no tool calls
+                Box::pin(stream::iter(vec![
+                    Ok(StreamChunk::Content("Simple ".to_string())),
+                    Ok(StreamChunk::Content("stream".to_string())),
+                ]))
+            }
+        }
+
+        let gateway = Arc::new(SimpleStreamGateway);
+        let broker = LlmBroker::new("test-model", gateway);
+
+        let messages = vec![LlmMessage::user("Test")];
+        let mut stream = broker.generate_stream(&messages, None, None);
+
+        let mut result = String::new();
+        while let Some(chunk) = stream.next().await {
+            result.push_str(&chunk.unwrap());
+        }
+
+        assert_eq!(result, "Simple stream");
     }
 }

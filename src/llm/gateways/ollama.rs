@@ -1,12 +1,14 @@
 use crate::error::{MojenticError, Result};
-use crate::llm::gateway::{CompletionConfig, LlmGateway};
+use crate::llm::gateway::{CompletionConfig, LlmGateway, StreamChunk};
 use crate::llm::models::{LlmGatewayResponse, LlmMessage, LlmToolCall, MessageRole};
 use crate::llm::tools::LlmTool;
 use async_trait::async_trait;
+use futures::stream::{Stream, StreamExt};
 use reqwest::Client;
 use serde_json::Value;
 use std::collections::HashMap;
-use tracing::{debug, info};
+use std::pin::Pin;
+use tracing::{debug, info, warn};
 
 /// Configuration for connecting to Ollama server
 #[derive(Debug, Clone)]
@@ -273,6 +275,148 @@ impl LlmGateway for OllamaGateway {
             .collect();
 
         Ok(embeddings)
+    }
+
+    fn complete_stream<'a>(
+        &'a self,
+        model: &'a str,
+        messages: &'a [LlmMessage],
+        tools: Option<&'a [Box<dyn LlmTool>]>,
+        config: &'a CompletionConfig,
+    ) -> Pin<Box<dyn Stream<Item = Result<StreamChunk>> + Send + 'a>> {
+        Box::pin(async_stream::stream! {
+            info!("Starting Ollama streaming completion");
+            debug!("Model: {}, Message count: {}", model, messages.len());
+
+            let ollama_messages = match adapt_messages_to_ollama(messages) {
+                Ok(msgs) => msgs,
+                Err(e) => {
+                    yield Err(e);
+                    return;
+                }
+            };
+
+            let options = extract_ollama_options(config);
+
+            let mut body = serde_json::json!({
+                "model": model,
+                "messages": ollama_messages,
+                "options": options,
+                "stream": true
+            });
+
+            // Add tools if provided
+            if let Some(tools) = tools {
+                let tool_defs: Vec<_> = tools.iter().map(|t| t.descriptor()).collect();
+                if let Ok(tools_value) = serde_json::to_value(tool_defs) {
+                    body["tools"] = tools_value;
+                }
+            }
+
+            // Make streaming API request
+            let response = match self
+                .client
+                .post(format!("{}/api/chat", self.config.host))
+                .json(&body)
+                .send()
+                .await
+            {
+                Ok(r) => r,
+                Err(e) => {
+                    yield Err(e.into());
+                    return;
+                }
+            };
+
+            if !response.status().is_success() {
+                yield Err(MojenticError::GatewayError(format!(
+                    "Ollama API error: {}",
+                    response.status()
+                )));
+                return;
+            }
+
+            // Process byte stream
+            let mut stream = response.bytes_stream();
+            let mut buffer = String::new();
+            let mut accumulated_tool_calls: Vec<LlmToolCall> = Vec::new();
+
+            while let Some(chunk_result) = stream.next().await {
+                match chunk_result {
+                    Ok(bytes) => {
+                        // Append to buffer
+                        if let Ok(text) = std::str::from_utf8(&bytes) {
+                            buffer.push_str(text);
+
+                            // Process complete JSON lines (newline-delimited)
+                            while let Some(newline_pos) = buffer.find('\n') {
+                                let line = buffer[..newline_pos].trim().to_string();
+                                buffer = buffer[newline_pos + 1..].to_string();
+
+                                if line.is_empty() {
+                                    continue;
+                                }
+
+                                // Parse JSON line
+                                match serde_json::from_str::<Value>(&line) {
+                                    Ok(json) => {
+                                        // Check if streaming is done
+                                        if json["done"].as_bool().unwrap_or(false) {
+                                            // Final chunk - yield accumulated tool calls if any
+                                            if !accumulated_tool_calls.is_empty() {
+                                                yield Ok(StreamChunk::ToolCalls(accumulated_tool_calls.clone()));
+                                            }
+                                            continue;
+                                        }
+
+                                        // Extract content
+                                        if let Some(message) = json["message"].as_object() {
+                                            if let Some(content) = message["content"].as_str() {
+                                                if !content.is_empty() {
+                                                    yield Ok(StreamChunk::Content(content.to_string()));
+                                                }
+                                            }
+
+                                            // Extract tool calls
+                                            if let Some(calls) = message.get("tool_calls").and_then(|v| v.as_array()) {
+                                                for call in calls {
+                                                    if let Some(function) = call.get("function").and_then(|v| v.as_object()) {
+                                                        if let (Some(name), Some(args)) = (
+                                                            function.get("name").and_then(|v| v.as_str()),
+                                                            function.get("arguments").and_then(|v| v.as_object()),
+                                                        ) {
+                                                            let arguments: HashMap<String, Value> = args
+                                                                .iter()
+                                                                .map(|(k, v)| (k.clone(), v.clone()))
+                                                                .collect();
+
+                                                            let tool_call = LlmToolCall {
+                                                                id: call.get("id").and_then(|v| v.as_str()).map(String::from),
+                                                                name: name.to_string(),
+                                                                arguments,
+                                                            };
+
+                                                            accumulated_tool_calls.push(tool_call);
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    Err(e) => {
+                                        warn!("Failed to parse streaming chunk: {}", e);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        yield Err(e.into());
+                        return;
+                    }
+                }
+            }
+        })
     }
 }
 

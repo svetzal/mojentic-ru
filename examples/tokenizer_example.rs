@@ -61,10 +61,7 @@ Token counting is important for:
     let unicode_tokens = tokenizer.encode(unicode_text);
     println!("Unicode text: \"{}\"", unicode_text);
     println!("Token count: {}", unicode_tokens.len());
-    println!(
-        "Decoded: \"{}\"\n",
-        tokenizer.decode(&unicode_tokens)
-    );
+    println!("Decoded: \"{}\"\n", tokenizer.decode(&unicode_tokens));
 
     // Example 5: Using count_tokens convenience method
     let sample_text = "What is the capital of France?";

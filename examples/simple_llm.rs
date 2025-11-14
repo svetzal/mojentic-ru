@@ -10,7 +10,7 @@ async fn main() -> Result<()> {
     let gateway = OllamaGateway::new();
 
     // Create broker with a local model
-    let broker = LlmBroker::new("phi4:14b", Arc::new(gateway));
+    let broker = LlmBroker::new("qwen3:32b", Arc::new(gateway));
 
     // Create a simple message
     let messages = vec![LlmMessage::user("Explain what Rust is in one sentence.")];

@@ -2,7 +2,9 @@ use crate::error::Result;
 use crate::llm::models::{LlmGatewayResponse, LlmMessage};
 use crate::llm::tools::LlmTool;
 use async_trait::async_trait;
+use futures::stream::Stream;
 use serde_json::Value;
+use std::pin::Pin;
 
 /// Configuration for LLM completion
 #[derive(Debug, Clone)]
@@ -50,6 +52,27 @@ pub trait LlmGateway: Send + Sync {
 
     /// Calculate embeddings for text
     async fn calculate_embeddings(&self, text: &str, model: Option<&str>) -> Result<Vec<f32>>;
+
+    /// Stream LLM responses chunk by chunk
+    ///
+    /// Returns a stream that yields either content chunks or tool calls.
+    /// Tool calls will be accumulated and yielded when complete.
+    fn complete_stream<'a>(
+        &'a self,
+        model: &'a str,
+        messages: &'a [LlmMessage],
+        tools: Option<&'a [Box<dyn LlmTool>]>,
+        config: &'a CompletionConfig,
+    ) -> Pin<Box<dyn Stream<Item = Result<StreamChunk>> + Send + 'a>>;
+}
+
+/// Streaming response chunk
+#[derive(Debug, Clone)]
+pub enum StreamChunk {
+    /// Content text chunk
+    Content(String),
+    /// Complete tool calls (accumulated from stream)
+    ToolCalls(Vec<crate::llm::models::LlmToolCall>),
 }
 
 #[cfg(test)]

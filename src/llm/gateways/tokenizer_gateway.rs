@@ -60,25 +60,6 @@ impl TokenizerGateway {
         Ok(Self { tokenizer })
     }
 
-    /// Creates a new TokenizerGateway with the default cl100k_base encoding.
-    ///
-    /// This is a convenience method that uses the encoding model for
-    /// GPT-4 and GPT-3.5-turbo.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use mojentic::llm::gateways::TokenizerGateway;
-    ///
-    /// let tokenizer = TokenizerGateway::default();
-    /// let tokens = tokenizer.encode("Hello!");
-    /// ```
-    pub fn default() -> Self {
-        // Use cl100k_base tokenizer
-        let tokenizer = tiktoken_rs::cl100k_base().expect("cl100k_base should always be available");
-        Self { tokenizer }
-    }
-
     /// Encodes text into tokens.
     ///
     /// # Arguments
@@ -125,12 +106,10 @@ impl TokenizerGateway {
     /// ```
     pub fn decode(&self, tokens: &[usize]) -> String {
         tracing::debug!("Decoding {} tokens", tokens.len());
-        self.tokenizer
-            .decode(tokens.to_vec())
-            .unwrap_or_else(|e| {
-                tracing::error!("Failed to decode tokens: {}", e);
-                String::new()
-            })
+        self.tokenizer.decode(tokens.to_vec()).unwrap_or_else(|e| {
+            tracing::error!("Failed to decode tokens: {}", e);
+            String::new()
+        })
     }
 
     /// Counts the number of tokens in a text string.
@@ -160,6 +139,13 @@ impl TokenizerGateway {
     }
 }
 
+impl Default for TokenizerGateway {
+    fn default() -> Self {
+        // Use cl100k_base as the default tokenizer
+        Self::new("cl100k_base").expect("cl100k_base should always be available")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -172,7 +158,7 @@ mod tests {
 
         assert!(!tokens.is_empty());
         // Tokens are valid usize values (some tokens can be 0, like BOS/EOS)
-        assert!(tokens.len() > 0);
+        assert!(!tokens.is_empty());
     }
 
     #[test]
@@ -290,6 +276,6 @@ mod tests {
         let decoded = tokenizer.decode(&tokens);
 
         assert_eq!(unicode_text, decoded);
-        assert!(tokens.len() > 0);
+        assert!(!tokens.is_empty());
     }
 }
