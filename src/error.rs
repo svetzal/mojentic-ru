@@ -1,3 +1,9 @@
+//! Error types and result aliases for the Mojentic library.
+//!
+//! This module defines the core error type [`MojenticError`] and the [`Result`] type alias
+//! used throughout the library. All public APIs that can fail return `Result<T>` for
+//! consistent error handling.
+
 use thiserror::Error;
 
 #[derive(Error, Debug)]

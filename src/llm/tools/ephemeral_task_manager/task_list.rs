@@ -55,7 +55,7 @@ impl TaskList {
             .tasks
             .iter()
             .position(|t| t.id == existing_task_id)
-            .ok_or_else(|| MojenticError::ValidationError(format!("No task with ID '{}' exists", existing_task_id)))?;
+            .ok_or_else(|| MojenticError::ToolError(format!("No task with ID '{}' exists", existing_task_id)))?;
 
         let id = self.claim_next_id();
         let task = Task::new(id, description);
@@ -71,10 +71,10 @@ impl TaskList {
             .tasks
             .iter_mut()
             .find(|t| t.id == task_id)
-            .ok_or_else(|| MojenticError::ValidationError(format!("No task with ID '{}' exists", task_id)))?;
+            .ok_or_else(|| MojenticError::ToolError(format!("No task with ID '{}' exists", task_id)))?;
 
         if task.status != TaskStatus::Pending {
-            return Err(MojenticError::ValidationError(format!(
+            return Err(MojenticError::ToolError(format!(
                 "Task '{}' cannot be started because it is not in PENDING status",
                 task_id
             )));
@@ -92,10 +92,10 @@ impl TaskList {
             .tasks
             .iter_mut()
             .find(|t| t.id == task_id)
-            .ok_or_else(|| MojenticError::ValidationError(format!("No task with ID '{}' exists", task_id)))?;
+            .ok_or_else(|| MojenticError::ToolError(format!("No task with ID '{}' exists", task_id)))?;
 
         if task.status != TaskStatus::InProgress {
-            return Err(MojenticError::ValidationError(format!(
+            return Err(MojenticError::ToolError(format!(
                 "Task '{}' cannot be completed because it is not in IN_PROGRESS status",
                 task_id
             )));

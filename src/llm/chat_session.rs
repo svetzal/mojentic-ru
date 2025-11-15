@@ -493,7 +493,7 @@ mod tests {
 
         // Add several messages with longer content to force trimming
         for i in 0..10 {
-            session.insert_message(LlmMessage::user(&format!(
+            session.insert_message(LlmMessage::user(format!(
                 "This is a longer message number {} with more content to increase token count",
                 i
             )));
@@ -521,7 +521,7 @@ mod tests {
 
         // Add many messages to force trimming
         for i in 0..20 {
-            session.insert_message(LlmMessage::user(&format!("Message {}", i)));
+            session.insert_message(LlmMessage::user(format!("Message {}", i)));
         }
 
         // System prompt should still be first
