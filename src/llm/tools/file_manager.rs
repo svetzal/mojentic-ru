@@ -19,7 +19,7 @@ impl FilesystemGateway {
     /// Creates a new FilesystemGateway with the specified base path.
     pub fn new<P: AsRef<Path>>(base_path: P) -> Result<Self> {
         let base_path = base_path.as_ref();
-        
+
         if !base_path.is_dir() {
             return Err(MojenticError::Tool {
                 message: format!("Base path {:?} is not a directory", base_path),
@@ -260,11 +260,11 @@ impl Tool for ListFilesTool {
                 message: "Missing 'path' parameter".to_string(),
                 source: None,
             })?;
-        
+
         let extension = args.get("extension").and_then(|v| v.as_str());
 
         let files = self.fs.ls(path)?;
-        
+
         let filtered: Vec<String> = if let Some(ext) = extension {
             files.into_iter().filter(|f| f.ends_with(ext)).collect()
         } else {
@@ -367,7 +367,7 @@ impl Tool for WriteFileTool {
                 message: "Missing 'path' parameter".to_string(),
                 source: None,
             })?;
-        
+
         let content = args["content"].as_str()
             .ok_or_else(|| MojenticError::Tool {
                 message: "Missing 'content' parameter".to_string(),
@@ -421,7 +421,7 @@ impl Tool for ListAllFilesTool {
             })?;
 
         let files = self.fs.list_all_files(path)?;
-        
+
         serde_json::to_string(&files)
             .map_err(|e| MojenticError::Tool {
                 message: format!("Failed to serialize result: {}", e),
@@ -473,7 +473,7 @@ impl Tool for FindFilesByGlobTool {
                 message: "Missing 'path' parameter".to_string(),
                 source: None,
             })?;
-        
+
         let pattern = args["pattern"].as_str()
             .ok_or_else(|| MojenticError::Tool {
                 message: "Missing 'pattern' parameter".to_string(),
@@ -481,7 +481,7 @@ impl Tool for FindFilesByGlobTool {
             })?;
 
         let files = self.fs.find_files_by_glob(path, pattern)?;
-        
+
         serde_json::to_string(&files)
             .map_err(|e| MojenticError::Tool {
                 message: format!("Failed to serialize result: {}", e),
@@ -533,7 +533,7 @@ impl Tool for FindFilesContainingTool {
                 message: "Missing 'path' parameter".to_string(),
                 source: None,
             })?;
-        
+
         let pattern = args["pattern"].as_str()
             .ok_or_else(|| MojenticError::Tool {
                 message: "Missing 'pattern' parameter".to_string(),
@@ -541,7 +541,7 @@ impl Tool for FindFilesContainingTool {
             })?;
 
         let files = self.fs.find_files_containing(path, pattern)?;
-        
+
         serde_json::to_string(&files)
             .map_err(|e| MojenticError::Tool {
                 message: format!("Failed to serialize result: {}", e),
@@ -593,7 +593,7 @@ impl Tool for FindLinesMatchingTool {
                 message: "Missing 'path' parameter".to_string(),
                 source: None,
             })?;
-        
+
         let pattern = args["pattern"].as_str()
             .ok_or_else(|| MojenticError::Tool {
                 message: "Missing 'pattern' parameter".to_string(),
@@ -602,7 +602,7 @@ impl Tool for FindLinesMatchingTool {
 
         let (directory, file_name) = split_path(path);
         let lines = self.fs.find_lines_matching(directory, file_name, pattern)?;
-        
+
         serde_json::to_string(&lines)
             .map_err(|e| MojenticError::Tool {
                 message: format!("Failed to serialize result: {}", e),
@@ -684,7 +684,7 @@ mod tests {
     fn test_resolve_path_security() {
         let temp_dir = TempDir::new().unwrap();
         let gateway = FilesystemGateway::new(temp_dir.path()).unwrap();
-        
+
         // Should fail - trying to escape sandbox
         let result = gateway.resolve_path("../../../etc/passwd");
         assert!(result.is_err());
@@ -694,10 +694,10 @@ mod tests {
     fn test_ls() {
         let temp_dir = TempDir::new().unwrap();
         fs::write(temp_dir.path().join("test.txt"), "content").unwrap();
-        
+
         let gateway = FilesystemGateway::new(temp_dir.path()).unwrap();
         let files = gateway.ls(".").unwrap();
-        
+
         assert_eq!(files.len(), 1);
         assert!(files[0].contains("test.txt"));
     }
@@ -706,10 +706,10 @@ mod tests {
     fn test_read_write() {
         let temp_dir = TempDir::new().unwrap();
         let gateway = FilesystemGateway::new(temp_dir.path()).unwrap();
-        
+
         gateway.write(".", "test.txt", "Hello, world!").unwrap();
         let content = gateway.read(".", "test.txt").unwrap();
-        
+
         assert_eq!(content, "Hello, world!");
     }
 }

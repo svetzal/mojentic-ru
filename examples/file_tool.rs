@@ -15,7 +15,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create a temporary directory for the example
     let sandbox_dir = TempDir::new()?;
     let sandbox_path = sandbox_dir.path();
-    
+
     println!("Sandbox directory: {:?}", sandbox_path);
     println!();
 
