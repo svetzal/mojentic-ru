@@ -1,4 +1,4 @@
-# Mojentic Quick Reference
+# Quick Reference
 
 ## Installation
 
@@ -75,57 +75,6 @@ let messages = vec![
 ];
 
 let person: Person = broker.generate_object(&messages, None).await?;
-```
-
-## Tools
-
-### Define a tool
-```rust
-struct MyTool;
-
-impl LlmTool for MyTool {
-    fn run(&self, args: &HashMap<String, Value>) -> mojentic::Result<Value> {
-        // Extract arguments
-        let param = args.get("param")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| mojentic::MojenticError::ToolError(
-                "Missing parameter".to_string()
-            ))?;
-
-        // Do work
-        Ok(json!({ "result": "value" }))
-    }
-
-    fn descriptor(&self) -> ToolDescriptor {
-        ToolDescriptor {
-            r#type: "function".to_string(),
-            function: FunctionDescriptor {
-                name: "my_tool".to_string(),
-                description: "Description of what the tool does".to_string(),
-                parameters: json!({
-                    "type": "object",
-                    "properties": {
-                        "param": {
-                            "type": "string",
-                            "description": "Parameter description"
-                        }
-                    },
-                    "required": ["param"]
-                }),
-            },
-        }
-    }
-}
-```
-
-### Use tools
-```rust
-let tools: Vec<Box<dyn LlmTool>> = vec![
-    Box::new(MyTool),
-];
-
-let messages = vec![LlmMessage::user("Use my tool")];
-let response = broker.generate(&messages, Some(&tools), None).await?;
 ```
 
 ## Configuration
@@ -268,47 +217,4 @@ Set log level via environment variable:
 RUST_LOG=debug cargo run
 RUST_LOG=info cargo run
 RUST_LOG=mojentic=debug cargo run
-```
-
-## Complete Example
-
-```rust
-use mojentic::prelude::*;
-use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-
-#[derive(Debug, Serialize, Deserialize, schemars::JsonSchema)]
-struct Analysis {
-    summary: String,
-    key_points: Vec<String>,
-    confidence: f32,
-}
-
-#[tokio::main]
-async fn main() -> Result<()> {
-    tracing_subscriber::fmt::init();
-
-    let gateway = OllamaGateway::new();
-    let broker = LlmBroker::new("qwen3:32b", Arc::new(gateway));
-
-    let config = CompletionConfig {
-        temperature: 0.7,
-        ..Default::default()
-    };
-
-    let messages = vec![
-        LlmMessage::system("You are an expert analyst"),
-        LlmMessage::user("Analyze this: The product exceeded expectations"),
-    ];
-
-    let analysis: Analysis = broker
-        .generate_object(&messages, Some(config))
-        .await?;
-
-    println!("Summary: {}", analysis.summary);
-    println!("Key points: {:?}", analysis.key_points);
-    println!("Confidence: {:.2}", analysis.confidence);
-
-    Ok(())
-}
 ```

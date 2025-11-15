@@ -68,6 +68,19 @@ Demonstrates:
 - Executing tool functions
 - Sending tool results back to the LLM
 
+#### `broker_as_tool.rs`
+Wrap agents as tools for delegation patterns.
+
+```bash
+cargo run --example broker_as_tool
+```
+
+Demonstrates:
+- Creating specialist agents with specific behaviors and tools
+- Wrapping agents as tools using ToolWrapper
+- Building coordinator agents that delegate to specialists
+- Multi-agent collaboration patterns
+
 ### Level 2: Advanced LLM Features ⚠️
 
 #### `image_analysis.rs` ✅
