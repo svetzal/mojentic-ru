@@ -3,7 +3,6 @@
 /// NOTE: The file_manager module is currently disabled in the library.
 /// This example is a placeholder demonstrating the intended API design.
 /// Once file_manager is re-enabled, this example will work as written.
-
 use std::fs;
 use tempfile::TempDir;
 
