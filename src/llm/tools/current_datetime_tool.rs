@@ -86,10 +86,7 @@ mod tests {
 
         assert_eq!(descriptor.r#type, "function");
         assert_eq!(descriptor.function.name, "get_current_datetime");
-        assert!(descriptor
-            .function
-            .description
-            .contains("current date and time"));
+        assert!(descriptor.function.description.contains("current date and time"));
     }
 
     #[test]

@@ -19,16 +19,11 @@ impl InsertTaskAfterTool {
 
 impl LlmTool for InsertTaskAfterTool {
     fn run(&self, args: &HashMap<String, Value>) -> Result<Value> {
-        let existing_task_id = args
-            .get("existing_task_id")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(0) as usize;
+        let existing_task_id =
+            args.get("existing_task_id").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
 
-        let description = args
-            .get("description")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string();
+        let description =
+            args.get("description").and_then(|v| v.as_str()).unwrap_or("").to_string();
 
         let mut task_list = self.task_list.lock().unwrap();
         let task = task_list.insert_task_after(existing_task_id, description)?;

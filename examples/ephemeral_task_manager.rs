@@ -1,7 +1,7 @@
 use mojentic::llm::broker::LlmBroker;
 use mojentic::llm::gateways::ollama::OllamaGateway;
-use mojentic::llm::LlmMessage;
 use mojentic::llm::tools::ephemeral_task_manager::{all_tools, TaskList};
+use mojentic::llm::LlmMessage;
 use std::sync::{Arc, Mutex};
 
 /// Example demonstrating the usage of the ephemeral task manager tools.
@@ -32,10 +32,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!();
 
     // Generate response with tools
-    match broker
-        .generate(&[message], Some(&tools), None)
-        .await
-    {
+    match broker.generate(&[message], Some(&tools), None).await {
         Ok(response) => {
             println!("LLM Response:");
             println!("{}", response);

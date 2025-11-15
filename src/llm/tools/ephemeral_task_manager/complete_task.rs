@@ -21,10 +21,7 @@ impl CompleteTaskTool {
 
 impl LlmTool for CompleteTaskTool {
     fn run(&self, args: &HashMap<String, Value>) -> Result<Value> {
-        let task_id = args
-            .get("id")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(0) as usize;
+        let task_id = args.get("id").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
 
         let mut task_list = self.task_list.lock().unwrap();
         let task = task_list.complete_task(task_id)?;
@@ -42,7 +39,9 @@ impl LlmTool for CompleteTaskTool {
             r#type: "function".to_string(),
             function: FunctionDescriptor {
                 name: "complete_task".to_string(),
-                description: "Complete a task by changing its status from IN_PROGRESS to COMPLETED.".to_string(),
+                description:
+                    "Complete a task by changing its status from IN_PROGRESS to COMPLETED."
+                        .to_string(),
                 parameters: json!({
                     "type": "object",
                     "properties": {

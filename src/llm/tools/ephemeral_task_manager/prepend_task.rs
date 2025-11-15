@@ -19,11 +19,8 @@ impl PrependTaskTool {
 
 impl LlmTool for PrependTaskTool {
     fn run(&self, args: &HashMap<String, Value>) -> Result<Value> {
-        let description = args
-            .get("description")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string();
+        let description =
+            args.get("description").and_then(|v| v.as_str()).unwrap_or("").to_string();
 
         let mut task_list = self.task_list.lock().unwrap();
         let task = task_list.prepend_task(description);

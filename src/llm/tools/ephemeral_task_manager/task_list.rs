@@ -50,12 +50,15 @@ impl TaskList {
     /// Inserts a new task after an existing task with the given ID
     ///
     /// Returns the newly created task or an error if the existing task is not found
-    pub fn insert_task_after(&mut self, existing_task_id: usize, description: String) -> Result<Task> {
-        let position = self
-            .tasks
-            .iter()
-            .position(|t| t.id == existing_task_id)
-            .ok_or_else(|| MojenticError::ToolError(format!("No task with ID '{}' exists", existing_task_id)))?;
+    pub fn insert_task_after(
+        &mut self,
+        existing_task_id: usize,
+        description: String,
+    ) -> Result<Task> {
+        let position =
+            self.tasks.iter().position(|t| t.id == existing_task_id).ok_or_else(|| {
+                MojenticError::ToolError(format!("No task with ID '{}' exists", existing_task_id))
+            })?;
 
         let id = self.claim_next_id();
         let task = Task::new(id, description);
@@ -67,11 +70,9 @@ impl TaskList {
     ///
     /// Returns an error if the task is not found or not in Pending status
     pub fn start_task(&mut self, task_id: usize) -> Result<Task> {
-        let task = self
-            .tasks
-            .iter_mut()
-            .find(|t| t.id == task_id)
-            .ok_or_else(|| MojenticError::ToolError(format!("No task with ID '{}' exists", task_id)))?;
+        let task = self.tasks.iter_mut().find(|t| t.id == task_id).ok_or_else(|| {
+            MojenticError::ToolError(format!("No task with ID '{}' exists", task_id))
+        })?;
 
         if task.status != TaskStatus::Pending {
             return Err(MojenticError::ToolError(format!(
@@ -88,11 +89,9 @@ impl TaskList {
     ///
     /// Returns an error if the task is not found or not in InProgress status
     pub fn complete_task(&mut self, task_id: usize) -> Result<Task> {
-        let task = self
-            .tasks
-            .iter_mut()
-            .find(|t| t.id == task_id)
-            .ok_or_else(|| MojenticError::ToolError(format!("No task with ID '{}' exists", task_id)))?;
+        let task = self.tasks.iter_mut().find(|t| t.id == task_id).ok_or_else(|| {
+            MojenticError::ToolError(format!("No task with ID '{}' exists", task_id))
+        })?;
 
         if task.status != TaskStatus::InProgress {
             return Err(MojenticError::ToolError(format!(

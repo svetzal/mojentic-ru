@@ -40,13 +40,7 @@ impl LlmBroker {
         // Handle tool calls if present
         if !response.tool_calls.is_empty() {
             if let Some(tools) = tools {
-                return self.handle_tool_calls(
-                    current_messages,
-                    response,
-                    tools,
-                    &config,
-                )
-                .await;
+                return self.handle_tool_calls(current_messages, response, tools, &config).await;
             }
         }
 
