@@ -1,10 +1,11 @@
-use std::fs;
-use std::path::{Path, PathBuf};
 use regex::Regex;
 use serde_json::{json, Value};
+use std::collections::HashMap;
+use std::fs;
+use std::path::{Path, PathBuf};
 
-use crate::llm::tools::Tool;
 use crate::error::{MojenticError, Result};
+use crate::llm::tools::{FunctionDescriptor, LlmTool, ToolDescriptor};
 
 /// A gateway for interacting with the filesystem within a sandboxed base path.
 ///
@@ -21,10 +22,10 @@ impl FilesystemGateway {
         let base_path = base_path.as_ref();
 
         if !base_path.is_dir() {
-            return Err(MojenticError::Tool {
-                message: format!("Base path {:?} is not a directory", base_path),
-                source: None,
-            });
+            return Err(MojenticError::ToolError(format!(
+                "Base path {:?} is not a directory",
+                base_path
+            )));
         }
 
         Ok(Self {
@@ -33,19 +34,49 @@ impl FilesystemGateway {
     }
 
     /// Resolves a path relative to the base path and ensures it stays within the sandbox.
-    fn resolve_path<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf> {
+    pub fn resolve_path<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf> {
         let path = path.as_ref();
-        let resolved = self.base_path.join(path).canonicalize()
-            .or_else(|_| {
-                // If canonicalize fails (e.g., file doesn't exist yet), use join + normalize
-                Ok::<PathBuf, std::io::Error>(self.base_path.join(path))
-            })?;
 
+        // First try to canonicalize the full path
+        let resolved = match self.base_path.join(path).canonicalize() {
+            Ok(canonical) => canonical,
+            Err(_) => {
+                // If canonicalize fails (file doesn't exist yet), manually normalize
+                // We need to ensure we still catch attempts to escape
+                let joined = self.base_path.join(path);
+
+                // Normalize by removing .. and . components
+                let mut normalized = PathBuf::new();
+                for component in joined.components() {
+                    match component {
+                        std::path::Component::ParentDir => {
+                            // Pop the last component if possible
+                            if !normalized.pop() {
+                                // Trying to go above root - this is an escape attempt
+                                return Err(MojenticError::ToolError(format!(
+                                    "Path {:?} attempts to escape the sandbox",
+                                    path
+                                )));
+                            }
+                        }
+                        std::path::Component::CurDir => {
+                            // Skip current directory markers
+                        }
+                        _ => {
+                            normalized.push(component);
+                        }
+                    }
+                }
+                normalized
+            }
+        };
+
+        // Verify the resolved path is within the sandbox
         if !resolved.starts_with(&self.base_path) {
-            return Err(MojenticError::Tool {
-                message: format!("Path {:?} attempts to escape the sandbox", path),
-                source: None,
-            });
+            return Err(MojenticError::ToolError(format!(
+                "Path {:?} attempts to escape the sandbox",
+                path
+            )));
         }
 
         Ok(resolved)
@@ -59,7 +90,8 @@ impl FilesystemGateway {
         let mut files = Vec::new();
         for entry in entries {
             let entry = entry?;
-            let relative = entry.path()
+            let relative = entry
+                .path()
                 .strip_prefix(&self.base_path)
                 .unwrap()
                 .to_string_lossy()
@@ -94,11 +126,8 @@ impl FilesystemGateway {
             if path.is_dir() {
                 self.collect_files_recursively(&path, files)?;
             } else {
-                let relative = path
-                    .strip_prefix(&self.base_path)
-                    .unwrap()
-                    .to_string_lossy()
-                    .to_string();
+                let relative =
+                    path.strip_prefix(&self.base_path).unwrap().to_string_lossy().to_string();
                 files.push(relative);
             }
         }
@@ -107,17 +136,19 @@ impl FilesystemGateway {
     }
 
     /// Finds files matching a glob pattern.
-    pub fn find_files_by_glob<P: AsRef<Path>>(&self, path: P, pattern: &str) -> Result<Vec<String>> {
+    pub fn find_files_by_glob<P: AsRef<Path>>(
+        &self,
+        path: P,
+        pattern: &str,
+    ) -> Result<Vec<String>> {
         let resolved_path = self.resolve_path(path)?;
         let glob_pattern = resolved_path.join(pattern);
         let glob_str = glob_pattern.to_string_lossy();
 
         let mut files = Vec::new();
         for entry in glob::glob(&glob_str)
-            .map_err(|e| MojenticError::Tool {
-                message: format!("Invalid glob pattern: {}", e),
-                source: Some(Box::new(e)),
-            })? {
+            .map_err(|e| MojenticError::ToolError(format!("Invalid glob pattern: {}", e)))?
+        {
             match entry {
                 Ok(path) => {
                     if let Ok(relative) = path.strip_prefix(&self.base_path) {
@@ -132,13 +163,14 @@ impl FilesystemGateway {
     }
 
     /// Finds files containing text matching a regex pattern.
-    pub fn find_files_containing<P: AsRef<Path>>(&self, path: P, pattern: &str) -> Result<Vec<String>> {
+    pub fn find_files_containing<P: AsRef<Path>>(
+        &self,
+        path: P,
+        pattern: &str,
+    ) -> Result<Vec<String>> {
         let resolved_path = self.resolve_path(path)?;
         let regex = Regex::new(pattern)
-            .map_err(|e| MojenticError::Tool {
-                message: format!("Invalid regex pattern: {}", e),
-                source: Some(Box::new(e)),
-            })?;
+            .map_err(|e| MojenticError::ToolError(format!("Invalid regex pattern: {}", e)))?;
 
         let mut files = Vec::new();
         self.find_matching_files(&resolved_path, &regex, &mut files)?;
@@ -146,7 +178,12 @@ impl FilesystemGateway {
         Ok(files)
     }
 
-    fn find_matching_files(&self, dir: &Path, regex: &Regex, files: &mut Vec<String>) -> Result<()> {
+    fn find_matching_files(
+        &self,
+        dir: &Path,
+        regex: &Regex,
+        files: &mut Vec<String>,
+    ) -> Result<()> {
         if !dir.is_dir() {
             return Ok(());
         }
@@ -177,14 +214,16 @@ impl FilesystemGateway {
     }
 
     /// Finds all lines in a file matching a regex pattern.
-    pub fn find_lines_matching<P: AsRef<Path>>(&self, path: P, file_name: &str, pattern: &str) -> Result<Vec<Value>> {
+    pub fn find_lines_matching<P: AsRef<Path>>(
+        &self,
+        path: P,
+        file_name: &str,
+        pattern: &str,
+    ) -> Result<Vec<Value>> {
         let resolved_path = self.resolve_path(path)?;
         let file_path = resolved_path.join(file_name);
         let regex = Regex::new(pattern)
-            .map_err(|e| MojenticError::Tool {
-                message: format!("Invalid regex pattern: {}", e),
-                source: Some(Box::new(e)),
-            })?;
+            .map_err(|e| MojenticError::ToolError(format!("Invalid regex pattern: {}", e)))?;
 
         let content = fs::read_to_string(&file_path)?;
         let mut matching_lines = Vec::new();
@@ -228,14 +267,14 @@ impl ListFilesTool {
     }
 }
 
-impl Tool for ListFilesTool {
-    fn descriptor(&self) -> Value {
-        json!({
-            "type": "function",
-            "function": {
-                "name": "list_files",
-                "description": "List files in the specified directory (non-recursive), optionally filtered by extension. Use this when you need to see what files are available in a specific directory without including subdirectories.",
-                "parameters": {
+impl LlmTool for ListFilesTool {
+    fn descriptor(&self) -> ToolDescriptor {
+        ToolDescriptor {
+            r#type: "function".to_string(),
+            function: FunctionDescriptor {
+                name: "list_files".to_string(),
+                description: "List files in the specified directory (non-recursive), optionally filtered by extension. Use this when you need to see what files are available in a specific directory without including subdirectories.".to_string(),
+                parameters: json!({
                     "type": "object",
                     "properties": {
                         "path": {
@@ -249,17 +288,16 @@ impl Tool for ListFilesTool {
                     },
                     "additionalProperties": false,
                     "required": ["path"]
-                }
-            }
-        })
+                }),
+            },
+        }
     }
 
-    fn run(&self, args: Value) -> Result<String> {
-        let path = args["path"].as_str()
-            .ok_or_else(|| MojenticError::Tool {
-                message: "Missing 'path' parameter".to_string(),
-                source: None,
-            })?;
+    fn run(&self, args: &HashMap<String, Value>) -> Result<Value> {
+        let path = args
+            .get("path")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| MojenticError::ToolError("Missing 'path' parameter".to_string()))?;
 
         let extension = args.get("extension").and_then(|v| v.as_str());
 
@@ -271,11 +309,7 @@ impl Tool for ListFilesTool {
             files
         };
 
-        serde_json::to_string(&filtered)
-            .map_err(|e| MojenticError::Tool {
-                message: format!("Failed to serialize result: {}", e),
-                source: Some(Box::new(e)),
-            })
+        Ok(json!(filtered))
     }
 }
 
@@ -290,14 +324,14 @@ impl ReadFileTool {
     }
 }
 
-impl Tool for ReadFileTool {
-    fn descriptor(&self) -> Value {
-        json!({
-            "type": "function",
-            "function": {
-                "name": "read_file",
-                "description": "Read the entire content of a file as a string. Use this when you need to access or analyze the complete contents of a file.",
-                "parameters": {
+impl LlmTool for ReadFileTool {
+    fn descriptor(&self) -> ToolDescriptor {
+        ToolDescriptor {
+            r#type: "function".to_string(),
+            function: FunctionDescriptor {
+                name: "read_file".to_string(),
+                description: "Read the entire content of a file as a string. Use this when you need to access or analyze the complete contents of a file.".to_string(),
+                parameters: json!({
                     "type": "object",
                     "properties": {
                         "path": {
@@ -307,20 +341,20 @@ impl Tool for ReadFileTool {
                     },
                     "additionalProperties": false,
                     "required": ["path"]
-                }
-            }
-        })
+                }),
+            },
+        }
     }
 
-    fn run(&self, args: Value) -> Result<String> {
-        let path = args["path"].as_str()
-            .ok_or_else(|| MojenticError::Tool {
-                message: "Missing 'path' parameter".to_string(),
-                source: None,
-            })?;
+    fn run(&self, args: &HashMap<String, Value>) -> Result<Value> {
+        let path = args
+            .get("path")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| MojenticError::ToolError("Missing 'path' parameter".to_string()))?;
 
         let (directory, file_name) = split_path(path);
-        self.fs.read(directory, file_name)
+        let content = self.fs.read(directory, file_name)?;
+        Ok(json!(content))
     }
 }
 
@@ -335,14 +369,14 @@ impl WriteFileTool {
     }
 }
 
-impl Tool for WriteFileTool {
-    fn descriptor(&self) -> Value {
-        json!({
-            "type": "function",
-            "function": {
-                "name": "write_file",
-                "description": "Write content to a file, completely overwriting any existing content. Use this when you want to replace the entire contents of a file with new content.",
-                "parameters": {
+impl LlmTool for WriteFileTool {
+    fn descriptor(&self) -> ToolDescriptor {
+        ToolDescriptor {
+            r#type: "function".to_string(),
+            function: FunctionDescriptor {
+                name: "write_file".to_string(),
+                description: "Write content to a file, completely overwriting any existing content. Use this when you want to replace the entire contents of a file with new content.".to_string(),
+                parameters: json!({
                     "type": "object",
                     "properties": {
                         "path": {
@@ -356,27 +390,25 @@ impl Tool for WriteFileTool {
                     },
                     "additionalProperties": false,
                     "required": ["path", "content"]
-                }
-            }
-        })
+                }),
+            },
+        }
     }
 
-    fn run(&self, args: Value) -> Result<String> {
-        let path = args["path"].as_str()
-            .ok_or_else(|| MojenticError::Tool {
-                message: "Missing 'path' parameter".to_string(),
-                source: None,
-            })?;
+    fn run(&self, args: &HashMap<String, Value>) -> Result<Value> {
+        let path = args
+            .get("path")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| MojenticError::ToolError("Missing 'path' parameter".to_string()))?;
 
-        let content = args["content"].as_str()
-            .ok_or_else(|| MojenticError::Tool {
-                message: "Missing 'content' parameter".to_string(),
-                source: None,
-            })?;
+        let content = args
+            .get("content")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| MojenticError::ToolError("Missing 'content' parameter".to_string()))?;
 
         let (directory, file_name) = split_path(path);
         self.fs.write(directory, file_name, content)?;
-        Ok(format!("Successfully wrote to {}", path))
+        Ok(json!(format!("Successfully wrote to {}", path)))
     }
 }
 
@@ -391,14 +423,14 @@ impl ListAllFilesTool {
     }
 }
 
-impl Tool for ListAllFilesTool {
-    fn descriptor(&self) -> Value {
-        json!({
-            "type": "function",
-            "function": {
-                "name": "list_all_files",
-                "description": "List all files recursively in the specified directory, including files in subdirectories. Use this when you need a complete inventory of all files in a directory and its subdirectories.",
-                "parameters": {
+impl LlmTool for ListAllFilesTool {
+    fn descriptor(&self) -> ToolDescriptor {
+        ToolDescriptor {
+            r#type: "function".to_string(),
+            function: FunctionDescriptor {
+                name: "list_all_files".to_string(),
+                description: "List all files recursively in the specified directory, including files in subdirectories. Use this when you need a complete inventory of all files in a directory and its subdirectories.".to_string(),
+                parameters: json!({
                     "type": "object",
                     "properties": {
                         "path": {
@@ -408,25 +440,19 @@ impl Tool for ListAllFilesTool {
                     },
                     "additionalProperties": false,
                     "required": ["path"]
-                }
-            }
-        })
+                }),
+            },
+        }
     }
 
-    fn run(&self, args: Value) -> Result<String> {
-        let path = args["path"].as_str()
-            .ok_or_else(|| MojenticError::Tool {
-                message: "Missing 'path' parameter".to_string(),
-                source: None,
-            })?;
+    fn run(&self, args: &HashMap<String, Value>) -> Result<Value> {
+        let path = args
+            .get("path")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| MojenticError::ToolError("Missing 'path' parameter".to_string()))?;
 
         let files = self.fs.list_all_files(path)?;
-
-        serde_json::to_string(&files)
-            .map_err(|e| MojenticError::Tool {
-                message: format!("Failed to serialize result: {}", e),
-                source: Some(Box::new(e)),
-            })
+        Ok(json!(files))
     }
 }
 
@@ -441,14 +467,14 @@ impl FindFilesByGlobTool {
     }
 }
 
-impl Tool for FindFilesByGlobTool {
-    fn descriptor(&self) -> Value {
-        json!({
-            "type": "function",
-            "function": {
-                "name": "find_files_by_glob",
-                "description": "Find files matching a glob pattern in the specified directory. Use this when you need to locate files with specific patterns in their names or paths (e.g., all Python files with '*.py' or all text files in any subdirectory with '**/*.txt').",
-                "parameters": {
+impl LlmTool for FindFilesByGlobTool {
+    fn descriptor(&self) -> ToolDescriptor {
+        ToolDescriptor {
+            r#type: "function".to_string(),
+            function: FunctionDescriptor {
+                name: "find_files_by_glob".to_string(),
+                description: "Find files matching a glob pattern in the specified directory. Use this when you need to locate files with specific patterns in their names or paths (e.g., all Python files with '*.py' or all text files in any subdirectory with '**/*.txt').".to_string(),
+                parameters: json!({
                     "type": "object",
                     "properties": {
                         "path": {
@@ -462,31 +488,24 @@ impl Tool for FindFilesByGlobTool {
                     },
                     "additionalProperties": false,
                     "required": ["path", "pattern"]
-                }
-            }
-        })
+                }),
+            },
+        }
     }
 
-    fn run(&self, args: Value) -> Result<String> {
-        let path = args["path"].as_str()
-            .ok_or_else(|| MojenticError::Tool {
-                message: "Missing 'path' parameter".to_string(),
-                source: None,
-            })?;
+    fn run(&self, args: &HashMap<String, Value>) -> Result<Value> {
+        let path = args
+            .get("path")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| MojenticError::ToolError("Missing 'path' parameter".to_string()))?;
 
-        let pattern = args["pattern"].as_str()
-            .ok_or_else(|| MojenticError::Tool {
-                message: "Missing 'pattern' parameter".to_string(),
-                source: None,
-            })?;
+        let pattern = args
+            .get("pattern")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| MojenticError::ToolError("Missing 'pattern' parameter".to_string()))?;
 
         let files = self.fs.find_files_by_glob(path, pattern)?;
-
-        serde_json::to_string(&files)
-            .map_err(|e| MojenticError::Tool {
-                message: format!("Failed to serialize result: {}", e),
-                source: Some(Box::new(e)),
-            })
+        Ok(json!(files))
     }
 }
 
@@ -501,14 +520,14 @@ impl FindFilesContainingTool {
     }
 }
 
-impl Tool for FindFilesContainingTool {
-    fn descriptor(&self) -> Value {
-        json!({
-            "type": "function",
-            "function": {
-                "name": "find_files_containing",
-                "description": "Find files containing text matching a regex pattern in the specified directory. Use this when you need to search for specific content across multiple files, such as finding all files that contain a particular function name or text string.",
-                "parameters": {
+impl LlmTool for FindFilesContainingTool {
+    fn descriptor(&self) -> ToolDescriptor {
+        ToolDescriptor {
+            r#type: "function".to_string(),
+            function: FunctionDescriptor {
+                name: "find_files_containing".to_string(),
+                description: "Find files containing text matching a regex pattern in the specified directory. Use this when you need to search for specific content across multiple files, such as finding all files that contain a particular function name or text string.".to_string(),
+                parameters: json!({
                     "type": "object",
                     "properties": {
                         "path": {
@@ -522,31 +541,24 @@ impl Tool for FindFilesContainingTool {
                     },
                     "additionalProperties": false,
                     "required": ["path", "pattern"]
-                }
-            }
-        })
+                }),
+            },
+        }
     }
 
-    fn run(&self, args: Value) -> Result<String> {
-        let path = args["path"].as_str()
-            .ok_or_else(|| MojenticError::Tool {
-                message: "Missing 'path' parameter".to_string(),
-                source: None,
-            })?;
+    fn run(&self, args: &HashMap<String, Value>) -> Result<Value> {
+        let path = args
+            .get("path")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| MojenticError::ToolError("Missing 'path' parameter".to_string()))?;
 
-        let pattern = args["pattern"].as_str()
-            .ok_or_else(|| MojenticError::Tool {
-                message: "Missing 'pattern' parameter".to_string(),
-                source: None,
-            })?;
+        let pattern = args
+            .get("pattern")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| MojenticError::ToolError("Missing 'pattern' parameter".to_string()))?;
 
         let files = self.fs.find_files_containing(path, pattern)?;
-
-        serde_json::to_string(&files)
-            .map_err(|e| MojenticError::Tool {
-                message: format!("Failed to serialize result: {}", e),
-                source: Some(Box::new(e)),
-            })
+        Ok(json!(files))
     }
 }
 
@@ -561,14 +573,14 @@ impl FindLinesMatchingTool {
     }
 }
 
-impl Tool for FindLinesMatchingTool {
-    fn descriptor(&self) -> Value {
-        json!({
-            "type": "function",
-            "function": {
-                "name": "find_lines_matching",
-                "description": "Find all lines in a file matching a regex pattern, returning both line numbers and content. Use this when you need to locate specific patterns within a single file and need to know exactly where they appear.",
-                "parameters": {
+impl LlmTool for FindLinesMatchingTool {
+    fn descriptor(&self) -> ToolDescriptor {
+        ToolDescriptor {
+            r#type: "function".to_string(),
+            function: FunctionDescriptor {
+                name: "find_lines_matching".to_string(),
+                description: "Find all lines in a file matching a regex pattern, returning both line numbers and content. Use this when you need to locate specific patterns within a single file and need to know exactly where they appear.".to_string(),
+                parameters: json!({
                     "type": "object",
                     "properties": {
                         "path": {
@@ -582,32 +594,25 @@ impl Tool for FindLinesMatchingTool {
                     },
                     "additionalProperties": false,
                     "required": ["path", "pattern"]
-                }
-            }
-        })
+                }),
+            },
+        }
     }
 
-    fn run(&self, args: Value) -> Result<String> {
-        let path = args["path"].as_str()
-            .ok_or_else(|| MojenticError::Tool {
-                message: "Missing 'path' parameter".to_string(),
-                source: None,
-            })?;
+    fn run(&self, args: &HashMap<String, Value>) -> Result<Value> {
+        let path = args
+            .get("path")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| MojenticError::ToolError("Missing 'path' parameter".to_string()))?;
 
-        let pattern = args["pattern"].as_str()
-            .ok_or_else(|| MojenticError::Tool {
-                message: "Missing 'pattern' parameter".to_string(),
-                source: None,
-            })?;
+        let pattern = args
+            .get("pattern")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| MojenticError::ToolError("Missing 'pattern' parameter".to_string()))?;
 
         let (directory, file_name) = split_path(path);
         let lines = self.fs.find_lines_matching(directory, file_name, pattern)?;
-
-        serde_json::to_string(&lines)
-            .map_err(|e| MojenticError::Tool {
-                message: format!("Failed to serialize result: {}", e),
-                source: Some(Box::new(e)),
-            })
+        Ok(json!(lines))
     }
 }
 
@@ -622,14 +627,14 @@ impl CreateDirectoryTool {
     }
 }
 
-impl Tool for CreateDirectoryTool {
-    fn descriptor(&self) -> Value {
-        json!({
-            "type": "function",
-            "function": {
-                "name": "create_directory",
-                "description": "Create a new directory at the specified path. If the directory already exists, this operation will succeed without error. Use this when you need to create a directory structure before writing files to it.",
-                "parameters": {
+impl LlmTool for CreateDirectoryTool {
+    fn descriptor(&self) -> ToolDescriptor {
+        ToolDescriptor {
+            r#type: "function".to_string(),
+            function: FunctionDescriptor {
+                name: "create_directory".to_string(),
+                description: "Create a new directory at the specified path. If the directory already exists, this operation will succeed without error. Use this when you need to create a directory structure before writing files to it.".to_string(),
+                parameters: json!({
                     "type": "object",
                     "properties": {
                         "path": {
@@ -639,32 +644,27 @@ impl Tool for CreateDirectoryTool {
                     },
                     "additionalProperties": false,
                     "required": ["path"]
-                }
-            }
-        })
+                }),
+            },
+        }
     }
 
-    fn run(&self, args: Value) -> Result<String> {
-        let path = args["path"].as_str()
-            .ok_or_else(|| MojenticError::Tool {
-                message: "Missing 'path' parameter".to_string(),
-                source: None,
-            })?;
+    fn run(&self, args: &HashMap<String, Value>) -> Result<Value> {
+        let path = args
+            .get("path")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| MojenticError::ToolError("Missing 'path' parameter".to_string()))?;
 
         let resolved_path = self.fs.resolve_path(path)?;
         fs::create_dir_all(&resolved_path)?;
-        Ok(format!("Successfully created directory '{}'", path))
+        Ok(json!(format!("Successfully created directory '{}'", path)))
     }
 }
 
 fn split_path(path: &str) -> (&str, &str) {
     let path_obj = Path::new(path);
-    let directory = path_obj.parent()
-        .and_then(|p| p.to_str())
-        .unwrap_or(".");
-    let file_name = path_obj.file_name()
-        .and_then(|f| f.to_str())
-        .unwrap_or("");
+    let directory = path_obj.parent().and_then(|p| p.to_str()).unwrap_or(".");
+    let file_name = path_obj.file_name().and_then(|f| f.to_str()).unwrap_or("");
     (directory, file_name)
 }
 

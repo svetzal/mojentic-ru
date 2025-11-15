@@ -105,10 +105,10 @@ fn run(&self, args: Value) -> Result<String> {
             message: "Missing 'param' parameter".to_string(),
             source: None,
         })?;
-    
+
     // Do work...
     let result = some_work()?;
-    
+
     Ok(result)  // Returns String directly
 }
 ```
@@ -119,10 +119,10 @@ fn run(&self, args: &HashMap<String, Value>) -> Result<Value> {
     let param = args.get("param")
         .and_then(|v| v.as_str())
         .ok_or_else(|| MojenticError::ToolError("Missing 'param' parameter".to_string()))?;
-    
+
     // Do work...
     let result = some_work()?;
-    
+
     Ok(json!(result))  // Wrap result in json!()
 }
 ```
