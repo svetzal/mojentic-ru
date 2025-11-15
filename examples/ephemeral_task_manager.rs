@@ -1,6 +1,6 @@
 use mojentic::llm::broker::LlmBroker;
 use mojentic::llm::gateways::ollama::OllamaGateway;
-use mojentic::llm::message::LlmMessage;
+use mojentic::llm::LlmMessage;
 use mojentic::llm::tools::ephemeral_task_manager::{all_tools, TaskList};
 use std::sync::{Arc, Mutex};
 
@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create broker with Ollama
-    let gateway = OllamaGateway::new("http://localhost:11434");
+    let gateway = OllamaGateway::new();
     let broker = LlmBroker::new("qwen3:32b".to_string(), Arc::new(gateway));
 
     // Create shared task list
@@ -33,12 +33,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Generate response with tools
     match broker
-        .generate(vec![message], Some(&tools), None, Some(0.0))
+        .generate(&[message], Some(&tools), None)
         .await
     {
         Ok(response) => {
             println!("LLM Response:");
-            println!("{}", response.content);
+            println!("{}", response);
             println!();
         }
         Err(e) => {

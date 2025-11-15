@@ -72,6 +72,26 @@ Review these guidelines to understand the correct patterns, conventions, and bes
 
 ## Quality Guidelines
 
+### MANDATORY Pre-Commit Quality Gates
+
+**STOP**: Before considering ANY work complete or committing code, you MUST run ALL quality checks:
+
+```bash
+# Complete quality gate check (run this EVERY TIME)
+cargo fmt --check && \
+cargo clippy --all-targets --all-features -- -D warnings && \
+cargo test && \
+cargo deny check
+```
+
+**Why `--all-targets` matters**: This flag ensures examples, tests, and benchmarks are checked, not just library code. Examples are executable documentation - if they don't compile, users cannot learn from them.
+
+**If any check fails**:
+- STOP immediately
+- Fix the root cause (don't suppress warnings)
+- Re-run all checks
+- Only proceed when all pass
+
 ### Code Quality
 - Run `cargo fmt` to format code consistently
 - Run `cargo clippy --all-targets --all-features -- -D warnings` for strict linting
