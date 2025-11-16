@@ -152,7 +152,10 @@ impl ChatSession {
             ..Default::default()
         };
 
-        let response = self.broker.generate(&messages, self.tools.as_deref(), Some(config), None).await?;
+        let response = self
+            .broker
+            .generate(&messages, self.tools.as_deref(), Some(config), None)
+            .await?;
 
         // Ensure all messages in history have token counts
         self.ensure_all_messages_are_sized();

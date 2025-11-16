@@ -18,7 +18,7 @@ async fn main() -> Result<()> {
     let gateway = OllamaGateway::new();
 
     // Create broker with a local model
-    let broker = LlmBroker::new("qwen3:32b", Arc::new(gateway));
+    let broker = LlmBroker::new("qwen3:32b", Arc::new(gateway), None);
 
     // Create a message asking for sentiment analysis
     let messages = vec![LlmMessage::user(
@@ -27,7 +27,7 @@ async fn main() -> Result<()> {
 
     // Generate a structured response
     println!("Generating structured sentiment analysis...");
-    let sentiment: Sentiment = broker.generate_object(&messages, None).await?;
+    let sentiment: Sentiment = broker.generate_object(&messages, None, None).await?;
 
     println!("\nSentiment Analysis:");
     println!("  Label: {}", sentiment.label);

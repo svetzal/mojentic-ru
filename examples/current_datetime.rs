@@ -10,7 +10,7 @@ async fn main() -> mojentic::Result<()> {
     let gateway = OllamaGateway::new();
 
     // Create broker with a local model
-    let broker = LlmBroker::new("qwen3:32b", Arc::new(gateway));
+    let broker = LlmBroker::new("qwen3:32b", Arc::new(gateway), None);
 
     // Create the tool
     let tool = CurrentDatetimeTool::new();
@@ -30,7 +30,7 @@ async fn main() -> mojentic::Result<()> {
 
     let tools: Vec<Box<dyn LlmTool>> = vec![Box::new(tool)];
 
-    match broker.generate(&messages, Some(&tools), None).await {
+    match broker.generate(&messages, Some(&tools), None, None).await {
         Ok(response) => {
             println!("LLM Response:");
             println!("{}", response);
@@ -51,7 +51,7 @@ async fn main() -> mojentic::Result<()> {
         ),
     ];
 
-    match broker.generate(&messages, Some(&tools), None).await {
+    match broker.generate(&messages, Some(&tools), None, None).await {
         Ok(response) => {
             println!("LLM Response:");
             println!("{}", response);
@@ -70,7 +70,7 @@ async fn main() -> mojentic::Result<()> {
         LlmMessage::user("When was this program run? Give me the exact timestamp."),
     ];
 
-    match broker.generate(&messages, Some(&tools), None).await {
+    match broker.generate(&messages, Some(&tools), None, None).await {
         Ok(response) => {
             println!("LLM Response:");
             println!("{}", response);

@@ -31,7 +31,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create broker with Ollama
     let gateway = Arc::new(OllamaGateway::new());
-    let broker = LlmBroker::new("qwen3:32b", gateway);
+    let broker = LlmBroker::new("qwen3:32b", gateway, None);
 
     // Create date resolution tool
     let date_tool = SimpleDateTool;
@@ -46,7 +46,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
          relative to today, like 'three days from now' or 'last week'. Keep it brief.",
     )];
 
-    let mut stream = broker.generate_stream(&messages, Some(&tools), None);
+    let mut stream = broker.generate_stream(&messages, Some(&tools), None, None);
 
     // Print chunks as they arrive
     // Tool calls will be executed transparently during the stream

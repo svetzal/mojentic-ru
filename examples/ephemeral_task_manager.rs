@@ -11,7 +11,7 @@ use std::sync::{Arc, Mutex};
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create broker with Ollama
     let gateway = OllamaGateway::new();
-    let broker = LlmBroker::new("qwen3:32b".to_string(), Arc::new(gateway));
+    let broker = LlmBroker::new("qwen3:32b".to_string(), Arc::new(gateway), None);
 
     // Create shared task list
     let task_list = Arc::new(Mutex::new(TaskList::new()));
@@ -32,7 +32,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!();
 
     // Generate response with tools
-    match broker.generate(&[message], Some(&tools), None).await {
+    match broker.generate(&[message], Some(&tools), None, None).await {
         Ok(response) => {
             println!("LLM Response:");
             println!("{}", response);

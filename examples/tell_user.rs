@@ -13,7 +13,7 @@ async fn main() -> mojentic::Result<()> {
 
     // Create gateway and broker
     let gateway = OllamaGateway::new();
-    let broker = LlmBroker::new("qwen3:32b", Arc::new(gateway));
+    let broker = LlmBroker::new("qwen3:32b", Arc::new(gateway), None);
 
     // Create the TellUser tool
     let tell_user_tool = mojentic::llm::tools::tell_user_tool::TellUserTool::new();
@@ -36,7 +36,7 @@ async fn main() -> mojentic::Result<()> {
     // Generate response with the TellUser tool
     let tools: Vec<Box<dyn LlmTool>> = vec![Box::new(tell_user_tool)];
 
-    let response = broker.generate(&messages, Some(&tools), None).await?;
+    let response = broker.generate(&messages, Some(&tools), None, None).await?;
 
     println!("\nFinal Response:");
     println!("{}", response);

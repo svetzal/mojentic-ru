@@ -18,7 +18,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create LLM broker with Ollama
     let gateway = Arc::new(OllamaGateway::default());
-    let broker = LlmBroker::new("qwen3:32b", gateway);
+    let broker = LlmBroker::new("qwen3:32b", gateway, None);
 
     // Create chat session with default settings
     let mut session = ChatSession::new(broker);

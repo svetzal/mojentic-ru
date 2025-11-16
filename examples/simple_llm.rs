@@ -10,14 +10,14 @@ async fn main() -> Result<()> {
     let gateway = OllamaGateway::new();
 
     // Create broker with a local model
-    let broker = LlmBroker::new("qwen3:32b", Arc::new(gateway));
+    let broker = LlmBroker::new("qwen3:32b", Arc::new(gateway), None);
 
     // Create a simple message
     let messages = vec![LlmMessage::user("Explain what Rust is in one sentence.")];
 
     // Generate a response
     println!("Generating response...");
-    let response = broker.generate(&messages, None, None).await?;
+    let response = broker.generate(&messages, None, None, None).await?;
 
     println!("\nResponse: {}", response);
 

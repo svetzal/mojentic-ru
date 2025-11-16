@@ -100,10 +100,8 @@ impl LlmBroker {
         let start = std::time::Instant::now();
 
         // Make initial LLM call
-        let response = self
-            .gateway
-            .complete(&self.model, &current_messages, tools, &config)
-            .await?;
+        let response =
+            self.gateway.complete(&self.model, &current_messages, tools, &config).await?;
 
         let call_duration_ms = start.elapsed().as_secs_f64() * 1000.0;
 
@@ -142,13 +140,7 @@ impl LlmBroker {
         if !response.tool_calls.is_empty() {
             if let Some(tools) = tools {
                 return self
-                    .handle_tool_calls(
-                        current_messages,
-                        response,
-                        tools,
-                        &config,
-                        &correlation_id,
-                    )
+                    .handle_tool_calls(current_messages, response, tools, &config, &correlation_id)
                     .await;
             }
         }
@@ -206,7 +198,12 @@ impl LlmBroker {
 
                     // Recursively call generate with updated messages, passing correlation_id
                     return self
-                        .generate(&messages, Some(tools), Some(config.clone()), Some(correlation_id.to_string()))
+                        .generate(
+                            &messages,
+                            Some(tools),
+                            Some(config.clone()),
+                            Some(correlation_id.to_string()),
+                        )
                         .await;
                 } else {
                     warn!("Tool not found: {}", tool_call.name);
@@ -241,18 +238,17 @@ impl LlmBroker {
 
         // Record LLM call
         if let Some(tracer) = &self.tracer {
-            let messages_json: Vec<std::collections::HashMap<String, serde_json::Value>> =
-                messages
-                    .iter()
-                    .map(|m| {
-                        let mut map = std::collections::HashMap::new();
-                        map.insert("role".to_string(), serde_json::json!(format!("{:?}", m.role)));
-                        if let Some(content) = &m.content {
-                            map.insert("content".to_string(), serde_json::json!(content));
-                        }
-                        map
-                    })
-                    .collect();
+            let messages_json: Vec<std::collections::HashMap<String, serde_json::Value>> = messages
+                .iter()
+                .map(|m| {
+                    let mut map = std::collections::HashMap::new();
+                    map.insert("role".to_string(), serde_json::json!(format!("{:?}", m.role)));
+                    if let Some(content) = &m.content {
+                        map.insert("content".to_string(), serde_json::json!(content));
+                    }
+                    map
+                })
+                .collect();
 
             tracer.record_llm_call(
                 &self.model,
@@ -268,10 +264,8 @@ impl LlmBroker {
         let start = std::time::Instant::now();
 
         // Call the gateway with the schema
-        let json_response = self
-            .gateway
-            .complete_json(&self.model, messages, schema, &config)
-            .await?;
+        let json_response =
+            self.gateway.complete_json(&self.model, messages, schema, &config).await?;
 
         let call_duration_ms = start.elapsed().as_secs_f64() * 1000.0;
 

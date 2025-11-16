@@ -38,7 +38,7 @@ async fn main() -> Result<()> {
     // Create gateway and broker with a vision-capable model
     // Options: llava:latest, bakllava:latest, gemma3:27b, qwen3-vl:30b, etc.
     let gateway = OllamaGateway::new();
-    let broker = LlmBroker::new("qwen3-vl:30b", Arc::new(gateway));
+    let broker = LlmBroker::new("qwen3-vl:30b", Arc::new(gateway), None);
 
     // Create a message with image
     let message = LlmMessage::user(
@@ -47,7 +47,7 @@ async fn main() -> Result<()> {
     .with_images(vec![image_path.to_string_lossy().to_string()]);
 
     // Generate response
-    match broker.generate(&[message], None, None).await {
+    match broker.generate(&[message], None, None, None).await {
         Ok(response) => {
             println!("Response:");
             println!("{}", response);

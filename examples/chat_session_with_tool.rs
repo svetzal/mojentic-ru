@@ -19,7 +19,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create LLM broker with Ollama
     let gateway = Arc::new(OllamaGateway::default());
-    let broker = LlmBroker::new("qwen3:32b", gateway);
+    let broker = LlmBroker::new("qwen3:32b", gateway, None);
 
     // Create chat session with SimpleDateTool
     let tools: Vec<Box<dyn mojentic::llm::LlmTool>> = vec![Box::new(SimpleDateTool)];

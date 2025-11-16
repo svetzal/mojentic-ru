@@ -82,8 +82,8 @@ async fn main() -> Result<()> {
 
     // Initialize gateway and brokers
     let gateway = Arc::new(OllamaGateway::new());
-    let text_broker = LlmBroker::new("qwen3:32b", gateway.clone());
-    let vision_broker = LlmBroker::new("qwen3-vl:30b", gateway.clone());
+    let text_broker = LlmBroker::new("qwen3:32b", gateway.clone(), None);
+    let vision_broker = LlmBroker::new("qwen3-vl:30b", gateway.clone(), None);
 
     // ============================================================================
     // Test 1: Simple Text Generation
@@ -93,7 +93,7 @@ async fn main() -> Result<()> {
     println!("Testing with model: qwen3:32b");
     let messages = vec![LlmMessage::user("Hello, how are you?")];
 
-    match text_broker.generate(&messages, None, None).await {
+    match text_broker.generate(&messages, None, None, None).await {
         Ok(response) => print_result("Simple text generation", Ok(response)),
         Err(e) => print_result("Simple text generation", Err(e)),
     }
@@ -109,7 +109,10 @@ async fn main() -> Result<()> {
         "I love this product! It's amazing and works perfectly.",
     )];
 
-    match text_broker.generate_object::<SentimentAnalysis>(&messages, None).await {
+    match text_broker
+        .generate_object::<SentimentAnalysis>(&messages, None, None)
+        .await
+    {
         Ok(result) => print_result(
             "Structured output",
             Ok(format!("label: {}, confidence: {}", result.label, result.confidence)),
@@ -128,7 +131,7 @@ async fn main() -> Result<()> {
     let tools: Vec<Box<dyn LlmTool>> = vec![date_tool];
     let messages = vec![LlmMessage::user("What day of the week is Christmas 2025?")];
 
-    match text_broker.generate(&messages, Some(&tools), None).await {
+    match text_broker.generate(&messages, Some(&tools), None, None).await {
         Ok(response) => print_result("Tool usage", Ok(response)),
         Err(e) => print_result("Tool usage", Err(e)),
     }
@@ -153,7 +156,7 @@ async fn main() -> Result<()> {
         )
         .with_images(vec![image_path.to_string_lossy().to_string()])];
 
-        match vision_broker.generate(&messages, None, None).await {
+        match vision_broker.generate(&messages, None, None, None).await {
             Ok(response) => print_result("Image analysis", Ok(response)),
             Err(e) => print_result("Image analysis", Err(e)),
         }

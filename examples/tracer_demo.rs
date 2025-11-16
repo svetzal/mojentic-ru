@@ -16,7 +16,6 @@
 //! Make sure you have Ollama running locally with an appropriate model.
 
 use mojentic::llm::broker::LlmBroker;
-use mojentic::llm::chat_session::ChatSession;
 use mojentic::llm::gateways::ollama::OllamaGateway;
 use mojentic::llm::models::LlmMessage;
 use mojentic::llm::tools::simple_date_tool::SimpleDateTool;
@@ -28,17 +27,19 @@ use uuid::Uuid;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("=".repeat(80));
+    println!("{}", "=".repeat(80));
     println!("Interactive Chat with Tracer Demonstration");
-    println!("=".repeat(80));
+    println!("{}", "=".repeat(80));
     println!();
     println!("This example demonstrates the tracer system for observability.");
     println!("Ask questions about dates (e.g., 'What day is tomorrow?') or anything else.");
-    println!("Behind the scenes, the tracer records all LLM calls, responses, and tool executions.");
+    println!(
+        "Behind the scenes, the tracer records all LLM calls, responses, and tool executions."
+    );
     println!("Each conversation turn is assigned a unique correlation_id to trace related events.");
     println!();
     println!("Press Enter with no input to exit and see the trace summary.");
-    println!("=".repeat(80));
+    println!("{}", "=".repeat(80));
     println!();
 
     // Create tracer system for monitoring
@@ -90,11 +91,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         turn_counter += 1;
         conversation_correlation_ids.push((turn_counter, correlation_id.clone()));
 
-        println!(
-            "[Turn {}, correlation_id: {}...]",
-            turn_counter,
-            &correlation_id[..8]
-        );
+        println!("[Turn {}, correlation_id: {}...]", turn_counter, &correlation_id[..8]);
 
         // Add user message to conversation
         conversation_history.push(LlmMessage::user(input));
@@ -103,12 +100,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         io::stdout().flush()?;
 
         match broker
-            .generate(
-                &conversation_history,
-                Some(&tools),
-                None,
-                Some(correlation_id),
-            )
+            .generate(&conversation_history, Some(&tools), None, Some(correlation_id))
             .await
         {
             Ok(response) => {
@@ -131,9 +123,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// Display comprehensive tracer event summary
 fn display_tracer_summary(tracer: &TracerSystem, correlation_ids: &[(usize, String)]) {
     println!("\n");
-    println!("=".repeat(80));
+    println!("{}", "=".repeat(80));
     println!("Tracer System Summary");
-    println!("=".repeat(80));
+    println!("{}", "=".repeat(80));
     println!();
 
     let all_events = tracer.get_event_summaries(None, None, None);
@@ -141,15 +133,21 @@ fn display_tracer_summary(tracer: &TracerSystem, correlation_ids: &[(usize, Stri
     println!();
 
     // Count events by type
-    let llm_call_count = tracer.count_events(None, None, Some(&|e| {
-        e.printable_summary().contains("LlmCallTracerEvent")
-    }));
-    let llm_response_count = tracer.count_events(None, None, Some(&|e| {
-        e.printable_summary().contains("LlmResponseTracerEvent")
-    }));
-    let tool_call_count = tracer.count_events(None, None, Some(&|e| {
-        e.printable_summary().contains("ToolCallTracerEvent")
-    }));
+    let llm_call_count = tracer.count_events(
+        None,
+        None,
+        Some(&|e| e.printable_summary().contains("LlmCallTracerEvent")),
+    );
+    let llm_response_count = tracer.count_events(
+        None,
+        None,
+        Some(&|e| e.printable_summary().contains("LlmResponseTracerEvent")),
+    );
+    let tool_call_count = tracer.count_events(
+        None,
+        None,
+        Some(&|e| e.printable_summary().contains("ToolCallTracerEvent")),
+    );
 
     println!("Events by type:");
     println!("  - LLM Call Events: {}", llm_call_count);
@@ -182,10 +180,7 @@ fn display_tracer_summary(tracer: &TracerSystem, correlation_ids: &[(usize, Stri
         if turn_events.is_empty() {
             println!("No events found with this correlation_id.");
         } else {
-            println!(
-                "Found {} related event(s) for this conversation turn:",
-                turn_events.len()
-            );
+            println!("Found {} related event(s) for this conversation turn:", turn_events.len());
             println!();
             for (i, event) in turn_events.iter().enumerate() {
                 println!("{}. {}", i + 1, event);
@@ -230,7 +225,7 @@ fn display_tracer_summary(tracer: &TracerSystem, correlation_ids: &[(usize, Stri
     }
 
     println!();
-    println!("=".repeat(80));
+    println!("{}", "=".repeat(80));
     println!("Tracer demonstration complete!");
-    println!("=".repeat(80));
+    println!("{}", "=".repeat(80));
 }

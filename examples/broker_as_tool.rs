@@ -24,7 +24,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Create a temporal specialist agent
     // This agent specializes in resolving dates and temporal information
-    let temporal_broker = Arc::new(LlmBroker::new("qwen2.5:7b", gateway.clone()));
+    let temporal_broker = Arc::new(LlmBroker::new("qwen2.5:7b", gateway.clone(), None));
     let temporal_tools: Vec<Box<dyn LlmTool>> = vec![Box::new(SimpleDateTool)];
     let temporal_behaviour = "You are a temporal specialist who helps resolve dates and time-related questions. \
                               When asked about dates, use the resolve_date tool to provide accurate date information.";
@@ -40,7 +40,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Create a coordinator agent with the temporal specialist as a tool
-    let coordinator_broker = LlmBroker::new("qwen2.5:14b", gateway);
+    let coordinator_broker = LlmBroker::new("qwen2.5:14b", gateway, None);
     let coordinator_tools: Vec<Box<dyn LlmTool>> = vec![Box::new(temporal_tool)];
 
     let coordinator_behaviour = "You are a coordinator who can delegate tasks to specialist agents. \
@@ -57,7 +57,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     messages.push(LlmMessage::user(query1));
 
-    let response1 = coordinator_broker.generate(&messages, Some(&coordinator_tools), None).await?;
+    let response1 = coordinator_broker.generate(&messages, Some(&coordinator_tools), None, None).await?;
 
     println!("Coordinator: {}\n", response1);
 
@@ -71,7 +71,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     messages = vec![LlmMessage::system(coordinator_behaviour)];
     messages.push(LlmMessage::user(query2));
 
-    let response2 = coordinator_broker.generate(&messages, Some(&coordinator_tools), None).await?;
+    let response2 = coordinator_broker.generate(&messages, Some(&coordinator_tools), None, None).await?;
 
     println!("Coordinator: {}\n", response2);
 
@@ -84,7 +84,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     messages = vec![LlmMessage::system(coordinator_behaviour)];
     messages.push(LlmMessage::user(query3));
 
-    let response3 = coordinator_broker.generate(&messages, Some(&coordinator_tools), None).await?;
+    let response3 = coordinator_broker.generate(&messages, Some(&coordinator_tools), None, None).await?;
 
     println!("Coordinator: {}\n", response3);
 

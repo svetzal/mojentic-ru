@@ -57,7 +57,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Initialize LLM broker with Ollama
     let gateway = OllamaGateway::new();
-    let broker = LlmBroker::new("qwen3-coder:30b".to_string(), Arc::new(gateway));
+    let broker = LlmBroker::new("qwen3-coder:30b".to_string(), Arc::new(gateway), None);
 
     println!("🤖 Initializing LLM (qwen3-coder:30b via Ollama)...");
     println!();
@@ -106,7 +106,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("🔄 Iteration {}/{}", iteration, max_iterations);
         println!();
 
-        match broker.generate(&messages, Some(&tools), None).await {
+        match broker.generate(&messages, Some(&tools), None, None).await {
             Ok(response) => {
                 println!("💬 LLM Response:");
                 println!("{}", response);

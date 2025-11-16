@@ -77,8 +77,9 @@ impl LlmTool for ToolWrapper {
         // Call the broker with the messages and tools
         // We need to handle the async call in a way that works with the sync trait
         let response = tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current()
-                .block_on(async { self.broker.generate(&messages, Some(&self.tools), None, None).await })
+            tokio::runtime::Handle::current().block_on(async {
+                self.broker.generate(&messages, Some(&self.tools), None, None).await
+            })
         })?;
 
         Ok(json!(response))

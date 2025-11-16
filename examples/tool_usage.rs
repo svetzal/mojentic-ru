@@ -49,7 +49,7 @@ async fn main() -> mojentic::Result<()> {
     let gateway = OllamaGateway::new();
 
     // Create broker with a local model
-    let broker = LlmBroker::new("qwen3:32b", Arc::new(gateway));
+    let broker = LlmBroker::new("qwen3:32b", Arc::new(gateway), None);
 
     // Create tools
     let tools: Vec<Box<dyn LlmTool>> = vec![Box::new(GetWeatherTool)];
@@ -61,7 +61,7 @@ async fn main() -> mojentic::Result<()> {
 
     // Generate a response (the LLM should call the tool)
     println!("Asking about weather (this will use the tool)...");
-    let response = broker.generate(&messages, Some(&tools), None).await?;
+    let response = broker.generate(&messages, Some(&tools), None, None).await?;
 
     println!("\nResponse: {}", response);
 
