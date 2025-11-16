@@ -162,7 +162,7 @@ let last_llm_events = tracer.get_last_n_summaries(
     5,
     Some(&|event| {
         let summary = event.printable_summary();
-        summary.contains("LlmCallTracerEvent") || 
+        summary.contains("LlmCallTracerEvent") ||
         summary.contains("LlmResponseTracerEvent")
     })
 );
