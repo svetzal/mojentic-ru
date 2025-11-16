@@ -152,7 +152,7 @@ impl ChatSession {
             ..Default::default()
         };
 
-        let response = self.broker.generate(&messages, self.tools.as_deref(), Some(config)).await?;
+        let response = self.broker.generate(&messages, self.tools.as_deref(), Some(config), None).await?;
 
         // Ensure all messages in history have token counts
         self.ensure_all_messages_are_sized();
@@ -400,7 +400,7 @@ mod tests {
     #[tokio::test]
     async fn test_new_session_has_system_message() {
         let gateway = Arc::new(MockGateway::new(vec![]));
-        let broker = LlmBroker::new("test-model", gateway);
+        let broker = LlmBroker::new("test-model", gateway, None);
         let session = ChatSession::new(broker);
 
         assert_eq!(session.messages.len(), 1);
@@ -411,7 +411,7 @@ mod tests {
     #[tokio::test]
     async fn test_builder_custom_system_prompt() {
         let gateway = Arc::new(MockGateway::new(vec![]));
-        let broker = LlmBroker::new("test-model", gateway);
+        let broker = LlmBroker::new("test-model", gateway, None);
         let session = ChatSession::builder(broker).system_prompt("Custom system prompt").build();
 
         assert_eq!(session.messages.len(), 1);
@@ -421,7 +421,7 @@ mod tests {
     #[tokio::test]
     async fn test_builder_custom_temperature() {
         let gateway = Arc::new(MockGateway::new(vec![]));
-        let broker = LlmBroker::new("test-model", gateway);
+        let broker = LlmBroker::new("test-model", gateway, None);
         let session = ChatSession::builder(broker).temperature(0.5).build();
 
         assert_eq!(session.temperature, 0.5);
@@ -430,7 +430,7 @@ mod tests {
     #[tokio::test]
     async fn test_builder_custom_max_context() {
         let gateway = Arc::new(MockGateway::new(vec![]));
-        let broker = LlmBroker::new("test-model", gateway);
+        let broker = LlmBroker::new("test-model", gateway, None);
         let session = ChatSession::builder(broker).max_context(16384).build();
 
         assert_eq!(session.max_context, 16384);
@@ -439,7 +439,7 @@ mod tests {
     #[tokio::test]
     async fn test_send_adds_messages_to_history() {
         let gateway = Arc::new(MockGateway::new(vec!["Hello, World!".to_string()]));
-        let broker = LlmBroker::new("test-model", gateway);
+        let broker = LlmBroker::new("test-model", gateway, None);
         let mut session = ChatSession::new(broker);
 
         let response = session.send("Hi").await.unwrap();
@@ -459,7 +459,7 @@ mod tests {
             "First response".to_string(),
             "Second response".to_string(),
         ]));
-        let broker = LlmBroker::new("test-model", gateway);
+        let broker = LlmBroker::new("test-model", gateway, None);
         let mut session = ChatSession::new(broker);
 
         session.send("First query").await.unwrap();
@@ -474,7 +474,7 @@ mod tests {
     #[tokio::test]
     async fn test_insert_message_calculates_token_length() {
         let gateway = Arc::new(MockGateway::new(vec![]));
-        let broker = LlmBroker::new("test-model", gateway);
+        let broker = LlmBroker::new("test-model", gateway, None);
         let mut session = ChatSession::new(broker);
 
         session.insert_message(LlmMessage::user("Hello"));
@@ -486,7 +486,7 @@ mod tests {
     #[tokio::test]
     async fn test_context_window_trimming() {
         let gateway = Arc::new(MockGateway::new(vec![]));
-        let broker = LlmBroker::new("test-model", gateway);
+        let broker = LlmBroker::new("test-model", gateway, None);
 
         // Create session with very small context window
         let mut session = ChatSession::builder(broker).max_context(50).build();
@@ -512,7 +512,7 @@ mod tests {
     #[tokio::test]
     async fn test_context_window_preserves_system_prompt() {
         let gateway = Arc::new(MockGateway::new(vec![]));
-        let broker = LlmBroker::new("test-model", gateway);
+        let broker = LlmBroker::new("test-model", gateway, None);
 
         let mut session = ChatSession::builder(broker)
             .system_prompt("Important system prompt")
@@ -532,7 +532,7 @@ mod tests {
     #[tokio::test]
     async fn test_total_tokens() {
         let gateway = Arc::new(MockGateway::new(vec![]));
-        let broker = LlmBroker::new("test-model", gateway);
+        let broker = LlmBroker::new("test-model", gateway, None);
         let mut session = ChatSession::new(broker);
 
         let initial_tokens = session.total_tokens();
@@ -546,7 +546,7 @@ mod tests {
     #[tokio::test]
     async fn test_messages_accessor() {
         let gateway = Arc::new(MockGateway::new(vec![]));
-        let broker = LlmBroker::new("test-model", gateway);
+        let broker = LlmBroker::new("test-model", gateway, None);
         let mut session = ChatSession::new(broker);
 
         session.insert_message(LlmMessage::user("Test"));
@@ -560,7 +560,7 @@ mod tests {
     #[tokio::test]
     async fn test_builder_with_tools() {
         let gateway = Arc::new(MockGateway::new(vec![]));
-        let broker = LlmBroker::new("test-model", gateway);
+        let broker = LlmBroker::new("test-model", gateway, None);
 
         let tool: Box<dyn LlmTool> = Box::new(MockTool {
             name: "test_tool".to_string(),
@@ -585,7 +585,7 @@ mod tests {
     #[tokio::test]
     async fn test_message_with_no_content_has_zero_tokens() {
         let gateway = Arc::new(MockGateway::new(vec![]));
-        let broker = LlmBroker::new("test-model", gateway);
+        let broker = LlmBroker::new("test-model", gateway, None);
         let mut session = ChatSession::new(broker);
 
         let message = LlmMessage {

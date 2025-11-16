@@ -78,7 +78,7 @@ impl LlmTool for ToolWrapper {
         // We need to handle the async call in a way that works with the sync trait
         let response = tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current()
-                .block_on(async { self.broker.generate(&messages, Some(&self.tools), None).await })
+                .block_on(async { self.broker.generate(&messages, Some(&self.tools), None, None).await })
         })?;
 
         Ok(json!(response))
@@ -193,7 +193,7 @@ mod tests {
             "You are a test agent".to_string(),
             "test response".to_string(),
         ));
-        let broker = Arc::new(LlmBroker::new("test-model", gateway));
+        let broker = Arc::new(LlmBroker::new("test-model", gateway, None));
         let tools: Vec<Box<dyn LlmTool>> = vec![];
 
         let wrapper = ToolWrapper::new(
@@ -225,7 +225,7 @@ mod tests {
             "You are a helpful assistant".to_string(),
             "I can help with that!".to_string(),
         ));
-        let broker = Arc::new(LlmBroker::new("test-model", gateway));
+        let broker = Arc::new(LlmBroker::new("test-model", gateway, None));
         let tools: Vec<Box<dyn LlmTool>> = vec![];
 
         let wrapper = ToolWrapper::new(
@@ -249,7 +249,7 @@ mod tests {
     async fn test_tool_wrapper_missing_input() {
         let gateway =
             Arc::new(MockGateway::new("You are a test agent".to_string(), "test".to_string()));
-        let broker = Arc::new(LlmBroker::new("test-model", gateway));
+        let broker = Arc::new(LlmBroker::new("test-model", gateway, None));
         let tools: Vec<Box<dyn LlmTool>> = vec![];
 
         let wrapper =
@@ -293,7 +293,7 @@ mod tests {
             "You are an agent with tools".to_string(),
             "Task completed using tools".to_string(),
         ));
-        let broker = Arc::new(LlmBroker::new("test-model", gateway));
+        let broker = Arc::new(LlmBroker::new("test-model", gateway, None));
         let tools: Vec<Box<dyn LlmTool>> = vec![Box::new(MockTool)];
 
         let wrapper = ToolWrapper::new(
@@ -315,7 +315,7 @@ mod tests {
     #[tokio::test]
     async fn test_tool_wrapper_matches() {
         let gateway = Arc::new(MockGateway::new("test".to_string(), "test".to_string()));
-        let broker = Arc::new(LlmBroker::new("test-model", gateway));
+        let broker = Arc::new(LlmBroker::new("test-model", gateway, None));
         let tools: Vec<Box<dyn LlmTool>> = vec![];
 
         let wrapper =

@@ -2,45 +2,154 @@ use crate::error::Result;
 use crate::llm::gateway::{CompletionConfig, LlmGateway, StreamChunk};
 use crate::llm::models::{LlmGatewayResponse, LlmMessage, MessageRole};
 use crate::llm::tools::LlmTool;
+use crate::tracer::TracerSystem;
 use futures::stream::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
 use std::pin::Pin;
 use std::sync::Arc;
 use tracing::{info, warn};
+use uuid::Uuid;
 
 /// Main interface for LLM interactions
 pub struct LlmBroker {
     model: String,
     gateway: Arc<dyn LlmGateway>,
+    tracer: Option<Arc<TracerSystem>>,
 }
 
 impl LlmBroker {
     /// Create a new LLM broker
-    pub fn new(model: impl Into<String>, gateway: Arc<dyn LlmGateway>) -> Self {
+    ///
+    /// # Arguments
+    ///
+    /// * `model` - The name of the LLM model to use
+    /// * `gateway` - The gateway to use for LLM communication
+    /// * `tracer` - Optional tracer system for observability
+    pub fn new(
+        model: impl Into<String>,
+        gateway: Arc<dyn LlmGateway>,
+        tracer: Option<Arc<TracerSystem>>,
+    ) -> Self {
         Self {
             model: model.into(),
             gateway,
+            tracer,
         }
     }
 
     /// Generate text response from LLM
+    ///
+    /// # Arguments
+    ///
+    /// * `messages` - The messages to send to the LLM
+    /// * `tools` - Optional tools available to the LLM
+    /// * `config` - Optional completion configuration
+    /// * `correlation_id` - Optional correlation ID for tracing (generates UUID if None)
     pub async fn generate(
         &self,
         messages: &[LlmMessage],
         tools: Option<&[Box<dyn LlmTool>]>,
         config: Option<CompletionConfig>,
+        correlation_id: Option<String>,
     ) -> Result<String> {
         let config = config.unwrap_or_default();
         let current_messages = messages.to_vec();
+        let correlation_id = correlation_id.unwrap_or_else(|| Uuid::new_v4().to_string());
+
+        // Record LLM call
+        if let Some(tracer) = &self.tracer {
+            let messages_json: Vec<std::collections::HashMap<String, serde_json::Value>> =
+                current_messages
+                    .iter()
+                    .map(|m| {
+                        let mut map = std::collections::HashMap::new();
+                        map.insert("role".to_string(), serde_json::json!(format!("{:?}", m.role)));
+                        if let Some(content) = &m.content {
+                            map.insert("content".to_string(), serde_json::json!(content));
+                        }
+                        map
+                    })
+                    .collect();
+
+            let tools_json = tools.map(|t| {
+                t.iter()
+                    .map(|tool| {
+                        let desc = tool.descriptor();
+                        let mut map = std::collections::HashMap::new();
+                        map.insert("name".to_string(), serde_json::json!(desc.function.name));
+                        map.insert(
+                            "description".to_string(),
+                            serde_json::json!(desc.function.description),
+                        );
+                        map
+                    })
+                    .collect()
+            });
+
+            tracer.record_llm_call(
+                &self.model,
+                messages_json,
+                config.temperature as f64,
+                tools_json,
+                "LlmBroker",
+                &correlation_id,
+            );
+        }
+
+        // Measure call duration
+        let start = std::time::Instant::now();
 
         // Make initial LLM call
-        let response =
-            self.gateway.complete(&self.model, &current_messages, tools, &config).await?;
+        let response = self
+            .gateway
+            .complete(&self.model, &current_messages, tools, &config)
+            .await?;
+
+        let call_duration_ms = start.elapsed().as_secs_f64() * 1000.0;
+
+        // Record LLM response
+        if let Some(tracer) = &self.tracer {
+            let tool_calls_json = if !response.tool_calls.is_empty() {
+                Some(
+                    response
+                        .tool_calls
+                        .iter()
+                        .map(|tc| {
+                            let mut map = std::collections::HashMap::new();
+                            map.insert("name".to_string(), serde_json::json!(&tc.name));
+                            if let Some(id) = &tc.id {
+                                map.insert("id".to_string(), serde_json::json!(id));
+                            }
+                            map
+                        })
+                        .collect(),
+                )
+            } else {
+                None
+            };
+
+            tracer.record_llm_response(
+                &self.model,
+                response.content.as_ref().unwrap_or(&String::new()),
+                tool_calls_json,
+                Some(call_duration_ms),
+                "LlmBroker",
+                &correlation_id,
+            );
+        }
 
         // Handle tool calls if present
         if !response.tool_calls.is_empty() {
             if let Some(tools) = tools {
-                return self.handle_tool_calls(current_messages, response, tools, &config).await;
+                return self
+                    .handle_tool_calls(
+                        current_messages,
+                        response,
+                        tools,
+                        &config,
+                        &correlation_id,
+                    )
+                    .await;
             }
         }
 
@@ -53,6 +162,7 @@ impl LlmBroker {
         response: LlmGatewayResponse,
         tools: &'a [Box<dyn LlmTool>],
         config: &'a CompletionConfig,
+        correlation_id: &'a str,
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<String>> + Send + 'a>> {
         Box::pin(async move {
             info!("Tool calls requested: {}", response.tool_calls.len());
@@ -62,7 +172,23 @@ impl LlmBroker {
                 if let Some(tool) = tools.iter().find(|t| t.matches(&tool_call.name)) {
                     info!("Executing tool: {}", tool_call.name);
 
+                    // Measure tool execution time
+                    let start = std::time::Instant::now();
                     let output = tool.run(&tool_call.arguments)?;
+                    let tool_duration_ms = start.elapsed().as_secs_f64() * 1000.0;
+
+                    // Record tool call
+                    if let Some(tracer) = &self.tracer {
+                        tracer.record_tool_call(
+                            &tool_call.name,
+                            tool_call.arguments.clone(),
+                            output.clone(),
+                            Some("LlmBroker".to_string()),
+                            Some(tool_duration_ms),
+                            "LlmBroker",
+                            correlation_id,
+                        );
+                    }
 
                     // Add tool call and response to messages
                     messages.push(LlmMessage {
@@ -78,8 +204,10 @@ impl LlmBroker {
                         image_paths: None,
                     });
 
-                    // Recursively call generate with updated messages
-                    return self.generate(&messages, Some(tools), Some(config.clone())).await;
+                    // Recursively call generate with updated messages, passing correlation_id
+                    return self
+                        .generate(&messages, Some(tools), Some(config.clone()), Some(correlation_id.to_string()))
+                        .await;
                 } else {
                     warn!("Tool not found: {}", tool_call.name);
                 }
@@ -90,25 +218,78 @@ impl LlmBroker {
     }
 
     /// Generate structured object response from LLM
+    ///
+    /// # Arguments
+    ///
+    /// * `messages` - The messages to send to the LLM
+    /// * `config` - Optional completion configuration
+    /// * `correlation_id` - Optional correlation ID for tracing (generates UUID if None)
     pub async fn generate_object<T>(
         &self,
         messages: &[LlmMessage],
         config: Option<CompletionConfig>,
+        correlation_id: Option<String>,
     ) -> Result<T>
     where
         T: for<'de> Deserialize<'de> + Serialize + schemars::JsonSchema + Send,
     {
         let config = config.unwrap_or_default();
+        let correlation_id = correlation_id.unwrap_or_else(|| Uuid::new_v4().to_string());
 
         // Generate JSON schema for the type
         let schema = serde_json::to_value(schemars::schema_for!(T))?;
 
+        // Record LLM call
+        if let Some(tracer) = &self.tracer {
+            let messages_json: Vec<std::collections::HashMap<String, serde_json::Value>> =
+                messages
+                    .iter()
+                    .map(|m| {
+                        let mut map = std::collections::HashMap::new();
+                        map.insert("role".to_string(), serde_json::json!(format!("{:?}", m.role)));
+                        if let Some(content) = &m.content {
+                            map.insert("content".to_string(), serde_json::json!(content));
+                        }
+                        map
+                    })
+                    .collect();
+
+            tracer.record_llm_call(
+                &self.model,
+                messages_json,
+                config.temperature as f64,
+                None,
+                "LlmBroker::generate_object",
+                &correlation_id,
+            );
+        }
+
+        // Measure call duration
+        let start = std::time::Instant::now();
+
         // Call the gateway with the schema
-        let json_response =
-            self.gateway.complete_json(&self.model, messages, schema, &config).await?;
+        let json_response = self
+            .gateway
+            .complete_json(&self.model, messages, schema, &config)
+            .await?;
+
+        let call_duration_ms = start.elapsed().as_secs_f64() * 1000.0;
 
         // Deserialize the JSON into the target type
-        let object: T = serde_json::from_value(json_response)?;
+        let object: T = serde_json::from_value(json_response.clone())?;
+
+        // Record LLM response
+        if let Some(tracer) = &self.tracer {
+            let object_str = serde_json::to_string_pretty(&json_response).unwrap_or_default();
+            tracer.record_llm_response(
+                &self.model,
+                format!("Structured response: {}", object_str),
+                None,
+                Some(call_duration_ms),
+                "LlmBroker::generate_object",
+                &correlation_id,
+            );
+        }
 
         Ok(object)
     }
@@ -119,15 +300,22 @@ impl LlmBroker {
     /// are detected, the broker executes them and recursively streams the LLM's
     /// follow-up response.
     ///
+    /// # Arguments
+    ///
+    /// * `messages` - The messages to send to the LLM
+    /// * `tools` - Optional tools available to the LLM
+    /// * `config` - Optional completion configuration
+    /// * `correlation_id` - Optional correlation ID for tracing (generates UUID if None)
+    ///
     /// # Example
     ///
     /// ```ignore
     /// use futures::stream::StreamExt;
     ///
-    /// let broker = LlmBroker::new("qwen3:32b", gateway);
+    /// let broker = LlmBroker::new("qwen3:32b", gateway, None);
     /// let messages = vec![LlmMessage::user("Tell me a story")];
     ///
-    /// let mut stream = broker.generate_stream(&messages, None, None);
+    /// let mut stream = broker.generate_stream(&messages, None, None, None);
     /// while let Some(result) = stream.next().await {
     ///     match result {
     ///         Ok(chunk) => print!("{}", chunk),
@@ -140,13 +328,58 @@ impl LlmBroker {
         messages: &'a [LlmMessage],
         tools: Option<&'a [Box<dyn LlmTool>]>,
         config: Option<CompletionConfig>,
+        correlation_id: Option<String>,
     ) -> Pin<Box<dyn Stream<Item = Result<String>> + 'a>> {
         let config = config.unwrap_or_default();
         let current_messages = messages.to_vec();
+        let correlation_id = correlation_id.unwrap_or_else(|| Uuid::new_v4().to_string());
 
         Box::pin(async_stream::stream! {
+            // Record LLM call
+            if let Some(tracer) = &self.tracer {
+                let messages_json: Vec<std::collections::HashMap<String, serde_json::Value>> =
+                    current_messages
+                        .iter()
+                        .map(|m| {
+                            let mut map = std::collections::HashMap::new();
+                            map.insert("role".to_string(), serde_json::json!(format!("{:?}", m.role)));
+                            if let Some(content) = &m.content {
+                                map.insert("content".to_string(), serde_json::json!(content));
+                            }
+                            map
+                        })
+                        .collect();
+
+                let tools_json = tools.map(|t| {
+                    t.iter()
+                        .map(|tool| {
+                            let desc = tool.descriptor();
+                            let mut map = std::collections::HashMap::new();
+                            map.insert("name".to_string(), serde_json::json!(desc.function.name));
+                            map.insert(
+                                "description".to_string(),
+                                serde_json::json!(desc.function.description),
+                            );
+                            map
+                        })
+                        .collect()
+                });
+
+                tracer.record_llm_call(
+                    &self.model,
+                    messages_json,
+                    config.temperature as f64,
+                    tools_json,
+                    "LlmBroker::generate_stream",
+                    &correlation_id,
+                );
+            }
+
             let mut accumulated_content = String::new();
             let mut accumulated_tool_calls = Vec::new();
+
+            // Measure stream duration
+            let start = std::time::Instant::now();
 
             // Stream from gateway
             let mut stream = self.gateway.complete_stream(
@@ -172,6 +405,38 @@ impl LlmBroker {
                 }
             }
 
+            let call_duration_ms = start.elapsed().as_secs_f64() * 1000.0;
+
+            // Record LLM response
+            if let Some(tracer) = &self.tracer {
+                let tool_calls_json = if !accumulated_tool_calls.is_empty() {
+                    Some(
+                        accumulated_tool_calls
+                            .iter()
+                            .map(|tc| {
+                                let mut map = std::collections::HashMap::new();
+                                map.insert("name".to_string(), serde_json::json!(&tc.name));
+                                if let Some(id) = &tc.id {
+                                    map.insert("id".to_string(), serde_json::json!(id));
+                                }
+                                map
+                            })
+                            .collect(),
+                    )
+                } else {
+                    None
+                };
+
+                tracer.record_llm_response(
+                    &self.model,
+                    &accumulated_content,
+                    tool_calls_json,
+                    Some(call_duration_ms),
+                    "LlmBroker::generate_stream",
+                    &correlation_id,
+                );
+            }
+
             // Handle tool calls if present
             if !accumulated_tool_calls.is_empty() {
                 if let Some(tools) = tools {
@@ -193,8 +458,26 @@ impl LlmBroker {
                         if let Some(tool) = tools.iter().find(|t| t.matches(&tool_call.name)) {
                             info!("Executing tool: {}", tool_call.name);
 
+                            // Measure tool execution time
+                            let tool_start = std::time::Instant::now();
+
                             match tool.run(&tool_call.arguments) {
                                 Ok(output) => {
+                                    let tool_duration_ms = tool_start.elapsed().as_secs_f64() * 1000.0;
+
+                                    // Record tool call
+                                    if let Some(tracer) = &self.tracer {
+                                        tracer.record_tool_call(
+                                            &tool_call.name,
+                                            tool_call.arguments.clone(),
+                                            output.clone(),
+                                            Some("LlmBroker::generate_stream".to_string()),
+                                            Some(tool_duration_ms),
+                                            "LlmBroker::generate_stream",
+                                            &correlation_id,
+                                        );
+                                    }
+
                                     let output_str = match serde_json::to_string(&output) {
                                         Ok(s) => s,
                                         Err(e) => {
@@ -221,8 +504,8 @@ impl LlmBroker {
                         }
                     }
 
-                    // Recursively stream with updated messages
-                    let mut recursive_stream = self.generate_stream(&new_messages, Some(tools), Some(config.clone()));
+                    // Recursively stream with updated messages, passing correlation_id
+                    let mut recursive_stream = self.generate_stream(&new_messages, Some(tools), Some(config.clone()), Some(correlation_id.clone()));
 
                     while let Some(result) = recursive_stream.next().await {
                         yield result;
@@ -343,14 +626,14 @@ mod tests {
     #[tokio::test]
     async fn test_broker_new() {
         let gateway = Arc::new(MockGateway::new(vec![]));
-        let broker = LlmBroker::new("test-model", gateway);
+        let broker = LlmBroker::new("test-model", gateway, None);
         assert_eq!(broker.model, "test-model");
     }
 
     #[tokio::test]
     async fn test_broker_new_string_conversion() {
         let gateway = Arc::new(MockGateway::new(vec![]));
-        let broker = LlmBroker::new(String::from("my-model"), gateway);
+        let broker = LlmBroker::new(String::from("my-model"), gateway, None);
         assert_eq!(broker.model, "my-model");
     }
 
@@ -363,10 +646,10 @@ mod tests {
         };
 
         let gateway = Arc::new(MockGateway::new(vec![response]));
-        let broker = LlmBroker::new("test-model", gateway);
+        let broker = LlmBroker::new("test-model", gateway, None);
 
         let messages = vec![LlmMessage::user("Hi")];
-        let result = broker.generate(&messages, None, None).await.unwrap();
+        let result = broker.generate(&messages, None, None, None).await.unwrap();
 
         assert_eq!(result, "Hello, World!");
     }
@@ -380,7 +663,7 @@ mod tests {
         };
 
         let gateway = Arc::new(MockGateway::new(vec![response]));
-        let broker = LlmBroker::new("test-model", gateway);
+        let broker = LlmBroker::new("test-model", gateway, None);
 
         let config = CompletionConfig {
             temperature: 0.5,
@@ -390,7 +673,7 @@ mod tests {
         };
 
         let messages = vec![LlmMessage::user("Hi")];
-        let result = broker.generate(&messages, None, Some(config)).await.unwrap();
+        let result = broker.generate(&messages, None, Some(config), None).await.unwrap();
 
         assert_eq!(result, "Response");
     }
@@ -404,10 +687,10 @@ mod tests {
         };
 
         let gateway = Arc::new(MockGateway::new(vec![response]));
-        let broker = LlmBroker::new("test-model", gateway);
+        let broker = LlmBroker::new("test-model", gateway, None);
 
         let messages = vec![LlmMessage::user("Hi")];
-        let result = broker.generate(&messages, None, None).await.unwrap();
+        let result = broker.generate(&messages, None, None, None).await.unwrap();
 
         assert_eq!(result, "");
     }
@@ -433,7 +716,7 @@ mod tests {
         };
 
         let gateway = Arc::new(MockGateway::new(vec![first_response, second_response]));
-        let broker = LlmBroker::new("test-model", gateway);
+        let broker = LlmBroker::new("test-model", gateway, None);
 
         let tool = MockTool {
             name: "test_tool".to_string(),
@@ -443,7 +726,7 @@ mod tests {
         let tools: Vec<Box<dyn LlmTool>> = vec![Box::new(tool)];
 
         let messages = vec![LlmMessage::user("Use the tool")];
-        let result = broker.generate(&messages, Some(&tools), None).await.unwrap();
+        let result = broker.generate(&messages, Some(&tools), None, None).await.unwrap();
 
         assert_eq!(result, "After tool execution");
     }
@@ -463,10 +746,10 @@ mod tests {
         };
 
         let gateway = Arc::new(MockGateway::new(vec![response]));
-        let broker = LlmBroker::new("test-model", gateway);
+        let broker = LlmBroker::new("test-model", gateway, None);
 
         let messages = vec![LlmMessage::user("Use the tool")];
-        let result = broker.generate(&messages, None, None).await.unwrap();
+        let result = broker.generate(&messages, None, None, None).await.unwrap();
 
         assert_eq!(result, "fallback");
     }
@@ -479,10 +762,10 @@ mod tests {
         }
 
         let gateway = Arc::new(MockGateway::new(vec![]));
-        let broker = LlmBroker::new("test-model", gateway);
+        let broker = LlmBroker::new("test-model", gateway, None);
 
         let messages = vec![LlmMessage::user("Generate object")];
-        let result: TestObject = broker.generate_object(&messages, None).await.unwrap();
+        let result: TestObject = broker.generate_object(&messages, None, None).await.unwrap();
 
         assert_eq!(result.test, "value");
     }
@@ -495,7 +778,7 @@ mod tests {
         }
 
         let gateway = Arc::new(MockGateway::new(vec![]));
-        let broker = LlmBroker::new("test-model", gateway);
+        let broker = LlmBroker::new("test-model", gateway, None);
 
         let config = CompletionConfig {
             temperature: 0.1,
@@ -505,7 +788,7 @@ mod tests {
         };
 
         let messages = vec![LlmMessage::user("Generate")];
-        let result: TestData = broker.generate_object(&messages, Some(config)).await.unwrap();
+        let result: TestData = broker.generate_object(&messages, Some(config), None).await.unwrap();
 
         assert_eq!(result.test, "value");
     }
@@ -519,7 +802,7 @@ mod tests {
         };
 
         let gateway = Arc::new(MockGateway::new(vec![response]));
-        let broker = LlmBroker::new("test-model", gateway);
+        let broker = LlmBroker::new("test-model", gateway, None);
 
         let messages = vec![
             LlmMessage::system("You are helpful"),
@@ -528,7 +811,7 @@ mod tests {
             LlmMessage::user("Second message"),
         ];
 
-        let result = broker.generate(&messages, None, None).await.unwrap();
+        let result = broker.generate(&messages, None, None, None).await.unwrap();
         assert_eq!(result, "Response to conversation");
     }
 
@@ -593,10 +876,10 @@ mod tests {
         }
 
         let gateway = Arc::new(StreamingMockGateway);
-        let broker = LlmBroker::new("test-model", gateway);
+        let broker = LlmBroker::new("test-model", gateway, None);
         let messages = vec![LlmMessage::user("Hello")];
 
-        let mut stream = broker.generate_stream(&messages, None, None);
+        let mut stream = broker.generate_stream(&messages, None, None, None);
         let mut result = String::new();
 
         while let Some(chunk) = stream.next().await {
@@ -694,7 +977,7 @@ mod tests {
         }
 
         let gateway = Arc::new(ToolCallMockGateway::new());
-        let broker = LlmBroker::new("test-model", gateway);
+        let broker = LlmBroker::new("test-model", gateway, None);
 
         let tool = MockTool {
             name: "test_tool".to_string(),
@@ -703,7 +986,7 @@ mod tests {
         let tools: Vec<Box<dyn LlmTool>> = vec![Box::new(tool)];
 
         let messages = vec![LlmMessage::user("Use the tool")];
-        let mut stream = broker.generate_stream(&messages, Some(&tools), None);
+        let mut stream = broker.generate_stream(&messages, Some(&tools), None, None);
 
         let mut result = String::new();
         while let Some(chunk) = stream.next().await {
@@ -775,10 +1058,10 @@ mod tests {
         }
 
         let gateway = Arc::new(SimpleStreamGateway);
-        let broker = LlmBroker::new("test-model", gateway);
+        let broker = LlmBroker::new("test-model", gateway, None);
 
         let messages = vec![LlmMessage::user("Test")];
-        let mut stream = broker.generate_stream(&messages, None, None);
+        let mut stream = broker.generate_stream(&messages, None, None, None);
 
         let mut result = String::new();
         while let Some(chunk) = stream.next().await {
@@ -786,5 +1069,90 @@ mod tests {
         }
 
         assert_eq!(result, "Simple stream");
+    }
+
+    #[tokio::test]
+    async fn test_tracer_integration() {
+        use crate::tracer::TracerSystem;
+
+        let response = LlmGatewayResponse {
+            content: Some("Test response".to_string()),
+            object: None,
+            tool_calls: vec![],
+        };
+
+        let gateway = Arc::new(MockGateway::new(vec![response]));
+        let tracer = Arc::new(TracerSystem::default());
+        let broker = LlmBroker::new("test-model", gateway, Some(tracer.clone()));
+
+        let messages = vec![LlmMessage::user("Test")];
+        let correlation_id = "test-correlation-123";
+
+        let result = broker
+            .generate(&messages, None, None, Some(correlation_id.to_string()))
+            .await
+            .unwrap();
+
+        assert_eq!(result, "Test response");
+
+        // Verify tracer recorded events
+        assert_eq!(tracer.len(), 2); // One LLM call + one LLM response
+
+        // Verify correlation ID is preserved
+        let summaries = tracer.get_event_summaries(None, None, None);
+        assert!(summaries[0].contains(correlation_id));
+        assert!(summaries[1].contains(correlation_id));
+    }
+
+    #[tokio::test]
+    async fn test_tracer_with_tool_calls() {
+        use crate::tracer::TracerSystem;
+
+        let tool_call = LlmToolCall {
+            id: Some("call_1".to_string()),
+            name: "test_tool".to_string(),
+            arguments: HashMap::new(),
+        };
+
+        let first_response = LlmGatewayResponse {
+            content: None,
+            object: None,
+            tool_calls: vec![tool_call],
+        };
+
+        let second_response = LlmGatewayResponse {
+            content: Some("After tool".to_string()),
+            object: None,
+            tool_calls: vec![],
+        };
+
+        let gateway = Arc::new(MockGateway::new(vec![first_response, second_response]));
+        let tracer = Arc::new(TracerSystem::default());
+        let broker = LlmBroker::new("test-model", gateway, Some(tracer.clone()));
+
+        let tool = MockTool {
+            name: "test_tool".to_string(),
+            result: serde_json::json!({"result": "success"}),
+        };
+        let tools: Vec<Box<dyn LlmTool>> = vec![Box::new(tool)];
+
+        let messages = vec![LlmMessage::user("Use tool")];
+        let correlation_id = "tool-test-456";
+
+        let result = broker
+            .generate(&messages, Some(&tools), None, Some(correlation_id.to_string()))
+            .await
+            .unwrap();
+
+        assert_eq!(result, "After tool");
+
+        // Should have: 2 LLM calls, 2 LLM responses, 1 tool call
+        assert_eq!(tracer.len(), 5);
+
+        // Verify all events share the same correlation ID
+        let summaries = tracer.get_event_summaries(None, None, None);
+        for summary in &summaries {
+            assert!(summary.contains(correlation_id));
+        }
     }
 }
