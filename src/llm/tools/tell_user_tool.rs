@@ -47,10 +47,7 @@ impl Default for TellUserTool {
 
 impl LlmTool for TellUserTool {
     fn run(&self, args: &HashMap<String, Value>) -> Result<Value> {
-        let message = args
-            .get("message")
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
+        let message = args.get("message").and_then(|v| v.as_str()).unwrap_or("");
 
         println!("\n\n\nMESSAGE FROM ASSISTANT:\n{}", message);
 
@@ -89,30 +86,21 @@ mod tests {
 
         assert_eq!(descriptor.r#type, "function");
         assert_eq!(descriptor.function.name, "tell_user");
-        assert!(descriptor
-            .function
-            .description
-            .contains("Display a message to the user"));
+        assert!(descriptor.function.description.contains("Display a message to the user"));
 
         // Verify parameters structure
         let params = &descriptor.function.parameters;
         assert_eq!(params["type"], "object");
         assert!(params["properties"]["message"].is_object());
         assert_eq!(params["properties"]["message"]["type"], "string");
-        assert!(params["required"]
-            .as_array()
-            .unwrap()
-            .contains(&json!("message")));
+        assert!(params["required"].as_array().unwrap().contains(&json!("message")));
     }
 
     #[test]
     fn test_run_with_message() {
         let tool = TellUserTool::new();
         let mut args = HashMap::new();
-        args.insert(
-            "message".to_string(),
-            json!("This is an important update"),
-        );
+        args.insert("message".to_string(), json!("This is an important update"));
 
         let result = tool.run(&args).unwrap();
 
@@ -140,10 +128,7 @@ mod tests {
     fn test_multiline_message() {
         let tool = TellUserTool::new();
         let mut args = HashMap::new();
-        args.insert(
-            "message".to_string(),
-            json!("Line 1\nLine 2\nLine 3"),
-        );
+        args.insert("message".to_string(), json!("Line 1\nLine 2\nLine 3"));
 
         let result = tool.run(&args).unwrap();
 
@@ -152,7 +137,7 @@ mod tests {
 
     #[test]
     fn test_default_implementation() {
-        let tool = TellUserTool::default();
+        let tool = TellUserTool;
         let descriptor = tool.descriptor();
 
         assert_eq!(descriptor.function.name, "tell_user");

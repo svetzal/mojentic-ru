@@ -1,5 +1,6 @@
 pub mod error;
 pub mod llm;
+pub mod tracer;
 
 pub use error::{MojenticError, Result};
 

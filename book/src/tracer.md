@@ -2,11 +2,6 @@
 
 The tracer system provides comprehensive observability into LLM interactions, tool executions, and agent communications. It records events with timestamps and correlation IDs, enabling detailed debugging and monitoring.
 
-Goals:
-- Performance insight
-- Failure localization
-- Reproducibility of agent flows
-
 ## Architecture
 
 The tracer system consists of several key components:
@@ -250,8 +245,6 @@ For environments where tracing should be completely disabled without conditional
 
 ```rust
 use mojentic::tracer::NullTracer;
-use std::collections::HashMap;
-use serde_json::json;
 
 let tracer = NullTracer::new();
 
@@ -320,26 +313,8 @@ Run tests with:
 cargo test tracer
 ```
 
-##  Implementation Status
-
-**✅ Layer 2 Tracer System - Core Complete**
-
-Current implementation:
-- ✅ TracerEvent trait with 4 event types
-- ✅ EventStore with callbacks and filtering
-- ✅ TracerSystem coordination layer
-- ✅ NullTracer for zero-overhead tracing
-- ✅ 24 comprehensive unit tests (all passing)
-- ✅ Correlation ID support
-- ✅ Documentation complete
-
-Pending integration:
-- ⏳ LlmBroker integration (add tracer parameter)
-- ⏳ Tool system integration (add tracer parameter)
-- ⏳ Example application (tracer_demo.rs)
-
 ## See Also
 
-- [Observability Overview](./README.md)
-- [Error Handling](../core/README.md)
-- [LLM Integration](../broker.md)
+- [Core Architecture](./core/README.md)
+- [Error Handling](./error_handling.md)
+- [LLM Integration](./llm/README.md)
