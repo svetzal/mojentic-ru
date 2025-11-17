@@ -10,7 +10,9 @@ pub use error::{MojenticError, Result};
 
 /// Prelude module for common imports
 pub mod prelude {
-    pub use crate::agents::{AsyncAggregatorAgent, AsyncLlmAgent, BaseAsyncAgent};
+    pub use crate::agents::{
+        AsyncAggregatorAgent, AsyncLlmAgent, BaseAsyncAgent, IterativeProblemSolver,
+    };
     pub use crate::async_dispatcher::AsyncDispatcher;
     pub use crate::error::{MojenticError, Result};
     pub use crate::event::{Event, TerminateEvent};
