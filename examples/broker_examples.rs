@@ -109,10 +109,7 @@ async fn main() -> Result<()> {
         "I love this product! It's amazing and works perfectly.",
     )];
 
-    match text_broker
-        .generate_object::<SentimentAnalysis>(&messages, None, None)
-        .await
-    {
+    match text_broker.generate_object::<SentimentAnalysis>(&messages, None, None).await {
         Ok(result) => print_result(
             "Structured output",
             Ok(format!("label: {}, confidence: {}", result.label, result.confidence)),

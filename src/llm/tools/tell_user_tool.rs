@@ -13,6 +13,7 @@ use std::collections::HashMap;
 ///
 /// ```
 /// use mojentic::llm::tools::tell_user_tool::TellUserTool;
+/// use mojentic::llm::tools::LlmTool;
 /// use std::collections::HashMap;
 /// use serde_json::json;
 ///

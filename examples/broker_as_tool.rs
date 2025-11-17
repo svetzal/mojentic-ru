@@ -57,7 +57,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     messages.push(LlmMessage::user(query1));
 
-    let response1 = coordinator_broker.generate(&messages, Some(&coordinator_tools), None, None).await?;
+    let response1 = coordinator_broker
+        .generate(&messages, Some(&coordinator_tools), None, None)
+        .await?;
 
     println!("Coordinator: {}\n", response1);
 
@@ -71,7 +73,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     messages = vec![LlmMessage::system(coordinator_behaviour)];
     messages.push(LlmMessage::user(query2));
 
-    let response2 = coordinator_broker.generate(&messages, Some(&coordinator_tools), None, None).await?;
+    let response2 = coordinator_broker
+        .generate(&messages, Some(&coordinator_tools), None, None)
+        .await?;
 
     println!("Coordinator: {}\n", response2);
 
@@ -84,7 +88,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     messages = vec![LlmMessage::system(coordinator_behaviour)];
     messages.push(LlmMessage::user(query3));
 
-    let response3 = coordinator_broker.generate(&messages, Some(&coordinator_tools), None, None).await?;
+    let response3 = coordinator_broker
+        .generate(&messages, Some(&coordinator_tools), None, None)
+        .await?;
 
     println!("Coordinator: {}\n", response3);
 

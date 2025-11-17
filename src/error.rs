@@ -31,6 +31,18 @@ pub enum MojenticError {
 
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
+
+    #[error("Event processing error: {0}")]
+    EventError(String),
+
+    #[error("Agent error: {0}")]
+    AgentError(String),
+
+    #[error("Dispatcher error: {0}")]
+    DispatcherError(String),
+
+    #[error("Timeout error: {0}")]
+    TimeoutError(String),
 }
 
 pub type Result<T> = std::result::Result<T, MojenticError>;
