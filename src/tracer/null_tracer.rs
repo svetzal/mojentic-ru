@@ -94,33 +94,30 @@ impl NullTracer {
     }
 
     /// Return an empty vector for any get_event_summaries request
-    #[allow(clippy::type_complexity)]
     pub fn get_event_summaries(
         &self,
         _start_time: Option<f64>,
         _end_time: Option<f64>,
-        _filter_func: Option<&dyn Fn(&dyn TracerEvent) -> bool>,
+        _filter_func: Option<&dyn super::EventFilterFn>,
     ) -> Vec<String> {
         Vec::new()
     }
 
     /// Return an empty vector for any get_last_n_summaries request
-    #[allow(clippy::type_complexity)]
     pub fn get_last_n_summaries(
         &self,
         _n: usize,
-        _filter_func: Option<&dyn Fn(&dyn TracerEvent) -> bool>,
+        _filter_func: Option<&dyn super::EventFilterFn>,
     ) -> Vec<String> {
         Vec::new()
     }
 
     /// Return 0 for any count_events request
-    #[allow(clippy::type_complexity)]
     pub fn count_events(
         &self,
         _start_time: Option<f64>,
         _end_time: Option<f64>,
-        _filter_func: Option<&dyn Fn(&dyn TracerEvent) -> bool>,
+        _filter_func: Option<&dyn super::EventFilterFn>,
     ) -> usize {
         0
     }

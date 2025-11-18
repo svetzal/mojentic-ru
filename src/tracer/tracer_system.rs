@@ -221,12 +221,11 @@ impl TracerSystem {
     /// # Returns
     ///
     /// Vector of event summaries matching the filter criteria
-    #[allow(clippy::type_complexity)]
     pub fn get_event_summaries(
         &self,
         start_time: Option<f64>,
         end_time: Option<f64>,
-        filter_func: Option<&dyn Fn(&dyn TracerEvent) -> bool>,
+        filter_func: Option<&dyn super::EventFilterFn>,
     ) -> Vec<String> {
         self.event_store.get_event_summaries(start_time, end_time, filter_func)
     }
@@ -241,11 +240,10 @@ impl TracerSystem {
     /// # Returns
     ///
     /// Vector of the last N event summaries matching the filter criteria
-    #[allow(clippy::type_complexity)]
     pub fn get_last_n_summaries(
         &self,
         n: usize,
-        filter_func: Option<&dyn Fn(&dyn TracerEvent) -> bool>,
+        filter_func: Option<&dyn super::EventFilterFn>,
     ) -> Vec<String> {
         self.event_store.get_last_n_summaries(n, filter_func)
     }
@@ -261,12 +259,11 @@ impl TracerSystem {
     /// # Returns
     ///
     /// Number of events matching the filter criteria
-    #[allow(clippy::type_complexity)]
     pub fn count_events(
         &self,
         start_time: Option<f64>,
         end_time: Option<f64>,
-        filter_func: Option<&dyn Fn(&dyn TracerEvent) -> bool>,
+        filter_func: Option<&dyn super::EventFilterFn>,
     ) -> usize {
         self.event_store.count_events(start_time, end_time, filter_func)
     }

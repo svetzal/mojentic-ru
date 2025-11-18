@@ -136,17 +136,23 @@ fn display_tracer_summary(tracer: &TracerSystem, correlation_ids: &[(usize, Stri
     let llm_call_count = tracer.count_events(
         None,
         None,
-        Some(&|e| e.printable_summary().contains("LlmCallTracerEvent")),
+        Some(&|e: &dyn mojentic::tracer::TracerEvent| {
+            e.printable_summary().contains("LlmCallTracerEvent")
+        }),
     );
     let llm_response_count = tracer.count_events(
         None,
         None,
-        Some(&|e| e.printable_summary().contains("LlmResponseTracerEvent")),
+        Some(&|e: &dyn mojentic::tracer::TracerEvent| {
+            e.printable_summary().contains("LlmResponseTracerEvent")
+        }),
     );
     let tool_call_count = tracer.count_events(
         None,
         None,
-        Some(&|e| e.printable_summary().contains("ToolCallTracerEvent")),
+        Some(&|e: &dyn mojentic::tracer::TracerEvent| {
+            e.printable_summary().contains("ToolCallTracerEvent")
+        }),
     );
 
     println!("Events by type:");

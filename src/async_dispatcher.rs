@@ -280,22 +280,6 @@ mod tests {
         }
     }
 
-    #[allow(dead_code)]
-    struct EchoAgent;
-
-    #[async_trait]
-    impl BaseAsyncAgent for EchoAgent {
-        async fn receive_event_async(&self, event: Box<dyn Event>) -> Result<Vec<Box<dyn Event>>> {
-            // Echo back a new event
-            let new_event = Box::new(TestEvent {
-                source: "EchoAgent".to_string(),
-                correlation_id: event.correlation_id().map(|s| s.to_string()),
-                data: "echoed".to_string(),
-            }) as Box<dyn Event>;
-            Ok(vec![new_event])
-        }
-    }
-
     #[tokio::test]
     async fn test_dispatcher_new() {
         let router = Arc::new(Router::new());

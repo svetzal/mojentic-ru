@@ -64,12 +64,11 @@ impl EventStore {
     /// # Returns
     ///
     /// Number of events matching the filter criteria
-    #[allow(clippy::type_complexity)]
     pub fn count_events(
         &self,
         start_time: Option<f64>,
         end_time: Option<f64>,
-        filter_func: Option<&dyn Fn(&dyn TracerEvent) -> bool>,
+        filter_func: Option<&dyn super::EventFilterFn>,
     ) -> usize {
         let events = self.events.lock().unwrap();
         let mut count = 0;
@@ -92,7 +91,7 @@ impl EventStore {
 
             // Apply custom filter function
             if let Some(filter) = filter_func {
-                if !filter(event_ref) {
+                if !filter.matches(event_ref) {
                     continue;
                 }
             }
@@ -116,12 +115,11 @@ impl EventStore {
     /// # Returns
     ///
     /// Vector of event summaries matching the filter criteria
-    #[allow(clippy::type_complexity)]
     pub fn get_event_summaries(
         &self,
         start_time: Option<f64>,
         end_time: Option<f64>,
-        filter_func: Option<&dyn Fn(&dyn TracerEvent) -> bool>,
+        filter_func: Option<&dyn super::EventFilterFn>,
     ) -> Vec<String> {
         let events = self.events.lock().unwrap();
         let mut result = Vec::new();
@@ -144,7 +142,7 @@ impl EventStore {
 
             // Apply custom filter function
             if let Some(filter) = filter_func {
-                if !filter(event_ref) {
+                if !filter.matches(event_ref) {
                     continue;
                 }
             }
@@ -165,16 +163,15 @@ impl EventStore {
     /// # Returns
     ///
     /// Vector of the last N event summaries matching the filter criteria
-    #[allow(clippy::type_complexity)]
     pub fn get_last_n_summaries(
         &self,
         n: usize,
-        filter_func: Option<&dyn Fn(&dyn TracerEvent) -> bool>,
+        filter_func: Option<&dyn super::EventFilterFn>,
     ) -> Vec<String> {
         let events = self.events.lock().unwrap();
 
         let filtered: Vec<_> = if let Some(filter) = filter_func {
-            events.iter().filter(|e| filter(e.as_ref())).collect()
+            events.iter().filter(|e| filter.matches(e.as_ref())).collect()
         } else {
             events.iter().collect()
         };

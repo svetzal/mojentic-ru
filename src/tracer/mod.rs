@@ -61,7 +61,7 @@ pub mod tracer_system;
 pub use event_store::{EventCallback, EventStore};
 pub use null_tracer::NullTracer;
 pub use tracer_events::{
-    AgentInteractionTracerEvent, LlmCallTracerEvent, LlmResponseTracerEvent, ToolCallTracerEvent,
-    TracerEvent,
+    AgentInteractionTracerEvent, EventFilterFn, LlmCallTracerEvent, LlmResponseTracerEvent,
+    ToolCallTracerEvent, TracerEvent,
 };
 pub use tracer_system::TracerSystem;

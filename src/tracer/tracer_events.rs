@@ -8,6 +8,25 @@ use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+/// Trait for filtering tracer events
+///
+/// Implement this trait to create custom event filters. This trait is used
+/// instead of raw closure types to avoid type complexity warnings.
+pub trait EventFilterFn: Send + Sync {
+    /// Test whether an event passes the filter
+    fn matches(&self, event: &dyn TracerEvent) -> bool;
+}
+
+/// Implement EventFilterFn for any function that matches the signature
+impl<F> EventFilterFn for F
+where
+    F: Fn(&dyn TracerEvent) -> bool + Send + Sync,
+{
+    fn matches(&self, event: &dyn TracerEvent) -> bool {
+        self(event)
+    }
+}
+
 /// Base trait for all tracer events
 ///
 /// Tracer events are used to track system interactions for observability purposes.
