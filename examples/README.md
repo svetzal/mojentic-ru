@@ -98,6 +98,22 @@ Demonstrates:
 
 **Requirements**: Vision-capable model such as `qwen3-vl:30b`, `gemma3:27b`, or `llava:latest`
 
+#### `working_memory.rs` ✅
+Shared context and memory between agents.
+
+```bash
+cargo run --example working_memory
+```
+
+Demonstrates:
+- SharedWorkingMemory for maintaining state across agent interactions
+- Deep merging of JSON memory updates
+- RequestAgent that learns from conversations
+- Event-driven architecture with custom events
+- AsyncDispatcher and Router coordination
+
+**Requirements**: Any capable model such as `qwen2.5:14b`, `deepseek-r1:70b`, or similar
+
 ## Configuration
 
 ### Environment Variables

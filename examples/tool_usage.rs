@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 // Example tool that gets the current weather (mocked)
+#[derive(Clone)]
 struct GetWeatherTool;
 
 impl LlmTool for GetWeatherTool {
@@ -37,6 +38,10 @@ impl LlmTool for GetWeatherTool {
                 }),
             },
         }
+    }
+
+    fn clone_box(&self) -> Box<dyn LlmTool> {
+        Box::new(self.clone())
     }
 }
 

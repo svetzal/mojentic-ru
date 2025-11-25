@@ -28,6 +28,12 @@ pub trait LlmTool: Send + Sync {
     fn matches(&self, name: &str) -> bool {
         self.descriptor().function.name == name
     }
+
+    /// Clone the tool into a Box
+    ///
+    /// This method is required to support cloning trait objects.
+    /// Implementations should return `Box::new(self.clone())`.
+    fn clone_box(&self) -> Box<dyn LlmTool>;
 }
 
 #[cfg(test)]
@@ -108,6 +114,10 @@ mod tests {
                     parameters: json!({}),
                 },
             }
+        }
+
+        fn clone_box(&self) -> Box<dyn LlmTool> {
+            Box::new(MockTool)
         }
     }
 

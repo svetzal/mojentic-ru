@@ -8,6 +8,7 @@ use std::sync::{Arc, Mutex};
 /// Tool for starting a task in the ephemeral task manager
 ///
 /// This tool changes a task's status from Pending to InProgress
+#[derive(Clone)]
 pub struct StartTaskTool {
     task_list: Arc<Mutex<TaskList>>,
 }
@@ -53,5 +54,8 @@ impl LlmTool for StartTaskTool {
                 }),
             },
         }
+    }
+    fn clone_box(&self) -> Box<dyn LlmTool> {
+        Box::new(self.clone())
     }
 }

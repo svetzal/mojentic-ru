@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 /// Tool for prepending a new task to the beginning of the ephemeral task manager list
+#[derive(Clone)]
 pub struct PrependTaskTool {
     task_list: Arc<Mutex<TaskList>>,
 }
@@ -51,5 +52,8 @@ impl LlmTool for PrependTaskTool {
                 }),
             },
         }
+    }
+    fn clone_box(&self) -> Box<dyn LlmTool> {
+        Box::new(self.clone())
     }
 }

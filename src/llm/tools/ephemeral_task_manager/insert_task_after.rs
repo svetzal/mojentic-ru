@@ -5,7 +5,8 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-/// Tool for inserting a new task after an existing task in the ephemeral task manager list
+/// Tool for inserting a new task after a specific task ID in the ephemeral task manager list
+#[derive(Clone)]
 pub struct InsertTaskAfterTool {
     task_list: Arc<Mutex<TaskList>>,
 }
@@ -58,5 +59,8 @@ impl LlmTool for InsertTaskAfterTool {
                 }),
             },
         }
+    }
+    fn clone_box(&self) -> Box<dyn LlmTool> {
+        Box::new(self.clone())
     }
 }

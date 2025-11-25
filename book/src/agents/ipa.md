@@ -236,8 +236,9 @@ let analysis = solver.solve(&format!("Analyze: {}", data)).await?;
 
 ## Examples
 
-See the complete example at:
+See the complete examples at:
 - `examples/iterative_solver.rs` - Basic usage with date and user interaction tools
+- `examples/solver_chat_session.rs` - Interactive chat session with solver delegation pattern
 
 ## Error Handling
 
@@ -257,6 +258,149 @@ match solver.solve(problem).await {
     }
 }
 ```
+
+## Advanced: Solver as a Tool
+
+The `IterativeProblemSolver` can be wrapped as a tool and used within a `ChatSession`, enabling powerful delegation patterns where a chat assistant can offload complex problems to a specialized solver agent.
+
+### Creating a Solver Tool
+
+```rust
+use mojentic::llm::tools::{FunctionDescriptor, LlmTool, ToolDescriptor};
+use mojentic::agents::IterativeProblemSolver;
+use serde_json::{json, Value};
+use std::collections::HashMap;
+use std::sync::Arc;
+
+struct IterativeProblemSolverTool {
+    broker: Arc<LlmBroker>,
+    tools: Vec<Box<dyn LlmTool>>,
+}
+
+impl IterativeProblemSolverTool {
+    fn new(broker: Arc<LlmBroker>, tools: Vec<Box<dyn LlmTool>>) -> Self {
+        Self { broker, tools }
+    }
+}
+
+impl Clone for IterativeProblemSolverTool {
+    fn clone(&self) -> Self {
+        Self {
+            broker: self.broker.clone(),
+            tools: self.tools.iter().map(|t| t.clone_box()).collect(),
+        }
+    }
+}
+
+impl LlmTool for IterativeProblemSolverTool {
+    fn run(&self, args: &HashMap<String, Value>) -> mojentic::error::Result<Value> {
+        let problem_to_solve = args
+            .get("problem_to_solve")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| {
+                mojentic::error::MojenticError::ToolError(
+                    "Missing required argument: problem_to_solve".to_string(),
+                )
+            })?;
+
+        let solver_tools: Vec<Box<dyn LlmTool>> =
+            self.tools.iter().map(|t| t.clone_box()).collect();
+
+        let runtime = tokio::runtime::Handle::current();
+        let broker_clone = (*self.broker).clone();
+
+        let result = runtime.block_on(async move {
+            let mut solver = IterativeProblemSolver::builder(broker_clone)
+                .tools(solver_tools)
+                .max_iterations(5)
+                .build();
+
+            solver.solve(problem_to_solve).await
+        })?;
+
+        Ok(json!({"solution": result}))
+    }
+
+    fn descriptor(&self) -> ToolDescriptor {
+        ToolDescriptor {
+            r#type: "function".to_string(),
+            function: FunctionDescriptor {
+                name: "iterative_problem_solver".to_string(),
+                description: "Iteratively solve a complex multi-step problem using available tools.".to_string(),
+                parameters: json!({
+                    "type": "object",
+                    "properties": {
+                        "problem_to_solve": {
+                            "type": "string",
+                            "description": "The problem or request to be solved."
+                        }
+                    },
+                    "required": ["problem_to_solve"],
+                    "additionalProperties": false
+                }),
+            },
+        }
+    }
+
+    fn clone_box(&self) -> Box<dyn LlmTool> {
+        Box::new(self.clone())
+    }
+}
+```
+
+### Using the Solver Tool in a Chat Session
+
+```rust
+use mojentic::llm::{ChatSession, LlmBroker};
+use mojentic::llm::tools::simple_date_tool::SimpleDateTool;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let gateway = Arc::new(OllamaGateway::default());
+    let broker = Arc::new(LlmBroker::new("qwq", gateway, None));
+
+    // Create the solver tool with SimpleDateTool as the inner tool
+    let solver_tools: Vec<Box<dyn LlmTool>> = vec![Box::new(SimpleDateTool)];
+    let solver_tool = IterativeProblemSolverTool::new(broker.clone(), solver_tools);
+
+    // Create chat session with the solver tool
+    let mut session = ChatSession::builder((*broker).clone())
+        .system_prompt(
+            "You are a helpful assistant with access to an iterative problem solver. \
+             When faced with complex multi-step problems or questions that require \
+             reasoning and tool usage, use the iterative_problem_solver tool."
+        )
+        .tools(vec![Box::new(solver_tool)])
+        .build();
+
+    // Interactive loop
+    loop {
+        let mut query = String::new();
+        print!("Query: ");
+        io::stdout().flush()?;
+        io::stdin().read_line(&mut query)?;
+
+        if query.trim().is_empty() {
+            break;
+        }
+
+        let response = session.send(query.trim()).await?;
+        println!("{}\n", response);
+    }
+
+    Ok(())
+}
+```
+
+### Benefits of This Pattern
+
+1. **Delegation**: The chat assistant can offload complex problems to a specialized solver
+2. **Composability**: Mix solver capabilities with other tools in the same session
+3. **Context Preservation**: The chat session maintains conversation history
+4. **Flexible Interaction**: Users can ask simple questions directly or complex problems that trigger the solver
+
+See the complete example at:
+- `examples/solver_chat_session.rs` - Interactive chat session with solver delegation
 
 ## Limitations
 

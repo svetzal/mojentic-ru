@@ -29,6 +29,7 @@ struct SentimentAnalysis {
 }
 
 // Simple date tool (mocked for demonstration)
+#[derive(Clone)]
 struct SimpleDateTool;
 
 impl LlmTool for SimpleDateTool {
@@ -58,6 +59,10 @@ impl LlmTool for SimpleDateTool {
                 }),
             },
         }
+    }
+
+    fn clone_box(&self) -> Box<dyn LlmTool> {
+        Box::new(self.clone())
     }
 }
 

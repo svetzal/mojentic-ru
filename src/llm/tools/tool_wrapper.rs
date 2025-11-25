@@ -105,6 +105,16 @@ impl LlmTool for ToolWrapper {
             },
         }
     }
+
+    fn clone_box(&self) -> Box<dyn LlmTool> {
+        Box::new(ToolWrapper {
+            broker: self.broker.clone(),
+            tools: self.tools.iter().map(|t| t.clone_box()).collect(),
+            behaviour: self.behaviour.clone(),
+            name: self.name.clone(),
+            description: self.description.clone(),
+        })
+    }
 }
 
 #[cfg(test)]
@@ -287,6 +297,10 @@ mod tests {
                         parameters: json!({}),
                     },
                 }
+            }
+
+            fn clone_box(&self) -> Box<dyn LlmTool> {
+                Box::new(MockTool)
             }
         }
 

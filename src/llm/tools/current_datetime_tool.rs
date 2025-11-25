@@ -20,6 +20,7 @@ use std::collections::HashMap;
 /// let result = tool.run(&args)?;
 /// // result contains current_datetime, timestamp, and timezone
 /// ```
+#[derive(Clone)]
 pub struct CurrentDatetimeTool;
 
 impl CurrentDatetimeTool {
@@ -72,6 +73,10 @@ impl LlmTool for CurrentDatetimeTool {
                 }),
             },
         }
+    }
+
+    fn clone_box(&self) -> Box<dyn LlmTool> {
+        Box::new(self.clone())
     }
 }
 

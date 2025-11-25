@@ -328,6 +328,7 @@ mod tests {
     }
 
     // Mock tool for testing
+    #[derive(Clone)]
     struct MockTool {
         name: String,
     }
@@ -346,6 +347,10 @@ mod tests {
                     parameters: json!({}),
                 },
             }
+        }
+
+        fn clone_box(&self) -> Box<dyn LlmTool> {
+            Box::new(self.clone())
         }
     }
 

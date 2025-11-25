@@ -257,6 +257,7 @@ impl FilesystemGateway {
 }
 
 /// Tool for listing files in a directory (non-recursive).
+#[derive(Clone)]
 pub struct ListFilesTool {
     fs: FilesystemGateway,
 }
@@ -311,9 +312,13 @@ impl LlmTool for ListFilesTool {
 
         Ok(json!(filtered))
     }
+    fn clone_box(&self) -> Box<dyn LlmTool> {
+        Box::new(self.clone())
+    }
 }
 
 /// Tool for reading the entire content of a file.
+#[derive(Clone)]
 pub struct ReadFileTool {
     fs: FilesystemGateway,
 }
@@ -356,9 +361,13 @@ impl LlmTool for ReadFileTool {
         let content = self.fs.read(directory, file_name)?;
         Ok(json!(content))
     }
+    fn clone_box(&self) -> Box<dyn LlmTool> {
+        Box::new(self.clone())
+    }
 }
 
 /// Tool for writing content to a file, completely overwriting any existing content.
+#[derive(Clone)]
 pub struct WriteFileTool {
     fs: FilesystemGateway,
 }
@@ -410,9 +419,13 @@ impl LlmTool for WriteFileTool {
         self.fs.write(directory, file_name, content)?;
         Ok(json!(format!("Successfully wrote to {}", path)))
     }
+    fn clone_box(&self) -> Box<dyn LlmTool> {
+        Box::new(self.clone())
+    }
 }
 
 /// Tool for listing all files recursively in a directory.
+#[derive(Clone)]
 pub struct ListAllFilesTool {
     fs: FilesystemGateway,
 }
@@ -454,9 +467,13 @@ impl LlmTool for ListAllFilesTool {
         let files = self.fs.list_all_files(path)?;
         Ok(json!(files))
     }
+    fn clone_box(&self) -> Box<dyn LlmTool> {
+        Box::new(self.clone())
+    }
 }
 
 /// Tool for finding files matching a glob pattern.
+#[derive(Clone)]
 pub struct FindFilesByGlobTool {
     fs: FilesystemGateway,
 }
@@ -507,9 +524,13 @@ impl LlmTool for FindFilesByGlobTool {
         let files = self.fs.find_files_by_glob(path, pattern)?;
         Ok(json!(files))
     }
+    fn clone_box(&self) -> Box<dyn LlmTool> {
+        Box::new(self.clone())
+    }
 }
 
 /// Tool for finding files containing text matching a regex pattern.
+#[derive(Clone)]
 pub struct FindFilesContainingTool {
     fs: FilesystemGateway,
 }
@@ -560,9 +581,13 @@ impl LlmTool for FindFilesContainingTool {
         let files = self.fs.find_files_containing(path, pattern)?;
         Ok(json!(files))
     }
+    fn clone_box(&self) -> Box<dyn LlmTool> {
+        Box::new(self.clone())
+    }
 }
 
 /// Tool for finding all lines in a file matching a regex pattern.
+#[derive(Clone)]
 pub struct FindLinesMatchingTool {
     fs: FilesystemGateway,
 }
@@ -614,9 +639,13 @@ impl LlmTool for FindLinesMatchingTool {
         let lines = self.fs.find_lines_matching(directory, file_name, pattern)?;
         Ok(json!(lines))
     }
+    fn clone_box(&self) -> Box<dyn LlmTool> {
+        Box::new(self.clone())
+    }
 }
 
 /// Tool for creating a new directory.
+#[derive(Clone)]
 pub struct CreateDirectoryTool {
     fs: FilesystemGateway,
 }
@@ -658,6 +687,9 @@ impl LlmTool for CreateDirectoryTool {
         let resolved_path = self.fs.resolve_path(path)?;
         fs::create_dir_all(&resolved_path)?;
         Ok(json!(format!("Successfully created directory '{}'", path)))
+    }
+    fn clone_box(&self) -> Box<dyn LlmTool> {
+        Box::new(self.clone())
     }
 }
 

@@ -5,7 +5,8 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-/// Tool for clearing all tasks from the ephemeral task manager
+/// Tool for clearing all tasks from the ephemeral task manager list
+#[derive(Clone)]
 pub struct ClearTasksTool {
     task_list: Arc<Mutex<TaskList>>,
 }
@@ -40,5 +41,8 @@ impl LlmTool for ClearTasksTool {
                 }),
             },
         }
+    }
+    fn clone_box(&self) -> Box<dyn LlmTool> {
+        Box::new(self.clone())
     }
 }

@@ -22,6 +22,7 @@ use std::collections::HashMap;
 /// let result = tool.run(&args)?;
 /// // result contains absolute date for tomorrow
 /// ```
+#[derive(Clone)]
 pub struct SimpleDateTool;
 
 impl SimpleDateTool {
@@ -144,6 +145,10 @@ impl LlmTool for SimpleDateTool {
                 }),
             },
         }
+    }
+
+    fn clone_box(&self) -> Box<dyn LlmTool> {
+        Box::new(self.clone())
     }
 }
 

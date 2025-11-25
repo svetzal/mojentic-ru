@@ -818,6 +818,7 @@ mod tests {
 
         use crate::llm::tools::{FunctionDescriptor, LlmTool, ToolDescriptor};
 
+        #[derive(Clone)]
         struct MockTool;
         impl LlmTool for MockTool {
             fn run(&self, _args: &HashMap<String, Value>) -> Result<Value> {
@@ -832,6 +833,9 @@ mod tests {
                         parameters: serde_json::json!({}),
                     },
                 }
+            }
+            fn clone_box(&self) -> Box<dyn LlmTool> {
+                Box::new(self.clone())
             }
         }
 

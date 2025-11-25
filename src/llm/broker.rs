@@ -11,6 +11,7 @@ use tracing::{info, warn};
 use uuid::Uuid;
 
 /// Main interface for LLM interactions
+#[derive(Clone)]
 pub struct LlmBroker {
     model: String,
     gateway: Arc<dyn LlmGateway>,
@@ -614,6 +615,13 @@ mod tests {
                     parameters: serde_json::json!({}),
                 },
             }
+        }
+
+        fn clone_box(&self) -> Box<dyn LlmTool> {
+            Box::new(MockTool {
+                name: self.name.clone(),
+                result: self.result.clone(),
+            })
         }
     }
 

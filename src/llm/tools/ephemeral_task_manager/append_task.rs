@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 /// Tool for appending a new task to the end of the ephemeral task manager list
+#[derive(Clone)]
 pub struct AppendTaskTool {
     task_list: Arc<Mutex<TaskList>>,
 }
@@ -51,5 +52,8 @@ impl LlmTool for AppendTaskTool {
                 }),
             },
         }
+    }
+    fn clone_box(&self) -> Box<dyn LlmTool> {
+        Box::new(self.clone())
     }
 }

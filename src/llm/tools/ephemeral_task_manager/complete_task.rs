@@ -8,6 +8,7 @@ use std::sync::{Arc, Mutex};
 /// Tool for completing a task in the ephemeral task manager
 ///
 /// This tool changes a task's status from InProgress to Completed
+#[derive(Clone)]
 pub struct CompleteTaskTool {
     task_list: Arc<Mutex<TaskList>>,
 }
@@ -54,5 +55,8 @@ impl LlmTool for CompleteTaskTool {
                 }),
             },
         }
+    }
+    fn clone_box(&self) -> Box<dyn LlmTool> {
+        Box::new(self.clone())
     }
 }

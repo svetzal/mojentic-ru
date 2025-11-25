@@ -25,6 +25,7 @@ use std::io::{self, Write};
 /// // This would prompt the user for input
 /// // let result = tool.run(&args).unwrap();
 /// ```
+#[derive(Clone)]
 pub struct AskUserTool;
 
 impl AskUserTool {
@@ -84,6 +85,10 @@ impl LlmTool for AskUserTool {
                 }),
             },
         }
+    }
+
+    fn clone_box(&self) -> Box<dyn LlmTool> {
+        Box::new(self.clone())
     }
 }
 

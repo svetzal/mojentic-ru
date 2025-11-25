@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 /// Tool for listing all tasks in the ephemeral task manager
+#[derive(Clone)]
 pub struct ListTasksTool {
     task_list: Arc<Mutex<TaskList>>,
 }
@@ -55,5 +56,8 @@ impl LlmTool for ListTasksTool {
                 }),
             },
         }
+    }
+    fn clone_box(&self) -> Box<dyn LlmTool> {
+        Box::new(self.clone())
     }
 }

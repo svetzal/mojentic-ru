@@ -19,6 +19,7 @@
   - [Asynchronous Capabilities](agents/async_capabilities.md)
   - [Iterative Problem Solver](agents/ipa.md)
   - [Simple Recursive Agent](agents/sra.md)
+  - [Working Memory Pattern](agents/working_memory.md)
 - [Observability](observability/README.md)
   - [Tracer System](observability/tracer.md)
   - [Comprehensive Guide](observability/observable.md)

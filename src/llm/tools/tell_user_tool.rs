@@ -31,6 +31,7 @@ use std::collections::HashMap;
 /// //
 /// // Returns: "Message delivered to user."
 /// ```
+#[derive(Clone)]
 pub struct TellUserTool;
 
 impl TellUserTool {
@@ -73,6 +74,9 @@ impl LlmTool for TellUserTool {
                 }),
             },
         }
+    }
+    fn clone_box(&self) -> Box<dyn LlmTool> {
+        Box::new(self.clone())
     }
 }
 

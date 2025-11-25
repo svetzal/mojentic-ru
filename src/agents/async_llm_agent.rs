@@ -220,6 +220,7 @@ mod tests {
     async fn test_new_agent_with_tools() {
         use crate::llm::tools::{FunctionDescriptor, ToolDescriptor};
 
+        #[derive(Clone)]
         struct MockTool;
         impl LlmTool for MockTool {
             fn run(&self, _args: &HashMap<String, Value>) -> Result<Value> {
@@ -234,6 +235,9 @@ mod tests {
                         parameters: serde_json::json!({}),
                     },
                 }
+            }
+            fn clone_box(&self) -> Box<dyn LlmTool> {
+                Box::new(self.clone())
             }
         }
 
@@ -249,6 +253,7 @@ mod tests {
     async fn test_add_tool() {
         use crate::llm::tools::{FunctionDescriptor, ToolDescriptor};
 
+        #[derive(Clone)]
         struct MockTool;
         impl LlmTool for MockTool {
             fn run(&self, _args: &HashMap<String, Value>) -> Result<Value> {
@@ -263,6 +268,9 @@ mod tests {
                         parameters: serde_json::json!({}),
                     },
                 }
+            }
+            fn clone_box(&self) -> Box<dyn LlmTool> {
+                Box::new(self.clone())
             }
         }
 
