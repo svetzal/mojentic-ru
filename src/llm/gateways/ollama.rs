@@ -124,6 +124,9 @@ impl LlmGateway for OllamaGateway {
             body["tools"] = serde_json::to_value(tool_defs)?;
         }
 
+        // Add response format if specified
+        add_response_format(&mut body, config);
+
         // Make API request
         let response = self
             .client
@@ -313,6 +316,9 @@ impl LlmGateway for OllamaGateway {
                 }
             }
 
+            // Add response format if specified
+            add_response_format(&mut body, config);
+
             // Make streaming API request
             let response = match self
                 .client
@@ -496,7 +502,34 @@ fn extract_ollama_options(config: &CompletionConfig) -> Value {
         options["num_predict"] = serde_json::json!(config.max_tokens);
     }
 
+    if let Some(top_p) = config.top_p {
+        options["top_p"] = serde_json::json!(top_p);
+    }
+
+    if let Some(top_k) = config.top_k {
+        options["top_k"] = serde_json::json!(top_k);
+    }
+
     options
+}
+
+// Add response format to request body if specified
+fn add_response_format(body: &mut Value, config: &CompletionConfig) {
+    use crate::llm::gateway::ResponseFormat;
+
+    if let Some(response_format) = &config.response_format {
+        match response_format {
+            ResponseFormat::JsonObject { schema: Some(s) } => {
+                body["format"] = s.clone();
+            }
+            ResponseFormat::JsonObject { schema: None } => {
+                body["format"] = serde_json::json!("json");
+            }
+            ResponseFormat::Text => {
+                // Text is the default, no need to add format field
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -686,6 +719,9 @@ mod tests {
             num_ctx: 4096,
             max_tokens: 2048,
             num_predict: None,
+            top_p: None,
+            top_k: None,
+            response_format: None,
         };
 
         let options = extract_ollama_options(&config);
@@ -704,6 +740,9 @@ mod tests {
             num_ctx: 2048,
             max_tokens: 1000,
             num_predict: Some(500),
+            top_p: None,
+            top_k: None,
+            response_format: None,
         };
 
         let options = extract_ollama_options(&config);
@@ -721,6 +760,9 @@ mod tests {
             num_ctx: 8192,
             max_tokens: 4096,
             num_predict: Some(0),
+            top_p: None,
+            top_k: None,
+            response_format: None,
         };
 
         let options = extract_ollama_options(&config);
@@ -739,6 +781,9 @@ mod tests {
             num_ctx: 1024,
             max_tokens: 0,
             num_predict: None,
+            top_p: None,
+            top_k: None,
+            response_format: None,
         };
 
         let options = extract_ollama_options(&config);
@@ -749,6 +794,172 @@ mod tests {
         // Check that it's either missing or null (not set in the options object)
         let num_predict = options.get("num_predict");
         assert!(num_predict.is_none() || num_predict.unwrap().is_null());
+    }
+
+    #[test]
+    fn test_extract_ollama_options_with_top_p() {
+        let config = CompletionConfig {
+            temperature: 0.7,
+            num_ctx: 4096,
+            max_tokens: 2048,
+            num_predict: None,
+            top_p: Some(0.9),
+            top_k: None,
+            response_format: None,
+        };
+
+        let options = extract_ollama_options(&config);
+
+        assert!((options["temperature"].as_f64().unwrap() - 0.7).abs() < 0.01);
+        assert_eq!(options["num_ctx"], 4096);
+        assert!((options["top_p"].as_f64().unwrap() - 0.9).abs() < 0.01);
+        assert!(options.get("top_k").is_none());
+    }
+
+    #[test]
+    fn test_extract_ollama_options_with_top_k() {
+        let config = CompletionConfig {
+            temperature: 0.8,
+            num_ctx: 2048,
+            max_tokens: 1024,
+            num_predict: None,
+            top_p: None,
+            top_k: Some(40),
+            response_format: None,
+        };
+
+        let options = extract_ollama_options(&config);
+
+        assert!((options["temperature"].as_f64().unwrap() - 0.8).abs() < 0.01);
+        assert_eq!(options["top_k"], 40);
+        assert!(options.get("top_p").is_none());
+    }
+
+    #[test]
+    fn test_extract_ollama_options_with_all_sampling_params() {
+        let config = CompletionConfig {
+            temperature: 0.6,
+            num_ctx: 8192,
+            max_tokens: 4096,
+            num_predict: Some(2000),
+            top_p: Some(0.95),
+            top_k: Some(50),
+            response_format: None,
+        };
+
+        let options = extract_ollama_options(&config);
+
+        assert!((options["temperature"].as_f64().unwrap() - 0.6).abs() < 0.01);
+        assert_eq!(options["num_ctx"], 8192);
+        assert_eq!(options["num_predict"], 2000);
+        assert!((options["top_p"].as_f64().unwrap() - 0.95).abs() < 0.01);
+        assert_eq!(options["top_k"], 50);
+    }
+
+    #[test]
+    fn test_add_response_format_text() {
+        use crate::llm::gateway::ResponseFormat;
+
+        let config = CompletionConfig {
+            temperature: 0.7,
+            num_ctx: 4096,
+            max_tokens: 2048,
+            num_predict: None,
+            top_p: None,
+            top_k: None,
+            response_format: Some(ResponseFormat::Text),
+        };
+
+        let mut body = serde_json::json!({
+            "model": "test",
+            "messages": []
+        });
+
+        add_response_format(&mut body, &config);
+
+        // Text format shouldn't add a format field
+        assert!(body.get("format").is_none());
+    }
+
+    #[test]
+    fn test_add_response_format_json_no_schema() {
+        use crate::llm::gateway::ResponseFormat;
+
+        let config = CompletionConfig {
+            temperature: 0.7,
+            num_ctx: 4096,
+            max_tokens: 2048,
+            num_predict: None,
+            top_p: None,
+            top_k: None,
+            response_format: Some(ResponseFormat::JsonObject { schema: None }),
+        };
+
+        let mut body = serde_json::json!({
+            "model": "test",
+            "messages": []
+        });
+
+        add_response_format(&mut body, &config);
+
+        assert_eq!(body["format"], "json");
+    }
+
+    #[test]
+    fn test_add_response_format_json_with_schema() {
+        use crate::llm::gateway::ResponseFormat;
+
+        let schema = serde_json::json!({
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "age": {"type": "number"}
+            }
+        });
+
+        let config = CompletionConfig {
+            temperature: 0.7,
+            num_ctx: 4096,
+            max_tokens: 2048,
+            num_predict: None,
+            top_p: None,
+            top_k: None,
+            response_format: Some(ResponseFormat::JsonObject {
+                schema: Some(schema.clone()),
+            }),
+        };
+
+        let mut body = serde_json::json!({
+            "model": "test",
+            "messages": []
+        });
+
+        add_response_format(&mut body, &config);
+
+        assert_eq!(body["format"], schema);
+    }
+
+    #[test]
+    fn test_add_response_format_none() {
+        let config = CompletionConfig {
+            temperature: 0.7,
+            num_ctx: 4096,
+            max_tokens: 2048,
+            num_predict: None,
+            top_p: None,
+            top_k: None,
+            response_format: None,
+        };
+
+        let mut body = serde_json::json!({
+            "model": "test",
+            "messages": []
+        });
+
+        add_response_format(&mut body, &config);
+
+        // No format should be added when response_format is None
+        assert!(body.get("format").is_none());
     }
 
     #[tokio::test]

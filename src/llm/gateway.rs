@@ -6,6 +6,15 @@ use futures::stream::Stream;
 use serde_json::Value;
 use std::pin::Pin;
 
+/// Format specification for LLM responses
+#[derive(Debug, Clone)]
+pub enum ResponseFormat {
+    /// Plain text response
+    Text,
+    /// JSON object response with optional schema
+    JsonObject { schema: Option<Value> },
+}
+
 /// Configuration for LLM completion
 #[derive(Debug, Clone)]
 pub struct CompletionConfig {
@@ -13,6 +22,9 @@ pub struct CompletionConfig {
     pub num_ctx: usize,
     pub max_tokens: usize,
     pub num_predict: Option<i32>,
+    pub top_p: Option<f32>,
+    pub top_k: Option<u32>,
+    pub response_format: Option<ResponseFormat>,
 }
 
 impl Default for CompletionConfig {
@@ -22,6 +34,9 @@ impl Default for CompletionConfig {
             num_ctx: 32768,
             max_tokens: 16384,
             num_predict: None,
+            top_p: None,
+            top_k: None,
+            response_format: None,
         }
     }
 }
@@ -87,6 +102,9 @@ mod tests {
         assert_eq!(config.num_ctx, 32768);
         assert_eq!(config.max_tokens, 16384);
         assert_eq!(config.num_predict, None);
+        assert_eq!(config.top_p, None);
+        assert_eq!(config.top_k, None);
+        assert!(config.response_format.is_none());
     }
 
     #[test]
@@ -96,12 +114,18 @@ mod tests {
             num_ctx: 2048,
             max_tokens: 1024,
             num_predict: Some(100),
+            top_p: Some(0.9),
+            top_k: Some(40),
+            response_format: Some(ResponseFormat::Text),
         };
 
         assert_eq!(config.temperature, 0.5);
         assert_eq!(config.num_ctx, 2048);
         assert_eq!(config.max_tokens, 1024);
         assert_eq!(config.num_predict, Some(100));
+        assert_eq!(config.top_p, Some(0.9));
+        assert_eq!(config.top_k, Some(40));
+        assert!(matches!(config.response_format, Some(ResponseFormat::Text)));
     }
 
     #[test]
@@ -111,6 +135,9 @@ mod tests {
             num_ctx: 4096,
             max_tokens: 2048,
             num_predict: Some(50),
+            top_p: Some(0.95),
+            top_k: Some(50),
+            response_format: Some(ResponseFormat::JsonObject { schema: None }),
         };
 
         let config2 = config1.clone();
@@ -119,5 +146,59 @@ mod tests {
         assert_eq!(config1.num_ctx, config2.num_ctx);
         assert_eq!(config1.max_tokens, config2.max_tokens);
         assert_eq!(config1.num_predict, config2.num_predict);
+        assert_eq!(config1.top_p, config2.top_p);
+        assert_eq!(config1.top_k, config2.top_k);
+    }
+
+    #[test]
+    fn test_response_format_text() {
+        let format = ResponseFormat::Text;
+        assert!(matches!(format, ResponseFormat::Text));
+    }
+
+    #[test]
+    fn test_response_format_json_no_schema() {
+        let format = ResponseFormat::JsonObject { schema: None };
+        assert!(matches!(format, ResponseFormat::JsonObject { schema: None }));
+    }
+
+    #[test]
+    fn test_response_format_json_with_schema() {
+        let schema = serde_json::json!({
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"}
+            }
+        });
+        let format = ResponseFormat::JsonObject {
+            schema: Some(schema.clone()),
+        };
+
+        match format {
+            ResponseFormat::JsonObject { schema: Some(s) } => {
+                assert_eq!(s, schema);
+            }
+            _ => panic!("Expected JsonObject with schema"),
+        }
+    }
+
+    #[test]
+    fn test_completion_config_with_all_sampling_params() {
+        let config = CompletionConfig {
+            temperature: 0.8,
+            num_ctx: 8192,
+            max_tokens: 4096,
+            num_predict: Some(2000),
+            top_p: Some(0.92),
+            top_k: Some(60),
+            response_format: Some(ResponseFormat::JsonObject {
+                schema: Some(serde_json::json!({"type": "object"})),
+            }),
+        };
+
+        assert_eq!(config.temperature, 0.8);
+        assert_eq!(config.top_p, Some(0.92));
+        assert_eq!(config.top_k, Some(60));
+        assert!(config.response_format.is_some());
     }
 }

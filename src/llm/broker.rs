@@ -672,6 +672,9 @@ mod tests {
             num_ctx: 2048,
             max_tokens: 100,
             num_predict: Some(50),
+            top_p: None,
+            top_k: None,
+            response_format: None,
         };
 
         let messages = vec![LlmMessage::user("Hi")];
@@ -787,6 +790,9 @@ mod tests {
             num_ctx: 1024,
             max_tokens: 50,
             num_predict: None,
+            top_p: None,
+            top_k: None,
+            response_format: None,
         };
 
         let messages = vec![LlmMessage::user("Generate")];
