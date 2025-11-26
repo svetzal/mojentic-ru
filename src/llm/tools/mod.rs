@@ -6,6 +6,7 @@ pub mod simple_date_tool;
 pub mod tell_user_tool;
 mod tool;
 pub mod tool_wrapper;
+pub mod web_search_tool;
 
 pub use tool::{FunctionDescriptor, LlmTool, ToolDescriptor};
 pub use tool_wrapper::ToolWrapper;

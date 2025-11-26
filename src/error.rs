@@ -43,6 +43,18 @@ pub enum MojenticError {
 
     #[error("Timeout error: {0}")]
     TimeoutError(String),
+
+    #[error("Invalid argument: {0}")]
+    InvalidArgument(String),
+
+    #[error("Parse error: {0}")]
+    ParseError(String),
+
+    #[error("Tool execution error: {0}")]
+    ToolExecutionError(String),
+
+    #[error("Runtime error: {0}")]
+    RuntimeError(String),
 }
 
 pub type Result<T> = std::result::Result<T, MojenticError>;
