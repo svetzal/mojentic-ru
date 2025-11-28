@@ -1,44 +1,44 @@
-# Mojentic - Rust LLM Integration Framework
+# Mojentic
 
-Mojentic is a modern LLM integration framework for Rust that provides a clean abstraction over multiple LLM providers with tool support, structured output generation, and an event-driven agent system.
+[![Crates.io](https://img.shields.io/crates/v/mojentic.svg)](https://crates.io/crates/mojentic)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Rust](https://img.shields.io/badge/Rust-2021-orange)](https://www.rust-lang.org/)
 
-## Documentation
+A modern LLM integration framework for Rust with full feature parity across Python, Elixir, and TypeScript implementations.
 
-End-user documentation is published as an mdBook, with the Rust API reference included under `/api/`.
+Mojentic provides a clean abstraction over multiple LLM providers with tool support, structured output generation, streaming, and a complete event-driven agent system.
 
-- Live site (on release): GitHub Pages for this repository
-- Build locally:
+## 🚀 Features
 
-```bash
-# Build API docs
-cargo doc --no-deps --all-features
-# Build the mdBook
-mdbook build book
-# Open the book
-open book/book/index.html
-# API docs are at target/doc/ (served under /api/ in the published site)
-```
+- **🔌 Multi-Provider Support**: OpenAI and Ollama gateways
+- **🔒 Type-Safe**: Leverages Rust's type system for safe LLM interactions
+- **⚡ Async-First**: Built on Tokio for efficient async operations
+- **🛠️ Tool System**: Extensible tool calling with automatic recursive execution
+- **📊 Structured Output**: Generate type-safe structured data with serde
+- **🌊 Streaming**: Async streaming with `Pin<Box<dyn Stream>>`
+- **🔍 Tracer System**: Complete observability for debugging and monitoring
+- **🤖 Agent System**: Event-driven multi-agent coordination with ReAct pattern
+- **📦 24 Examples**: Comprehensive examples demonstrating all features
 
-## Features
-
-- **Multi-Provider Support**: Works with OpenAI, Ollama, and Anthropic (in development)
-- **Type-Safe**: Leverages Rust's type system for safe LLM interactions
-- **Async-First**: Built on Tokio for efficient async operations
-- **Tool System**: Extensible tool calling support for LLMs
-- **Structured Output**: Generate type-safe structured data from LLMs
-- **Local LLMs**: Full support for Ollama local models
-
-## Quick Start
+## 📦 Installation
 
 Add Mojentic to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-mojentic = "0.1.0"
+mojentic = "1.0.0"
 tokio = { version = "1", features = ["full"] }
 ```
 
-### Basic Usage
+## 🔧 Prerequisites
+
+To use Mojentic with local models, you need Ollama installed and running:
+
+1. Install Ollama from [ollama.ai](https://ollama.ai)
+2. Pull a model: `ollama pull qwen3:32b`
+3. Verify it's running: `ollama list`
+
+## 🎯 Quick Start
 
 ```rust
 use mojentic::prelude::*;
@@ -46,8 +46,8 @@ use std::sync::Arc;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let gateway = OllamaGateway::new();
-    let broker = LlmBroker::new("qwen3:32b", Arc::new(gateway));
+    let gateway = Arc::new(OllamaGateway::new());
+    let broker = LlmBroker::new("qwen3:32b", gateway, None);
 
     let messages = vec![
         LlmMessage::user("What is the capital of France?"),
@@ -60,60 +60,89 @@ async fn main() -> Result<()> {
 }
 ```
 
-## Prerequisites
+## 📚 Documentation
 
-To use Mojentic with local models, you need to have Ollama installed and running:
+- **User Guide**: [mdBook documentation](https://svetzal.github.io/mojentic-ru/)
+- **API Reference**: `cargo doc --no-deps --all-features --open`
 
-1. Install Ollama from [ollama.ai](https://ollama.ai)
-2. Pull a model: `ollama pull qwen3:32b`
-3. Verify it's running: `ollama list`
+Build documentation locally:
 
-## Examples
-
-The project includes several examples to get you started:
-
-### Simple Text Generation
 ```bash
-cargo run --example simple_llm
+# Build API docs
+cargo doc --no-deps --all-features
+
+# Build the mdBook
+mdbook build book
+open book/book/index.html
 ```
 
-### Structured Output (Type-Safe)
-```bash
-cargo run --example structured_output
-```
+## 🏗️ Architecture
 
-### Tool Usage
-```bash
-cargo run --example tool_usage
-```
+Mojentic is structured in three layers:
 
-## Architecture
+### Layer 1: LLM Integration
 
-Mojentic is structured in layers:
-
-### Layer 1: LLM Integration (Current Focus)
 - `LlmBroker` - Main interface for LLM interactions
 - `LlmGateway` trait - Abstract interface for LLM providers
-- Gateway implementations: `OllamaGateway` (OpenAI and Anthropic coming soon)
-- Message models and adapters
-- Tool system
+- `OllamaGateway` / `OpenAiGateway` - Provider implementations
+- `ChatSession` - Conversational session management
+- `TokenizerGateway` - Token counting with tiktoken-rs
+- `EmbeddingsGateway` - Vector embeddings
+- Comprehensive tool system with 10+ built-in tools
 
-### Layer 2: Agent System (Future)
-- Event-driven agent coordination
-- Async event processing
-- Router and dispatcher
+### Layer 2: Tracer System
 
-## Development Status
+- `TracerSystem` - Thread-safe event recording
+- `EventStore` - Event persistence and querying
+- Correlation ID tracking with `Arc` sharing
+- LLM call, response, and tool events
 
-This is an early-stage implementation focusing on:
-- ✅ Core types and error handling
-- ✅ LlmGateway trait
-- ✅ Ollama gateway implementation
-- ✅ LlmBroker with tool support
-- 🚧 OpenAI gateway (planned)
-- 🚧 Anthropic gateway (planned)
-- 🚧 Agent system (planned)
+### Layer 3: Agent System
 
-## License
+- `AsyncDispatcher` - Event routing
+- `Router` - Event-to-agent routing
+- `BaseLlmAgent` / `AsyncLlmAgent` - LLM-powered agents
+- `IterativeProblemSolver` - Multi-step reasoning
+- `SimpleRecursiveAgent` - Self-recursive processing
+- `SharedWorkingMemory` - Agent context sharing with `RwLock`
+- ReAct pattern implementation
 
-MIT
+## 🧪 Examples
+
+```bash
+cargo run --example simple_llm
+cargo run --example structured_output
+cargo run --example tool_usage
+cargo run --example streaming
+cargo run --example chat_session
+cargo run --example tracer_demo
+cargo run --example async_llm
+cargo run --example iterative_solver
+```
+
+## 🔧 Development
+
+```bash
+# Build
+cargo build
+
+# Test
+cargo test
+
+# Format
+cargo fmt
+
+# Lint
+cargo clippy --all-targets --all-features -- -D warnings
+
+# Security audit
+cargo deny check
+```
+
+## 📄 License
+
+MIT License - see [LICENSE](LICENSE)
+
+## Credits
+
+Mojentic is a [Mojility](https://mojility.com) product by Stacey Vetzal.
