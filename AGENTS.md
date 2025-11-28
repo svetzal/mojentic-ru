@@ -158,6 +158,58 @@ cargo deny check
 - Test all feature combinations in CI
 - Keep feature gates minimal and orthogonal
 
+## Release Process
+
+### Versioning
+- Follow semantic versioning (semver): MAJOR.MINOR.PATCH
+- Update version in `Cargo.toml`
+- Update `CHANGELOG.md` with release notes
+
+### Release Workflow
+
+```bash
+# 1. Update version in Cargo.toml
+
+# 2. Update CHANGELOG.md
+#    - Move [Unreleased] changes to new version section
+#    - Add release date: [X.Y.Z] - YYYY-MM-DD
+
+# 3. Commit and push
+git add -A && git commit -m "chore: prepare vX.Y.Z release"
+git push origin main
+
+# 4. Create GitHub release
+gh release create vX.Y.Z --title "vX.Y.Z" --notes "Release notes here"
+```
+
+The CI/CD pipeline will automatically:
+- Run quality checks (fmt, clippy, test, deny)
+- Build the package
+- Deploy documentation to GitHub Pages
+- Publish to crates.io (when configured)
+
+### CI/CD Pipeline
+
+The GitHub Actions workflow (`.github/workflows/build.yml`) runs:
+
+| Trigger | Quality Checks | Docs Deploy | Crates Publish |
+|---------|---------------|-------------|----------------|
+| Push to main | ✅ | ❌ | ❌ |
+| Pull request | ✅ | ❌ | ❌ |
+| Release published | ✅ | ✅ | ✅ (when configured) |
+
+### Pre-Release Checklist
+
+Before creating a release:
+- [ ] All tests pass: `cargo test --all-features`
+- [ ] Format check passes: `cargo fmt --check`
+- [ ] Clippy passes: `cargo clippy --all-targets --all-features -- -D warnings`
+- [ ] Security audit clean: `cargo deny check`
+- [ ] Docs build: `cargo doc --no-deps --all-features`
+- [ ] Version updated in `Cargo.toml`
+- [ ] CHANGELOG.md updated
+- [ ] Changes committed and pushed to main
+
 ## Useful Commands
 
 ### Development
