@@ -1,154 +1,145 @@
-# Chat Sessions
+# Tutorial: Building Chatbots
 
-`ChatSession` provides a high-level abstraction for managing multi-turn conversations with LLMs. It automatically handles conversation history, context window management, and token counting.
+## Why Use Chat Sessions?
 
-## Key Features
+When working with Large Language Models (LLMs), simple text generation is useful for one-off interactions, but many applications require ongoing conversations where the model remembers previous exchanges. This is where chat sessions come in.
 
-- **Automatic History Management**: Maintains conversation history automatically
-- **Context Window Trimming**: Removes oldest messages when token limit is exceeded
-- **System Prompt Preservation**: Always keeps the system prompt (index 0) intact
-- **Token Counting**: Uses `TokenizerGateway` for accurate token tracking
-- **Builder Pattern**: Flexible configuration with sensible defaults
+Chat sessions are essential when you need to:
 
-## Basic Usage
+- Build conversational agents or chatbots
+- Maintain context across multiple user interactions
+- Create applications where the LLM needs to remember previous information
+- Develop more natural and coherent conversational experiences
 
-The simplest way to create a chat session:
+## When to Apply This Approach
+
+Use chat sessions when:
+
+- Your application requires multi-turn conversations
+- You need the LLM to reference information from earlier in the conversation
+- You want to create a more interactive and engaging user experience
+
+## The Key Difference: Expanding Context
+
+The fundamental difference between simple text generation and chat sessions is the **expanding context**. With each new message in a chat session:
+
+1. The message is added to the conversation history
+2. All previous messages (within token limits) are sent to the LLM with each new query
+3. The LLM can reference and build upon earlier parts of the conversation
+
+## Getting Started
+
+Let's walk through a simple example of building a chatbot using Mojentic's `ChatSession`.
+
+### Basic Implementation
+
+Here's the simplest way to create a chat session with Mojentic:
 
 ```rust
-use mojentic::llm::{ChatSession, LlmBroker};
-use mojentic::llm::gateways::OllamaGateway;
+use mojentic::prelude::*;
+use std::io::{self, Write};
 use std::sync::Arc;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Create broker
-    let gateway = Arc::new(OllamaGateway::default());
-    let broker = LlmBroker::new("qwen3:32b", gateway);
+async fn main() -> Result<()> {
+    // 1. Create an LLM broker
+    let gateway = Arc::new(OllamaGateway::new());
+    let broker = LlmBroker::new("qwen3:32b", gateway, None);
 
-    // Create session with defaults
+    // 2. Initialize a chat session
     let mut session = ChatSession::new(broker);
 
-    // Send messages
-    let response = session.send("What is Rust?").await?;
-    println!("{}", response);
+    // 3. Simple interactive loop
+    println!("Chatbot started. Type 'exit' to quit.");
 
-    // Continue the conversation
-    let response = session.send("Tell me more about ownership.").await?;
-    println!("{}", response);
+    loop {
+        print!("Query: ");
+        io::stdout().flush()?;
 
+        let mut query = String::new();
+        io::stdin().read_line(&mut query)?;
+        let query = query.trim();
+
+        if query == "exit" {
+            break;
+        }
+
+        let response = session.send_message(query).await?;
+        println!("{}", response);
+    }
+    
     Ok(())
 }
 ```
 
-## Custom Configuration
+This code creates an interactive chatbot that maintains context across multiple exchanges.
 
-Use the builder pattern for custom configuration:
+## Step-by-Step Explanation
 
-```rust
-use mojentic::llm::ChatSession;
-
-let session = ChatSession::builder(broker)
-    .system_prompt("You are a helpful coding assistant specializing in Rust.")
-    .temperature(0.7)
-    .max_context(16384)  // 16k tokens
-    .build();
-```
-
-### Configuration Options
-
-- **`system_prompt`**: The system message (default: "You are a helpful assistant.")
-- **`temperature`**: Sampling temperature (default: 1.0)
-- **`max_context`**: Maximum tokens in context window (default: 32768)
-- **`tokenizer_gateway`**: Custom tokenizer (default: cl100k_base)
-- **`tools`**: Tools available to the LLM (default: None)
-
-## Context Window Management
-
-When the total token count exceeds `max_context`, `ChatSession` automatically removes the oldest messages:
+### 1. Initialize the Broker
 
 ```rust
-let mut session = ChatSession::builder(broker)
-    .max_context(2048)  // Small context window
-    .build();
-
-// Add many messages
-for i in 0..100 {
-    session.send(&format!("Message {}", i)).await?;
-}
-
-// Only recent messages are kept
-println!("Messages in history: {}", session.messages().len());
-println!("Total tokens: {}", session.total_tokens());
+let gateway = Arc::new(OllamaGateway::new());
+let broker = LlmBroker::new("qwen3:32b", gateway, None);
 ```
 
-**Important**: The system prompt (index 0) is always preserved, even when trimming.
+The `LlmBroker` is the central component that handles communication with the LLM provider (in this case, Ollama).
 
-## Message History
-
-Access the conversation history:
+### 2. Start the Session
 
 ```rust
-// Get all messages
-for msg in session.messages() {
-    println!("{:?}: {}", msg.role(), msg.content().unwrap_or(""));
-}
-
-// Check token usage
-println!("Total tokens: {}", session.total_tokens());
+let mut session = ChatSession::new(broker);
 ```
 
-## SizedLlmMessage
+`ChatSession` holds the state of the conversation. By default, it manages the message history and ensures it fits within the model's context window.
 
-Internally, `ChatSession` uses `SizedLlmMessage`, which extends `LlmMessage` with token count metadata:
+### 3. Send Messages
 
 ```rust
-pub struct SizedLlmMessage {
-    pub message: LlmMessage,
-    pub token_length: usize,
-}
+let response = session.send_message(query).await?;
 ```
 
-This allows efficient context window management without recounting tokens repeatedly.
+When you send a message:
+1. It's added to the history.
+2. The full history is sent to the LLM.
+3. The LLM's response is added to the history.
+4. The response text is returned.
 
-## Interactive Example
+## Customizing Your Chat Session
 
-See the complete interactive chat example:
+You can customize the session with a system prompt or tools.
 
-```bash
-cargo run --example chat_session
-```
+### System Prompt
 
-This example demonstrates:
-- Reading user input from stdin
-- Maintaining conversation context
-- Displaying token usage
-- Graceful exit handling
-
-## Best Practices
-
-1. **Choose appropriate context size**: Balance between conversation length and performance
-2. **Monitor token usage**: Use `session.total_tokens()` to track usage
-3. **Set clear system prompts**: Guide the LLM's behavior from the start
-4. **Adjust temperature**: Lower for deterministic responses, higher for creativity
-5. **Handle errors gracefully**: Network and API errors can occur
-
-## Error Handling
+The system prompt sets the behavior of the assistant.
 
 ```rust
-match session.send("Hello").await {
-    Ok(response) => println!("Response: {}", response),
-    Err(e) => eprintln!("Error: {}", e),
-}
+let mut session = ChatSession::new(broker)
+    .with_system_prompt("You are a helpful AI assistant specialized in Rust programming.");
 ```
 
-Common errors:
-- Network failures connecting to Ollama
-- Model not available
-- Context window exceeded before trimming
-- Tool execution failures (when using tools)
+### Adding Tools
 
-## Next Steps
+You can enhance your chatbot by providing tools that the LLM can use.
 
-- Learn about [Chat Sessions with Tools](chat_sessions_with_tools.md)
-- Explore [Tool Usage](tool_usage.md)
-- Read about [Building Tools](building_tools.md)
+```rust
+use mojentic::tools::DateResolver;
+
+let tools: Vec<Arc<dyn LlmTool>> = vec![Arc::new(DateResolver::new())];
+
+let mut session = ChatSession::new(broker)
+    .with_tools(tools);
+
+// The LLM can now use the date tool in conversations
+let response = session.send_message("What day of the week is July 4th, 2025?").await?;
+println!("{}", response);
+```
+
+## Summary
+
+In this tutorial, we've learned how to:
+1.  Initialize a `ChatSession` with an `LlmBroker`.
+2.  Create an interactive loop to chat with the model.
+3.  Customize the session with system prompts and tools.
+
+By leveraging chat sessions, you can create engaging conversational experiences that maintain context across multiple interactions.

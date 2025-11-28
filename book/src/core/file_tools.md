@@ -1,6 +1,6 @@
-# File Tools
+# Example: File Tools
 
-Mojentic provides powerful tools for interacting with the file system, allowing agents to read, write, and manage files.
+This chapter demonstrates how to build tools for interacting with the file system using the Mojentic framework. The included `FileTool` and `CodingFileTool` serve as reference implementations that you can use directly or adapt for your specific needs.
 
 ## Available Tools
 
