@@ -5,7 +5,12 @@ edition = "2021"
 authors = ["Stacey Vetzal <stacey@vetzal.com>"]
 description = "An LLM integration framework for Rust"
 license = "MIT"
-repository = "https://github.com/svetzal/mojentic-rs"
+repository = "https://github.com/svetzal/mojentic-ru"
+homepage = "https://svetzal.github.io/mojentic-ru"
+documentation = "https://svetzal.github.io/mojentic-ru/api/mojentic"
+readme = "README.md"
+keywords = ["llm", "ai", "ollama", "openai", "agents"]
+categories = ["api-bindings", "asynchronous"]
 
 [dependencies]
 # Core async runtime
