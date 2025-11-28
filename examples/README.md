@@ -175,20 +175,52 @@ After running these examples, check out:
 - [API Documentation](https://docs.rs/mojentic) - Online documentation
 - [Test Suite](../src/) - More examples in the test code
 
-## Coming Soon
+### Level 2: Advanced LLM Features (Continued)
 
-The following examples are planned for future implementation:
+#### `streaming.rs`
+Stream responses chunk-by-chunk with tool calling support.
 
-### Level 2: Advanced LLM Features (Remaining)
-- `streaming.rs` - Streaming responses (Ollama partial support)
-- `chat_session.rs` - Interactive chat sessions
-- `broker_examples.rs` - Comprehensive broker feature tests
+```bash
+cargo run --example streaming
+```
+
+#### `chat_session.rs`
+Interactive chat session maintaining conversation history.
+
+```bash
+cargo run --example chat_session
+```
+
+#### `broker_examples.rs`
+Comprehensive demonstration of various broker features and configurations.
+
+```bash
+cargo run --example broker_examples
+```
 
 ### Level 3: Tool System Extensions
-- `file_tool.rs` - File operations
-- `task_manager.rs` - Task management
+
+#### `file_tool.rs`
+Demonstrates file operations using the FileTool.
+
+```bash
+cargo run --example file_tool
+```
+
+#### `ephemeral_task_manager.rs`
+Task management using the TaskManager tool.
+
+```bash
+cargo run --example ephemeral_task_manager
+```
 
 ### Level 4: Tracing & Observability
-- `tracer_demo.rs` - Event tracing and debugging
+
+#### `tracer_demo.rs`
+Demonstrates the event tracing system for debugging and monitoring.
+
+```bash
+cargo run --example tracer_demo
+```
 
 See [PARITY.md](../../PARITY.md) for the complete feature roadmap across all language ports.
