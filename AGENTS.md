@@ -196,7 +196,19 @@ The GitHub Actions workflow (`.github/workflows/build.yml`) runs:
 |---------|---------------|-------------|----------------|
 | Push to main | ✅ | ❌ | ❌ |
 | Pull request | ✅ | ❌ | ❌ |
-| Release published | ✅ | ✅ | ✅ (when configured) |
+| Release (`v*` tag) | ✅ | ✅ | ✅ |
+| Release (other tag) | ✅ | ✅ | ❌ |
+
+### Crates.io Publishing Requirements
+
+1. **CRATES_IO_TOKEN secret**: Must be configured in GitHub repository settings
+   - Settings → Secrets and variables → Actions → New repository secret
+   - Use an API token from crates.io
+
+2. **Package configuration** (`Cargo.toml`):
+   - Valid `name`, `version`, `description`, `license`
+   - `repository` pointing to GitHub repo
+   - `documentation` pointing to docs.rs or GitHub Pages
 
 ### Pre-Release Checklist
 
