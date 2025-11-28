@@ -1,0 +1,461 @@
+<!DOCTYPE HTML>
+<html lang="en" class="light sidebar-visible" dir="ltr">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Extending Mojentic - Mojentic (Rust)</title>
+
+
+        <!-- Custom HTML head -->
+
+        <meta name="description" content="Agentic framework in Rust: asynchronous pubsub architecture for orchestrating LLM-powered agents.">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff">
+
+        <link rel="icon" href="../favicon.svg">
+        <link rel="shortcut icon" href="../favicon.png">
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        <link rel="stylesheet" href="../css/print.css" media="print">
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        <link rel="stylesheet" href="../fonts/fonts.css">
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" id="highlight-css" href="../highlight.css">
+        <link rel="stylesheet" id="tomorrow-night-css" href="../tomorrow-night.css">
+        <link rel="stylesheet" id="ayu-highlight-css" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        <link rel="stylesheet" href="../theme/custom.css">
+
+
+        <!-- Provide site root and default themes to javascript -->
+        <script>
+            const path_to_root = "../";
+            const default_light_theme = "light";
+            const default_dark_theme = "navy";
+            window.path_to_searchindex_js = "../searchindex.js";
+        </script>
+        <!-- Start loading toc.js asap -->
+        <script src="../toc.js"></script>
+    </head>
+    <body>
+    <div id="mdbook-help-container">
+        <div id="mdbook-help-popup">
+            <h2 class="mdbook-help-title">Keyboard shortcuts</h2>
+            <div>
+                <p>Press <kbd>←</kbd> or <kbd>→</kbd> to navigate between chapters</p>
+                <p>Press <kbd>S</kbd> or <kbd>/</kbd> to search in the book</p>
+                <p>Press <kbd>?</kbd> to show this help</p>
+                <p>Press <kbd>Esc</kbd> to hide this help</p>
+            </div>
+        </div>
+    </div>
+    <div id="body-container">
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script>
+            try {
+                let theme = localStorage.getItem('mdbook-theme');
+                let sidebar = localStorage.getItem('mdbook-sidebar');
+
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script>
+            const default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? default_dark_theme : default_light_theme;
+            let theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            const html = document.documentElement;
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add("js");
+        </script>
+
+        <input type="checkbox" id="sidebar-toggle-anchor" class="hidden">
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script>
+            let sidebar = null;
+            const sidebar_toggle = document.getElementById("sidebar-toggle-anchor");
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            } else {
+                sidebar = 'hidden';
+                sidebar_toggle.checked = false;
+            }
+            if (sidebar === 'visible') {
+                sidebar_toggle.checked = true;
+            } else {
+                html.classList.remove('sidebar-visible');
+            }
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <!-- populated by js -->
+            <mdbook-sidebar-scrollbox class="sidebar-scrollbox"></mdbook-sidebar-scrollbox>
+            <noscript>
+                <iframe class="sidebar-iframe-outer" src="../toc.html"></iframe>
+            </noscript>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle">
+                <div class="sidebar-resize-indicator"></div>
+            </div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky">
+                    <div class="left-buttons">
+                        <label id="sidebar-toggle" class="icon-button" for="sidebar-toggle-anchor" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </label>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="default_theme">Auto</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        <button id="search-toggle" class="icon-button" type="button" title="Search (`/`)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="/ s" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                    </div>
+
+                    <h1 class="menu-title">Mojentic (Rust)</h1>
+
+                    <div class="right-buttons">
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+
+                    </div>
+                </div>
+
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <div class="search-wrapper">
+                            <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                            <div class="spinner-wrapper">
+                                <i class="fa fa-spinner fa-spin"></i>
+                            </div>
+                        </div>
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script>
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <h1 id="extending-mojentic"><a class="header" href="#extending-mojentic">Extending Mojentic</a></h1>
+<p>This guide shows how to extend the Mojentic framework with new gateways and custom functionality.</p>
+<h2 id="adding-a-new-llm-gateway"><a class="header" href="#adding-a-new-llm-gateway">Adding a New LLM Gateway</a></h2>
+<p>To add support for a new LLM provider, implement the <code>LlmGateway</code> trait:</p>
+<h3 id="1-create-the-gateway-file"><a class="header" href="#1-create-the-gateway-file">1. Create the Gateway File</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// src/llm/gateways/openai.rs
+use crate::error::{MojenticError, Result};
+use crate::llm::gateway::{CompletionConfig, LlmGateway};
+use crate::llm::models::{LlmGatewayResponse, LlmMessage};
+use crate::llm::tools::LlmTool;
+use async_trait::async_trait;
+use serde_json::Value;
+
+pub struct OpenAiGateway {
+    client: reqwest::Client,
+    api_key: String,
+    base_url: String,
+}
+
+impl OpenAiGateway {
+    pub fn new(api_key: String) -&gt; Self {
+        Self {
+            client: reqwest::Client::new(),
+            api_key,
+            base_url: "https://api.openai.com/v1".to_string(),
+        }
+    }
+}
+
+#[async_trait]
+impl LlmGateway for OpenAiGateway {
+    async fn complete(
+        &amp;self,
+        model: &amp;str,
+        messages: &amp;[LlmMessage],
+        tools: Option&lt;&amp;[Box&lt;dyn LlmTool&gt;]&gt;,
+        config: &amp;CompletionConfig,
+    ) -&gt; Result&lt;LlmGatewayResponse&gt; {
+        // Implement OpenAI completion API call
+        todo!()
+    }
+
+    async fn complete_json(
+        &amp;self,
+        model: &amp;str,
+        messages: &amp;[LlmMessage],
+        schema: Value,
+        config: &amp;CompletionConfig,
+    ) -&gt; Result&lt;Value&gt; {
+        // Implement OpenAI structured output
+        todo!()
+    }
+
+    async fn get_available_models(&amp;self) -&gt; Result&lt;Vec&lt;String&gt;&gt; {
+        // Implement model listing
+        todo!()
+    }
+
+    async fn calculate_embeddings(
+        &amp;self,
+        text: &amp;str,
+        model: Option&lt;&amp;str&gt;,
+    ) -&gt; Result&lt;Vec&lt;f32&gt;&gt; {
+        // Implement embeddings API
+        todo!()
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h3 id="2-export-the-gateway"><a class="header" href="#2-export-the-gateway">2. Export the Gateway</a></h3>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// src/llm/gateways/mod.rs
+pub mod ollama;
+pub mod openai;  // Add this line
+
+pub use ollama::{OllamaConfig, OllamaGateway};
+pub use openai::OpenAiGateway;  // Add this line
+<span class="boring">}</span></code></pre></pre>
+<h3 id="3-use-the-gateway"><a class="header" href="#3-use-the-gateway">3. Use the Gateway</a></h3>
+<pre><pre class="playground"><code class="language-rust">use mojentic::prelude::*;
+use mojentic::llm::gateways::OpenAiGateway;
+use std::sync::Arc;
+
+#[tokio::main]
+async fn main() -&gt; Result&lt;()&gt; {
+    let gateway = OpenAiGateway::new("your-api-key".to_string());
+    let broker = LlmBroker::new("gpt-4", Arc::new(gateway));
+
+    // Use as normal
+    let messages = vec![LlmMessage::user("Hello!")];
+    let response = broker.generate(&amp;messages, None, None).await?;
+
+    Ok(())
+}</code></pre></pre>
+<h2 id="creating-custom-message-types"><a class="header" href="#creating-custom-message-types">Creating Custom Message Types</a></h2>
+<p>You can create helper functions for specific message types:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use mojentic::llm::models::{LlmMessage, MessageRole};
+
+impl LlmMessage {
+    /// Create a message with an image
+    pub fn user_with_image(content: impl Into&lt;String&gt;, image_path: impl Into&lt;String&gt;) -&gt; Self {
+        Self {
+            role: MessageRole::User,
+            content: Some(content.into()),
+            tool_calls: None,
+            image_paths: Some(vec![image_path.into()]),
+        }
+    }
+
+    /// Create a system message with specific formatting
+    pub fn system_instruction(instruction: impl Into&lt;String&gt;) -&gt; Self {
+        let content = format!("SYSTEM INSTRUCTION: {}", instruction.into());
+        Self::system(content)
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="implementing-structured-output-types"><a class="header" href="#implementing-structured-output-types">Implementing Structured Output Types</a></h2>
+<p>Define your own structured output types with JSON Schema:</p>
+<pre><pre class="playground"><code class="language-rust">use serde::{Deserialize, Serialize};
+use schemars::JsonSchema;
+
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
+struct ProductReview {
+    rating: u8,
+    pros: Vec&lt;String&gt;,
+    cons: Vec&lt;String&gt;,
+    recommendation: bool,
+    summary: String,
+}
+
+#[tokio::main]
+async fn main() -&gt; mojentic::Result&lt;()&gt; {
+    let gateway = OllamaGateway::new();
+    let broker = LlmBroker::new("qwen3:32b", Arc::new(gateway));
+
+    let messages = vec![
+        LlmMessage::user(
+            "Review this product: A wireless mouse with RGB lighting, \
+             3200 DPI, 6 buttons, and 40-hour battery life."
+        )
+    ];
+
+    let review: ProductReview = broker.generate_object(&amp;messages, None).await?;
+
+    println!("Rating: {}/5", review.rating);
+    println!("Pros: {:?}", review.pros);
+    println!("Cons: {:?}", review.cons);
+    println!("Recommended: {}", review.recommendation);
+
+    Ok(())
+}</code></pre></pre>
+<h2 id="advanced-custom-gateway-configuration"><a class="header" href="#advanced-custom-gateway-configuration">Advanced: Custom Gateway Configuration</a></h2>
+<p>Create configuration structs for your gateways:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[derive(Debug, Clone)]
+pub struct CustomGatewayConfig {
+    pub endpoint: String,
+    pub timeout: std::time::Duration,
+    pub retry_attempts: u32,
+    pub custom_headers: HashMap&lt;String, String&gt;,
+}
+
+impl Default for CustomGatewayConfig {
+    fn default() -&gt; Self {
+        Self {
+            endpoint: std::env::var("CUSTOM_ENDPOINT")
+                .unwrap_or_else(|_| "https://api.example.com".to_string()),
+            timeout: std::time::Duration::from_secs(30),
+            retry_attempts: 3,
+            custom_headers: HashMap::new(),
+        }
+    }
+}
+
+pub struct CustomGateway {
+    client: reqwest::Client,
+    config: CustomGatewayConfig,
+}
+
+impl CustomGateway {
+    pub fn new() -&gt; Self {
+        Self::with_config(CustomGatewayConfig::default())
+    }
+
+    pub fn with_config(config: CustomGatewayConfig) -&gt; Self {
+        let client = reqwest::Client::builder()
+            .timeout(config.timeout)
+            .build()
+            .unwrap();
+
+        Self { client, config }
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="testing-your-extensions"><a class="header" href="#testing-your-extensions">Testing Your Extensions</a></h2>
+<p>Create tests for your gateways and tools:</p>
+<pre><pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_gateway_models() {
+        let gateway = OllamaGateway::new();
+        let models = gateway.get_available_models().await.unwrap();
+        assert!(!models.is_empty());
+    }
+}
+<span class="boring">}</span></code></pre></pre>
+<h2 id="best-practices"><a class="header" href="#best-practices">Best Practices</a></h2>
+<ol>
+<li><strong>Error Handling</strong>: Always use proper error types, never panic in library code</li>
+<li><strong>Async</strong>: All I/O operations should be async</li>
+<li><strong>Documentation</strong>: Add rustdoc comments to all public APIs</li>
+<li><strong>Testing</strong>: Write tests for your implementations</li>
+<li><strong>Configuration</strong>: Support environment variables for API keys and endpoints</li>
+<li><strong>Type Safety</strong>: Leverage Rust's type system for compile-time guarantees</li>
+</ol>
+<h2 id="need-help"><a class="header" href="#need-help">Need Help?</a></h2>
+<ul>
+<li>Check the existing implementations in <code>src/llm/gateways/ollama.rs</code></li>
+<li>Review the tool example in <code>examples/tool_usage.rs</code></li>
+<li>See the <a href="../core/building_tools.html">Building Tools</a> guide for tool development</li>
+</ul>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="../contributing/index.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+
+                            <a rel="next prefetch" href="../contributing/testing.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="../contributing/index.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+
+                    <a rel="next prefetch" href="../contributing/testing.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+            </nav>
+
+        </div>
+
+
+
+
+        <script>
+            window.playground_copyable = true;
+        </script>
+
+
+        <script src="../elasticlunr.min.js"></script>
+        <script src="../mark.min.js"></script>
+        <script src="../searcher.js"></script>
+
+        <script src="../clipboard.min.js"></script>
+        <script src="../highlight.js"></script>
+        <script src="../book.js"></script>
+
+        <!-- Custom JS scripts -->
+
+
+
+    </div>
+    </body>
+</html>
