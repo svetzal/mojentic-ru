@@ -165,28 +165,41 @@ cargo deny check
 - Update version in `Cargo.toml`
 - Update `CHANGELOG.md` with release notes
 
-### Release Workflow
+### Publishing a Release
+
+**The release pipeline is fully automated.** When you create a GitHub release with a `v*` tag, the CI/CD workflow will:
+1. Run all quality checks (fmt, clippy, test, security audit)
+2. Build and publish the package to crates.io
+3. Deploy documentation to GitHub Pages
+
+#### Steps to Release
 
 ```bash
-# 1. Update version in Cargo.toml
+# 1. Update version in Cargo.toml (e.g., version = "1.1.0")
 
 # 2. Update CHANGELOG.md
-#    - Move [Unreleased] changes to new version section
-#    - Add release date: [X.Y.Z] - YYYY-MM-DD
+#    - Add new version section with date: ## [1.1.0] - YYYY-MM-DD
+#    - Document all changes under appropriate headers (Added, Changed, Fixed, etc.)
 
 # 3. Commit and push
-git add -A && git commit -m "chore: prepare vX.Y.Z release"
+git add Cargo.toml CHANGELOG.md
+git commit -m "chore: prepare v1.1.0 release"
 git push origin main
 
-# 4. Create GitHub release
-gh release create vX.Y.Z --title "vX.Y.Z" --notes "Release notes here"
+# 4. Create GitHub release (this triggers the publish)
+gh release create v1.1.0 \
+  --title "v1.1.0 - Release Title" \
+  --notes "## What's New
+
+- Feature 1
+- Feature 2
+
+See [CHANGELOG.md](CHANGELOG.md) for full details."
 ```
 
-The CI/CD pipeline will automatically:
-- Run quality checks (fmt, clippy, test, deny)
-- Build the package
-- Deploy documentation to GitHub Pages
-- Publish to crates.io (when configured)
+**Important**: The tag MUST start with `v` (e.g., `v1.0.0`) to trigger crates.io publishing.
+
+The pipeline will automatically publish to crates.io using the `CRATES_IO_TOKEN` secret configured in the repository.
 
 ### CI/CD Pipeline
 
@@ -199,16 +212,21 @@ The GitHub Actions workflow (`.github/workflows/build.yml`) runs:
 | Release (`v*` tag) | ✅ | ✅ | ✅ |
 | Release (other tag) | ✅ | ✅ | ❌ |
 
+**Required GitHub Secrets:**
+- `CRATES_IO_TOKEN` - crates.io API token for publishing (get from https://crates.io/settings/tokens)
+
 ### Crates.io Publishing Requirements
 
 1. **CRATES_IO_TOKEN secret**: Must be configured in GitHub repository settings
-   - Settings → Secrets and variables → Actions → New repository secret
-   - Use an API token from crates.io
+   - Go to https://crates.io/settings/tokens
+   - Create a new token with publish access
+   - Add to GitHub: Settings → Secrets and variables → Actions → New repository secret
 
-2. **Package configuration** (`Cargo.toml`):
-   - Valid `name`, `version`, `description`, `license`
-   - `repository` pointing to GitHub repo
-   - `documentation` pointing to docs.rs or GitHub Pages
+2. **Package configuration** (`Cargo.toml`) - Already configured:
+   - `name`, `version`, `description`, `license` ✅
+   - `repository` pointing to GitHub repo ✅
+   - `documentation` pointing to docs ✅
+   - `keywords` and `categories` ✅
 
 ### Pre-Release Checklist
 
