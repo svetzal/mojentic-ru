@@ -1,6 +1,6 @@
 [book]
 title = "Mojentic (Rust)"
-author = "Mojentic Contributors"
+authors = ["Mojentic Contributors"]
 description = "Agentic framework in Rust: asynchronous pubsub architecture for orchestrating LLM-powered agents."
 language = "en"
 multilingual = false
