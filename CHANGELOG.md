@@ -5,6 +5,16 @@ All notable changes to the Mojentic Rust implementation will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.1] - 2026-02-01
+
+### Added
+
+- `ChatSession::send_stream()` method for streaming responses with automatic conversation history management
+  - Returns `Pin<Box<dyn Stream<Item = Result<String>>>>` yielding chunks in real-time
+  - Automatically records user message and assembled assistant response in conversation history
+  - Supports tool calling through broker's recursive streaming
+  - Respects context window limits
+
 ## [1.0.0] - 2025-11-27
 
 ### 🎉 First Stable Release

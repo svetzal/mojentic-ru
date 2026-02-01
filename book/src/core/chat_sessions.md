@@ -135,6 +135,22 @@ let response = session.send_message("What day of the week is July 4th, 2025?").a
 println!("{}", response);
 ```
 
+## Streaming Responses
+
+For a better user experience with longer responses, you can stream the LLM's reply as it's generated:
+
+```rust
+use futures::stream::StreamExt;
+
+let mut stream = session.send_stream("Tell me a story");
+while let Some(result) = stream.next().await {
+    print!("{}", result?);
+}
+println!(); // Newline after streaming completes
+```
+
+The `send_stream()` method works just like `send()` for conversation management — it adds the user message to history before streaming, and records the full assembled response after the stream is consumed. Tools are handled transparently through the broker's recursive streaming.
+
 ## Summary
 
 In this tutorial, we've learned how to:

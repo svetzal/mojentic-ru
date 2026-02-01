@@ -9,7 +9,9 @@ use crate::llm::gateway::CompletionConfig;
 use crate::llm::gateways::TokenizerGateway;
 use crate::llm::models::{LlmMessage, MessageRole};
 use crate::llm::tools::LlmTool;
+use futures::stream::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
+use std::pin::Pin;
 
 /// An LLM message with token count metadata.
 ///
@@ -164,6 +166,72 @@ impl ChatSession {
         self.insert_message(LlmMessage::assistant(&response));
 
         Ok(response)
+    }
+
+    /// Send a message to the LLM and get a streaming response.
+    ///
+    /// This method:
+    /// 1. Adds the user message to the conversation history
+    /// 2. Streams the response from the LLM, yielding chunks as they arrive
+    /// 3. After the stream is fully consumed, adds the assembled response to history
+    /// 4. Automatically trims old messages if context window is exceeded
+    ///
+    /// # Arguments
+    ///
+    /// * `query` - The user's message
+    ///
+    /// # Returns
+    ///
+    /// A stream of string chunks from the LLM response
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use futures::stream::StreamExt;
+    ///
+    /// let mut stream = session.send_stream("Tell me a story");
+    /// while let Some(result) = stream.next().await {
+    ///     print!("{}", result?);
+    /// }
+    /// ```
+    pub fn send_stream<'a>(
+        &'a mut self,
+        query: &str,
+    ) -> Pin<Box<dyn Stream<Item = Result<String>> + 'a>> {
+        // Add user message
+        self.insert_message(LlmMessage::user(query));
+
+        // Clone messages for the broker call
+        let messages: Vec<LlmMessage> = self.messages.iter().map(|m| m.message.clone()).collect();
+        let config = CompletionConfig {
+            temperature: self.temperature,
+            ..Default::default()
+        };
+
+        Box::pin(async_stream::stream! {
+            let mut accumulated = Vec::new();
+            let tools_ref = self.tools.as_deref();
+            let mut inner_stream = self.broker.generate_stream(&messages, tools_ref, Some(config), None);
+
+            while let Some(result) = inner_stream.next().await {
+                match &result {
+                    Ok(chunk) => {
+                        accumulated.push(chunk.clone());
+                        yield result;
+                    }
+                    Err(_) => {
+                        yield result;
+                        return;
+                    }
+                }
+            }
+
+            // Stream consumed — finalize
+            drop(inner_stream);
+            self.ensure_all_messages_are_sized();
+            let full_response = accumulated.join("");
+            self.insert_message(LlmMessage::assistant(&full_response));
+        })
     }
 
     /// Insert a message into the conversation history.
@@ -588,6 +656,172 @@ mod tests {
         assert_eq!(sized.token_length, 5);
         assert_eq!(sized.role(), MessageRole::User);
         assert_eq!(sized.content(), Some("Test content"));
+    }
+
+    // Streaming mock gateway
+    struct StreamingMockGateway {
+        stream_chunks: Vec<Vec<String>>,
+        call_count: Mutex<usize>,
+    }
+
+    impl StreamingMockGateway {
+        fn new(stream_chunks: Vec<Vec<String>>) -> Self {
+            Self {
+                stream_chunks,
+                call_count: Mutex::new(0),
+            }
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl LlmGateway for StreamingMockGateway {
+        async fn complete(
+            &self,
+            _model: &str,
+            _messages: &[LlmMessage],
+            _tools: Option<&[Box<dyn LlmTool>]>,
+            _config: &CompletionConfig,
+        ) -> Result<LlmGatewayResponse> {
+            Ok(LlmGatewayResponse {
+                content: Some("default".to_string()),
+                object: None,
+                tool_calls: vec![],
+            })
+        }
+
+        async fn complete_json(
+            &self,
+            _model: &str,
+            _messages: &[LlmMessage],
+            _schema: Value,
+            _config: &CompletionConfig,
+        ) -> Result<Value> {
+            Ok(json!({}))
+        }
+
+        async fn get_available_models(&self) -> Result<Vec<String>> {
+            Ok(vec!["test-model".to_string()])
+        }
+
+        async fn calculate_embeddings(
+            &self,
+            _text: &str,
+            _model: Option<&str>,
+        ) -> Result<Vec<f32>> {
+            Ok(vec![0.1, 0.2, 0.3])
+        }
+
+        fn complete_stream<'a>(
+            &'a self,
+            _model: &'a str,
+            _messages: &'a [LlmMessage],
+            _tools: Option<&'a [Box<dyn LlmTool>]>,
+            _config: &'a CompletionConfig,
+        ) -> Pin<Box<dyn Stream<Item = Result<StreamChunk>> + Send + 'a>> {
+            let mut count = self.call_count.lock().unwrap();
+            let idx = *count;
+            *count += 1;
+
+            let chunks = if idx < self.stream_chunks.len() {
+                self.stream_chunks[idx].clone()
+            } else {
+                vec!["default".to_string()]
+            };
+
+            Box::pin(stream::iter(
+                chunks.into_iter().map(|c| Ok(StreamChunk::Content(c))).collect::<Vec<_>>(),
+            ))
+        }
+    }
+
+    #[tokio::test]
+    async fn test_send_stream_yields_content_chunks() {
+        let gateway = Arc::new(StreamingMockGateway::new(vec![vec![
+            "Hello".to_string(),
+            " world".to_string(),
+        ]]));
+        let broker = LlmBroker::new("test-model", gateway, None);
+        let mut session = ChatSession::new(broker);
+
+        let mut chunks = Vec::new();
+        let mut stream = session.send_stream("Hi");
+        while let Some(result) = stream.next().await {
+            chunks.push(result.unwrap());
+        }
+
+        assert_eq!(chunks, vec!["Hello", " world"]);
+    }
+
+    #[tokio::test]
+    async fn test_send_stream_grows_message_history() {
+        let gateway = Arc::new(StreamingMockGateway::new(vec![vec!["Response".to_string()]]));
+        let broker = LlmBroker::new("test-model", gateway, None);
+        let mut session = ChatSession::new(broker);
+
+        {
+            let mut stream = session.send_stream("Hi");
+            while stream.next().await.is_some() {}
+        }
+
+        // system + user + assistant
+        assert_eq!(session.messages.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_send_stream_records_assembled_response() {
+        let gateway = Arc::new(StreamingMockGateway::new(vec![vec![
+            "Hello".to_string(),
+            " world".to_string(),
+        ]]));
+        let broker = LlmBroker::new("test-model", gateway, None);
+        let mut session = ChatSession::new(broker);
+
+        {
+            let mut stream = session.send_stream("Hi");
+            while stream.next().await.is_some() {}
+        }
+
+        assert_eq!(session.messages[2].content(), Some("Hello world"));
+        assert_eq!(session.messages[2].role(), MessageRole::Assistant);
+    }
+
+    #[tokio::test]
+    async fn test_send_stream_records_user_message() {
+        let gateway = Arc::new(StreamingMockGateway::new(vec![vec!["Response".to_string()]]));
+        let broker = LlmBroker::new("test-model", gateway, None);
+        let mut session = ChatSession::new(broker);
+
+        {
+            let mut stream = session.send_stream("My question");
+            while stream.next().await.is_some() {}
+        }
+
+        assert_eq!(session.messages[1].role(), MessageRole::User);
+        assert_eq!(session.messages[1].content(), Some("My question"));
+    }
+
+    #[tokio::test]
+    async fn test_send_stream_respects_context_capacity() {
+        let gateway = Arc::new(StreamingMockGateway::new(vec![
+            vec!["This is a longer response to consume tokens in the context window".to_string()],
+            vec!["Another longer response that also consumes many tokens in context".to_string()],
+        ]));
+        let broker = LlmBroker::new("test-model", gateway, None);
+        let mut session = ChatSession::builder(broker).max_context(50).build();
+
+        {
+            let mut stream = session.send_stream("First longer query message with extra words");
+            while stream.next().await.is_some() {}
+        }
+        {
+            let mut stream = session.send_stream("Second longer query message with extra words");
+            while stream.next().await.is_some() {}
+        }
+
+        // System prompt should still be first
+        assert_eq!(session.messages[0].role(), MessageRole::System);
+        // Total tokens should be under limit
+        assert!(session.total_tokens() <= 50);
     }
 
     #[tokio::test]
