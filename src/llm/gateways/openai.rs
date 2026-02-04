@@ -830,7 +830,7 @@ mod tests {
 
         assert!(!params.contains_key("max_tokens"));
         assert!(params.contains_key("max_completion_tokens"));
-        assert!(!supports_tools); // o1 doesn't support tools
+        assert!(supports_tools); // o1 now supports tools (audit 2026-02-04)
     }
 
     #[tokio::test]

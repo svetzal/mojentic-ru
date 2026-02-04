@@ -88,68 +88,68 @@ impl OpenAIModelRegistry {
     }
 
     fn initialize_default_models(&mut self) {
+        // Updated 2026-02-04 based on OpenAI API audit
         // Reasoning Models (o1, o3, o4, gpt-5 series)
         let reasoning_models = vec![
             "o1",
             "o1-2024-12-17",
-            "o1-mini",
-            "o1-mini-2024-09-12",
-            "o1-pro",
-            "o1-pro-2025-03-19",
             "o3",
             "o3-2025-04-16",
-            "o3-deep-research",
-            "o3-deep-research-2025-06-26",
             "o3-mini",
             "o3-mini-2025-01-31",
-            "o3-pro",
-            "o3-pro-2025-06-10",
             "o4-mini",
             "o4-mini-2025-04-16",
-            "o4-mini-deep-research",
-            "o4-mini-deep-research-2025-06-26",
             "gpt-5",
             "gpt-5-2025-08-07",
-            "gpt-5-chat-latest",
-            "gpt-5-codex",
             "gpt-5-mini",
             "gpt-5-mini-2025-08-07",
             "gpt-5-nano",
             "gpt-5-nano-2025-08-07",
+            "gpt-5-pro",
+            "gpt-5-pro-2025-10-06",
+            "gpt-5.1",
+            "gpt-5.1-2025-11-13",
+            "gpt-5.1-chat-latest",
+            "gpt-5.2",
+            "gpt-5.2-2025-12-11",
+            "gpt-5.2-chat-latest",
         ];
 
         for model in reasoning_models {
-            let is_deep_research = model.contains("deep-research");
-            let is_gpt5 = model.contains("gpt-5");
-            let is_o1_series = model.starts_with("o1");
-            let is_o3_series = model.starts_with("o3");
-            let is_o4_series = model.starts_with("o4");
+            let is_gpt5_mini = model == "gpt-5-mini";
+            let is_o4_mini = model == "o4-mini";
+            let is_o_series =
+                model.starts_with("o1") || model.starts_with("o3") || model.starts_with("o4");
+            let is_gpt5_series = model.starts_with("gpt-5");
             let is_mini_or_nano = model.contains("mini") || model.contains("nano");
 
-            // GPT-5 models may support more features than o1/o3/o4
-            let supports_tools = is_gpt5;
-            let supports_streaming = is_gpt5;
+            // All reasoning models now support tools and streaming (audit 2026-02-04)
+            // Exceptions: gpt-5-mini (base) and o4-mini (base) do not support tools
+            let supports_tools = !is_gpt5_mini && !is_o4_mini;
+            let supports_streaming = true;
 
             // Set context and output tokens based on model tier
-            let (context_tokens, output_tokens) = if is_gpt5 {
+            let (context_tokens, output_tokens) = if is_gpt5_series {
                 if is_mini_or_nano {
                     (200000, 32768)
                 } else {
                     (300000, 50000)
                 }
-            } else if is_deep_research {
-                (200000, 100000)
             } else {
                 (128000, 32768)
             };
 
-            // Temperature restrictions based on model series
-            let supported_temps = if is_gpt5 || is_o1_series || is_o4_series {
-                // GPT-5, o1, and o4 series only support temperature=1.0
-                Some(vec![1.0])
-            } else if is_o3_series {
-                // o3 series doesn't support temperature parameter at all
-                Some(vec![])
+            // Temperature restrictions based on model series (audit 2026-02-04)
+            // o1 series: temperature=1.0 only
+            // o3 series: temperature=1.0 only (was: no temperature)
+            // o4 series: temperature=1.0 only
+            // gpt-5 base/mini/nano/pro: temperature=1.0 only
+            // gpt-5.1*: all temperatures
+            // gpt-5.2*: all temperatures
+            let supported_temps = if model.starts_with("gpt-5.1") || model.starts_with("gpt-5.2") {
+                None // All temperatures supported
+            } else if is_o_series || is_gpt5_series {
+                Some(vec![1.0]) // Only temperature=1.0
             } else {
                 None
             };
@@ -168,7 +168,7 @@ impl OpenAIModelRegistry {
             );
         }
 
-        // Chat Models (GPT-4 and GPT-4.1 series)
+        // Chat Models (GPT-4, GPT-4.1, and GPT-5 chat series)
         let gpt4_and_newer_models = vec![
             "chatgpt-4o-latest",
             "gpt-4",
@@ -189,37 +189,36 @@ impl OpenAIModelRegistry {
             "gpt-4o-2024-08-06",
             "gpt-4o-2024-11-20",
             "gpt-4o-audio-preview",
-            "gpt-4o-audio-preview-2024-10-01",
             "gpt-4o-audio-preview-2024-12-17",
             "gpt-4o-audio-preview-2025-06-03",
             "gpt-4o-mini",
             "gpt-4o-mini-2024-07-18",
             "gpt-4o-mini-audio-preview",
             "gpt-4o-mini-audio-preview-2024-12-17",
-            "gpt-4o-mini-realtime-preview",
-            "gpt-4o-mini-realtime-preview-2024-12-17",
             "gpt-4o-mini-search-preview",
             "gpt-4o-mini-search-preview-2025-03-11",
-            "gpt-4o-mini-transcribe",
-            "gpt-4o-mini-tts",
-            "gpt-4o-realtime-preview",
-            "gpt-4o-realtime-preview-2024-10-01",
-            "gpt-4o-realtime-preview-2024-12-17",
-            "gpt-4o-realtime-preview-2025-06-03",
             "gpt-4o-search-preview",
             "gpt-4o-search-preview-2025-03-11",
-            "gpt-4o-transcribe",
+            "gpt-5-chat-latest",
+            "gpt-5-search-api",
+            "gpt-5-search-api-2025-10-14",
         ];
 
         for model in gpt4_and_newer_models {
-            let vision_support = model.contains("gpt-4o")
-                || model.contains("audio-preview")
-                || model.contains("realtime");
+            // Audit 2026-02-04: Keep vision=true for gpt-4o (probe limitation, not real capability change)
+            let vision_support = model.contains("gpt-4o");
             let is_mini_or_nano = model.contains("mini") || model.contains("nano");
-            let is_audio = model.contains("audio")
-                || model.contains("realtime")
-                || model.contains("transcribe");
+            let is_audio = model.contains("audio-preview");
+            let is_search = model.contains("search");
             let is_gpt41 = model.contains("gpt-4.1");
+            let is_gpt41_nano_base = model == "gpt-4.1-nano";
+
+            // Audit 2026-02-04: chatgpt-4o-latest, gpt-4.1-nano (base only), audio models, and search models don't support tools
+            let supports_tools =
+                model != "chatgpt-4o-latest" && !is_gpt41_nano_base && !is_audio && !is_search;
+
+            // Audio models don't support streaming (require audio modality)
+            let supports_streaming = !is_audio;
 
             let (context_tokens, output_tokens) = if is_gpt41 {
                 if is_mini_or_nano {
@@ -229,20 +228,25 @@ impl OpenAIModelRegistry {
                 }
             } else if model.contains("gpt-4o") {
                 (128000, 16384)
+            } else if model.starts_with("gpt-5") {
+                (300000, 50000)
             } else {
                 (32000, 8192)
             };
+
+            // Search models don't allow temperature parameter
+            let supported_temps = if is_search { Some(vec![]) } else { None };
 
             self.models.insert(
                 model.to_string(),
                 ModelCapabilities {
                     model_type: ModelType::Chat,
-                    supports_tools: true,
-                    supports_streaming: !is_audio,
+                    supports_tools,
+                    supports_streaming,
                     supports_vision: vision_support,
                     max_context_tokens: Some(context_tokens),
                     max_output_tokens: Some(output_tokens),
-                    supported_temperatures: None,
+                    supported_temperatures: supported_temps,
                 },
             );
         }
@@ -300,6 +304,8 @@ impl OpenAIModelRegistry {
         self.pattern_mappings.insert("o1".to_string(), ModelType::Reasoning);
         self.pattern_mappings.insert("o3".to_string(), ModelType::Reasoning);
         self.pattern_mappings.insert("o4".to_string(), ModelType::Reasoning);
+        self.pattern_mappings.insert("gpt-5.2".to_string(), ModelType::Reasoning);
+        self.pattern_mappings.insert("gpt-5.1".to_string(), ModelType::Reasoning);
         self.pattern_mappings.insert("gpt-5".to_string(), ModelType::Reasoning);
         self.pattern_mappings.insert("gpt-4".to_string(), ModelType::Chat);
         self.pattern_mappings.insert("gpt-4.1".to_string(), ModelType::Chat);
@@ -579,5 +585,175 @@ mod tests {
         assert_eq!(caps.model_type, ModelType::Chat);
         assert!(!caps.supports_tools);
         assert!(!caps.supports_streaming);
+    }
+
+    // Tests for audit 2026-02-04 changes
+
+    #[test]
+    fn test_o1_supports_tools_and_streaming() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("o1");
+        assert!(caps.supports_tools);
+        assert!(caps.supports_streaming);
+        assert_eq!(caps.supported_temperatures, Some(vec![1.0]));
+    }
+
+    #[test]
+    fn test_o3_supports_tools_and_streaming_and_temperature() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("o3");
+        assert!(caps.supports_tools);
+        assert!(caps.supports_streaming);
+        assert_eq!(caps.supported_temperatures, Some(vec![1.0]));
+    }
+
+    #[test]
+    fn test_o3_mini_supports_tools_and_streaming() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("o3-mini");
+        assert!(caps.supports_tools);
+        assert!(caps.supports_streaming);
+        assert_eq!(caps.supported_temperatures, Some(vec![1.0]));
+    }
+
+    #[test]
+    fn test_o4_mini_no_tools_but_supports_streaming() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("o4-mini");
+        assert!(!caps.supports_tools);
+        assert!(caps.supports_streaming);
+    }
+
+    #[test]
+    fn test_o4_mini_dated_supports_tools() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("o4-mini-2025-04-16");
+        assert!(caps.supports_tools);
+        assert!(caps.supports_streaming);
+    }
+
+    #[test]
+    fn test_chatgpt_4o_latest_no_tools() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("chatgpt-4o-latest");
+        assert!(!caps.supports_tools);
+        assert!(caps.supports_streaming);
+    }
+
+    #[test]
+    fn test_gpt41_nano_base_no_tools() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("gpt-4.1-nano");
+        assert!(!caps.supports_tools);
+    }
+
+    #[test]
+    fn test_gpt41_nano_dated_has_tools() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("gpt-4.1-nano-2025-04-14");
+        assert!(caps.supports_tools);
+    }
+
+    #[test]
+    fn test_audio_preview_no_tools_no_streaming() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("gpt-4o-audio-preview");
+        assert!(!caps.supports_tools);
+        assert!(!caps.supports_streaming);
+    }
+
+    #[test]
+    fn test_search_preview_no_tools_no_temperature() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("gpt-4o-search-preview");
+        assert!(!caps.supports_tools);
+        assert!(caps.supports_streaming);
+        assert_eq!(caps.supported_temperatures, Some(vec![]));
+    }
+
+    #[test]
+    fn test_gpt5_chat_latest_is_chat_type() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("gpt-5-chat-latest");
+        assert_eq!(caps.model_type, ModelType::Chat);
+        assert!(caps.supports_tools);
+        assert_eq!(caps.supported_temperatures, None);
+    }
+
+    #[test]
+    fn test_gpt5_mini_base_no_tools() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("gpt-5-mini");
+        assert!(!caps.supports_tools);
+    }
+
+    #[test]
+    fn test_gpt5_mini_dated_has_tools() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("gpt-5-mini-2025-08-07");
+        assert!(caps.supports_tools);
+    }
+
+    #[test]
+    fn test_gpt5_pro_exists() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("gpt-5-pro");
+        assert_eq!(caps.model_type, ModelType::Reasoning);
+        assert!(caps.supports_tools);
+    }
+
+    #[test]
+    fn test_gpt5_search_api_no_tools_no_temperature() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("gpt-5-search-api");
+        assert_eq!(caps.model_type, ModelType::Chat);
+        assert!(!caps.supports_tools);
+        assert_eq!(caps.supported_temperatures, Some(vec![]));
+    }
+
+    #[test]
+    fn test_gpt51_all_temperatures() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("gpt-5.1");
+        assert_eq!(caps.model_type, ModelType::Reasoning);
+        assert_eq!(caps.supported_temperatures, None);
+    }
+
+    #[test]
+    fn test_gpt52_all_temperatures() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("gpt-5.2");
+        assert_eq!(caps.model_type, ModelType::Reasoning);
+        assert_eq!(caps.supported_temperatures, None);
+    }
+
+    #[test]
+    fn test_gpt51_pattern_matching() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("gpt-5.1-unknown");
+        assert_eq!(caps.model_type, ModelType::Reasoning);
+    }
+
+    #[test]
+    fn test_gpt52_pattern_matching() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("gpt-5.2-unknown");
+        assert_eq!(caps.model_type, ModelType::Reasoning);
+    }
+
+    #[test]
+    fn test_deprecated_models_removed() {
+        let registry = OpenAIModelRegistry::new();
+        let models = registry.get_registered_models();
+
+        // Verify removed models are not in registry
+        assert!(!models.contains(&"o1-mini".to_string()));
+        assert!(!models.contains(&"o1-mini-2024-09-12".to_string()));
+        assert!(!models.contains(&"o1-pro".to_string()));
+        assert!(!models.contains(&"o3-pro".to_string()));
+        assert!(!models.contains(&"o3-deep-research".to_string()));
+        assert!(!models.contains(&"o4-mini-deep-research".to_string()));
+        assert!(!models.contains(&"gpt-4o-audio-preview-2024-10-01".to_string()));
+        assert!(!models.contains(&"gpt-5-codex".to_string()));
     }
 }
