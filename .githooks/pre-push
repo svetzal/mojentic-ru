@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+echo "========================================"
+echo "  Mojentic Rust — Pre-Push Checks"
+echo "========================================"
+
+echo ""
+echo "--- [1/5] cargo fmt --check ---"
+cargo fmt -- --check
+echo "PASSED"
+
+echo ""
+echo "--- [2/5] cargo clippy ---"
+cargo clippy --all-targets --all-features -- -D warnings
+echo "PASSED"
+
+echo ""
+echo "--- [3/5] cargo test ---"
+cargo test --all-features
+echo "PASSED"
+
+echo ""
+echo "--- [4/5] cargo audit ---"
+cargo audit
+echo "PASSED"
+
+echo ""
+echo "--- [5/5] cargo deny check ---"
+cargo deny check
+echo "PASSED"
+
+echo ""
+echo "========================================"
+echo "  All checks passed — push allowed"
+echo "========================================"
