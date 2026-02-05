@@ -31,6 +31,9 @@ pub struct ModelCapabilities {
     pub max_output_tokens: Option<u32>,
     /// None means all temperatures supported, empty vec means no temperature parameter allowed
     pub supported_temperatures: Option<Vec<f32>>,
+    pub supports_chat_api: bool,
+    pub supports_completions_api: bool,
+    pub supports_responses_api: bool,
 }
 
 impl ModelCapabilities {
@@ -63,6 +66,9 @@ impl Default for ModelCapabilities {
             max_context_tokens: None,
             max_output_tokens: None,
             supported_temperatures: None,
+            supports_chat_api: true,
+            supports_completions_api: false,
+            supports_responses_api: false,
         }
     }
 }
@@ -154,6 +160,11 @@ impl OpenAIModelRegistry {
                 None
             };
 
+            // Endpoint support flags
+            let is_responses_only =
+                model.contains("pro") || model.contains("deep-research") || model == "gpt-5-codex";
+            let is_both_endpoint = model == "gpt-5.1" || model == "gpt-5.1-2025-11-13";
+
             self.models.insert(
                 model.to_string(),
                 ModelCapabilities {
@@ -164,6 +175,9 @@ impl OpenAIModelRegistry {
                     max_context_tokens: Some(context_tokens),
                     max_output_tokens: Some(output_tokens),
                     supported_temperatures: supported_temps,
+                    supports_chat_api: !is_responses_only,
+                    supports_completions_api: is_both_endpoint,
+                    supports_responses_api: is_responses_only,
                 },
             );
         }
@@ -237,6 +251,12 @@ impl OpenAIModelRegistry {
             // Search models don't allow temperature parameter
             let supported_temps = if is_search { Some(vec![]) } else { None };
 
+            // Endpoint support flags
+            let is_both_endpoint = model == "gpt-4.1-nano"
+                || model == "gpt-4.1-nano-2025-04-14"
+                || model == "gpt-4o-mini"
+                || model == "gpt-4o-mini-2024-07-18";
+
             self.models.insert(
                 model.to_string(),
                 ModelCapabilities {
@@ -247,6 +267,9 @@ impl OpenAIModelRegistry {
                     max_context_tokens: Some(context_tokens),
                     max_output_tokens: Some(output_tokens),
                     supported_temperatures: supported_temps,
+                    supports_chat_api: true,
+                    supports_completions_api: is_both_endpoint,
+                    supports_responses_api: false,
                 },
             );
         }
@@ -274,6 +297,9 @@ impl OpenAIModelRegistry {
                     max_context_tokens: Some(16385),
                     max_output_tokens: Some(4096),
                     supported_temperatures: None,
+                    supports_chat_api: !is_instruct,
+                    supports_completions_api: is_instruct,
+                    supports_responses_api: false,
                 },
             );
         }
@@ -296,9 +322,74 @@ impl OpenAIModelRegistry {
                     max_context_tokens: None,
                     max_output_tokens: None,
                     supported_temperatures: None,
+                    supports_chat_api: false,
+                    supports_completions_api: false,
+                    supports_responses_api: false,
                 },
             );
         }
+
+        // Legacy & Codex Models - completions-only and responses-only
+        self.models.insert(
+            "babbage-002".to_string(),
+            ModelCapabilities {
+                model_type: ModelType::Chat,
+                supports_tools: false,
+                supports_streaming: false,
+                supports_vision: false,
+                max_context_tokens: Some(16384),
+                max_output_tokens: Some(4096),
+                supported_temperatures: None,
+                supports_chat_api: false,
+                supports_completions_api: true,
+                supports_responses_api: false,
+            },
+        );
+        self.models.insert(
+            "davinci-002".to_string(),
+            ModelCapabilities {
+                model_type: ModelType::Chat,
+                supports_tools: false,
+                supports_streaming: false,
+                supports_vision: false,
+                max_context_tokens: Some(16384),
+                max_output_tokens: Some(4096),
+                supported_temperatures: None,
+                supports_chat_api: false,
+                supports_completions_api: true,
+                supports_responses_api: false,
+            },
+        );
+        self.models.insert(
+            "gpt-5.1-codex-mini".to_string(),
+            ModelCapabilities {
+                model_type: ModelType::Reasoning,
+                supports_tools: false,
+                supports_streaming: false,
+                supports_vision: false,
+                max_context_tokens: Some(200000),
+                max_output_tokens: Some(32768),
+                supported_temperatures: None,
+                supports_chat_api: false,
+                supports_completions_api: true,
+                supports_responses_api: false,
+            },
+        );
+        self.models.insert(
+            "codex-mini-latest".to_string(),
+            ModelCapabilities {
+                model_type: ModelType::Reasoning,
+                supports_tools: false,
+                supports_streaming: false,
+                supports_vision: false,
+                max_context_tokens: Some(200000),
+                max_output_tokens: Some(32768),
+                supported_temperatures: None,
+                supports_chat_api: false,
+                supports_completions_api: false,
+                supports_responses_api: true,
+            },
+        );
 
         // Pattern mappings for unknown models
         self.pattern_mappings.insert("o1".to_string(), ModelType::Reasoning);
@@ -352,6 +443,9 @@ impl OpenAIModelRegistry {
                 max_context_tokens: None,
                 max_output_tokens: None,
                 supported_temperatures: None,
+                supports_chat_api: true,
+                supports_completions_api: false,
+                supports_responses_api: false,
             },
             ModelType::Chat => ModelCapabilities {
                 model_type: ModelType::Chat,
@@ -361,6 +455,9 @@ impl OpenAIModelRegistry {
                 max_context_tokens: None,
                 max_output_tokens: None,
                 supported_temperatures: None,
+                supports_chat_api: true,
+                supports_completions_api: false,
+                supports_responses_api: false,
             },
             ModelType::Embedding => ModelCapabilities {
                 model_type: ModelType::Embedding,
@@ -370,6 +467,9 @@ impl OpenAIModelRegistry {
                 max_context_tokens: None,
                 max_output_tokens: None,
                 supported_temperatures: None,
+                supports_chat_api: false,
+                supports_completions_api: false,
+                supports_responses_api: false,
             },
             ModelType::Moderation => ModelCapabilities {
                 model_type: ModelType::Moderation,
@@ -379,6 +479,9 @@ impl OpenAIModelRegistry {
                 max_context_tokens: None,
                 max_output_tokens: None,
                 supported_temperatures: None,
+                supports_chat_api: false,
+                supports_completions_api: false,
+                supports_responses_api: false,
             },
         }
     }
@@ -755,5 +858,86 @@ mod tests {
         assert!(!models.contains(&"o4-mini-deep-research".to_string()));
         assert!(!models.contains(&"gpt-4o-audio-preview-2024-10-01".to_string()));
         assert!(!models.contains(&"gpt-5-codex".to_string()));
+    }
+
+    #[test]
+    fn test_chat_only_model_endpoint_flags() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("gpt-4");
+        assert!(caps.supports_chat_api);
+        assert!(!caps.supports_completions_api);
+        assert!(!caps.supports_responses_api);
+    }
+
+    #[test]
+    fn test_both_endpoint_model_flags() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("gpt-4o-mini");
+        assert!(caps.supports_chat_api);
+        assert!(caps.supports_completions_api);
+        assert!(!caps.supports_responses_api);
+    }
+
+    #[test]
+    fn test_completions_only_model_flags() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("gpt-3.5-turbo-instruct");
+        assert!(!caps.supports_chat_api);
+        assert!(caps.supports_completions_api);
+        assert!(!caps.supports_responses_api);
+    }
+
+    #[test]
+    fn test_responses_only_model_flags() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("gpt-5-pro");
+        assert!(!caps.supports_chat_api);
+        assert!(!caps.supports_completions_api);
+        assert!(caps.supports_responses_api);
+    }
+
+    #[test]
+    fn test_legacy_completions_model_flags() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("babbage-002");
+        assert!(!caps.supports_chat_api);
+        assert!(caps.supports_completions_api);
+        assert!(!caps.supports_responses_api);
+    }
+
+    #[test]
+    fn test_embedding_model_endpoint_flags() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("text-embedding-3-large");
+        assert!(!caps.supports_chat_api);
+        assert!(!caps.supports_completions_api);
+        assert!(!caps.supports_responses_api);
+    }
+
+    #[test]
+    fn test_codex_mini_latest_responses_only() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("codex-mini-latest");
+        assert!(!caps.supports_chat_api);
+        assert!(!caps.supports_completions_api);
+        assert!(caps.supports_responses_api);
+    }
+
+    #[test]
+    fn test_gpt51_both_chat_and_completions() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("gpt-5.1");
+        assert!(caps.supports_chat_api);
+        assert!(caps.supports_completions_api);
+        assert!(!caps.supports_responses_api);
+    }
+
+    #[test]
+    fn test_default_capabilities_include_endpoint_flags() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("completely-unknown-model-xyz");
+        assert!(caps.supports_chat_api);
+        assert!(!caps.supports_completions_api);
+        assert!(!caps.supports_responses_api);
     }
 }
