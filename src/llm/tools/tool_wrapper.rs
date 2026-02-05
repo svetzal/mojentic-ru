@@ -162,6 +162,7 @@ mod tests {
                 content: Some(self.response.clone()),
                 object: None,
                 tool_calls: vec![],
+                thinking: None,
             })
         }
 

@@ -3,6 +3,7 @@ use crate::llm::models::{LlmGatewayResponse, LlmMessage};
 use crate::llm::tools::LlmTool;
 use async_trait::async_trait;
 use futures::stream::Stream;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::pin::Pin;
 
@@ -15,6 +16,15 @@ pub enum ResponseFormat {
     JsonObject { schema: Option<Value> },
 }
 
+/// Reasoning effort level for models that support extended thinking
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ReasoningEffort {
+    Low,
+    Medium,
+    High,
+}
+
 /// Configuration for LLM completion
 #[derive(Debug, Clone)]
 pub struct CompletionConfig {
@@ -25,6 +35,7 @@ pub struct CompletionConfig {
     pub top_p: Option<f32>,
     pub top_k: Option<u32>,
     pub response_format: Option<ResponseFormat>,
+    pub reasoning_effort: Option<ReasoningEffort>,
 }
 
 impl Default for CompletionConfig {
@@ -37,6 +48,7 @@ impl Default for CompletionConfig {
             top_p: None,
             top_k: None,
             response_format: None,
+            reasoning_effort: None,
         }
     }
 }
@@ -105,6 +117,7 @@ mod tests {
         assert_eq!(config.top_p, None);
         assert_eq!(config.top_k, None);
         assert!(config.response_format.is_none());
+        assert!(config.reasoning_effort.is_none());
     }
 
     #[test]
@@ -117,6 +130,7 @@ mod tests {
             top_p: Some(0.9),
             top_k: Some(40),
             response_format: Some(ResponseFormat::Text),
+            reasoning_effort: None,
         };
 
         assert_eq!(config.temperature, 0.5);
@@ -138,6 +152,7 @@ mod tests {
             top_p: Some(0.95),
             top_k: Some(50),
             response_format: Some(ResponseFormat::JsonObject { schema: None }),
+            reasoning_effort: None,
         };
 
         let config2 = config1.clone();
@@ -194,11 +209,51 @@ mod tests {
             response_format: Some(ResponseFormat::JsonObject {
                 schema: Some(serde_json::json!({"type": "object"})),
             }),
+            reasoning_effort: None,
         };
 
         assert_eq!(config.temperature, 0.8);
         assert_eq!(config.top_p, Some(0.92));
         assert_eq!(config.top_k, Some(60));
         assert!(config.response_format.is_some());
+    }
+
+    #[test]
+    fn test_reasoning_effort_serialization() {
+        assert_eq!(serde_json::to_string(&ReasoningEffort::Low).unwrap(), "\"low\"");
+        assert_eq!(serde_json::to_string(&ReasoningEffort::Medium).unwrap(), "\"medium\"");
+        assert_eq!(serde_json::to_string(&ReasoningEffort::High).unwrap(), "\"high\"");
+    }
+
+    #[test]
+    fn test_reasoning_effort_deserialization() {
+        assert_eq!(
+            serde_json::from_str::<ReasoningEffort>("\"low\"").unwrap(),
+            ReasoningEffort::Low
+        );
+        assert_eq!(
+            serde_json::from_str::<ReasoningEffort>("\"medium\"").unwrap(),
+            ReasoningEffort::Medium
+        );
+        assert_eq!(
+            serde_json::from_str::<ReasoningEffort>("\"high\"").unwrap(),
+            ReasoningEffort::High
+        );
+    }
+
+    #[test]
+    fn test_completion_config_with_reasoning_effort() {
+        let config = CompletionConfig {
+            temperature: 1.0,
+            num_ctx: 32768,
+            max_tokens: 16384,
+            num_predict: None,
+            top_p: None,
+            top_k: None,
+            response_format: None,
+            reasoning_effort: Some(ReasoningEffort::High),
+        };
+
+        assert_eq!(config.reasoning_effort, Some(ReasoningEffort::High));
     }
 }

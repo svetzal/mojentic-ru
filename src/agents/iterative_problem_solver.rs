@@ -291,6 +291,7 @@ mod tests {
                 content: Some(content),
                 object: None,
                 tool_calls: vec![],
+                thinking: None,
             })
         }
 

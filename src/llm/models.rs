@@ -43,6 +43,7 @@ pub struct LlmGatewayResponse<T = ()> {
     pub content: Option<String>,
     pub object: Option<T>,
     pub tool_calls: Vec<LlmToolCall>,
+    pub thinking: Option<String>,
 }
 
 impl LlmMessage {

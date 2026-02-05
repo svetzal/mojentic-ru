@@ -19,6 +19,7 @@
   - [The Basics](core/starter_1.md)
   - [Message Composers](core/message_composers.md)
   - [Simple Text Generation](core/simple_text_generation.md)
+  - [Reasoning Effort Control](core/reasoning_effort.md)
   - [Building Tools](core/building_tools.md)
   - [Tool Usage](core/tool_usage.md)
   - [Agent Delegation](core/agent_delegation.md)

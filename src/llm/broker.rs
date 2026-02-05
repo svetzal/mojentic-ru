@@ -557,6 +557,7 @@ mod tests {
                     content: Some("default response".to_string()),
                     object: None,
                     tool_calls: vec![],
+                    thinking: None,
                 })
             }
         }
@@ -645,6 +646,7 @@ mod tests {
             content: Some("Hello, World!".to_string()),
             object: None,
             tool_calls: vec![],
+            thinking: None,
         };
 
         let gateway = Arc::new(MockGateway::new(vec![response]));
@@ -662,6 +664,7 @@ mod tests {
             content: Some("Response".to_string()),
             object: None,
             tool_calls: vec![],
+            thinking: None,
         };
 
         let gateway = Arc::new(MockGateway::new(vec![response]));
@@ -675,6 +678,7 @@ mod tests {
             top_p: None,
             top_k: None,
             response_format: None,
+            reasoning_effort: None,
         };
 
         let messages = vec![LlmMessage::user("Hi")];
@@ -689,6 +693,7 @@ mod tests {
             content: None,
             object: None,
             tool_calls: vec![],
+            thinking: None,
         };
 
         let gateway = Arc::new(MockGateway::new(vec![response]));
@@ -712,12 +717,14 @@ mod tests {
             content: None,
             object: None,
             tool_calls: vec![tool_call],
+            thinking: None,
         };
 
         let second_response = LlmGatewayResponse {
             content: Some("After tool execution".to_string()),
             object: None,
             tool_calls: vec![],
+            thinking: None,
         };
 
         let gateway = Arc::new(MockGateway::new(vec![first_response, second_response]));
@@ -748,6 +755,7 @@ mod tests {
             content: Some("fallback".to_string()),
             object: None,
             tool_calls: vec![tool_call],
+            thinking: None,
         };
 
         let gateway = Arc::new(MockGateway::new(vec![response]));
@@ -793,6 +801,7 @@ mod tests {
             top_p: None,
             top_k: None,
             response_format: None,
+            reasoning_effort: None,
         };
 
         let messages = vec![LlmMessage::user("Generate")];
@@ -807,6 +816,7 @@ mod tests {
             content: Some("Response to conversation".to_string()),
             object: None,
             tool_calls: vec![],
+            thinking: None,
         };
 
         let gateway = Arc::new(MockGateway::new(vec![response]));
@@ -843,6 +853,7 @@ mod tests {
                     content: Some("test".to_string()),
                     object: None,
                     tool_calls: vec![],
+                    thinking: None,
                 })
             }
 
@@ -927,6 +938,7 @@ mod tests {
                     content: Some("test".to_string()),
                     object: None,
                     tool_calls: vec![],
+                    thinking: None,
                 })
             }
 
@@ -1025,6 +1037,7 @@ mod tests {
                     content: Some("test".to_string()),
                     object: None,
                     tool_calls: vec![],
+                    thinking: None,
                 })
             }
 
@@ -1087,6 +1100,7 @@ mod tests {
             content: Some("Test response".to_string()),
             object: None,
             tool_calls: vec![],
+            thinking: None,
         };
 
         let gateway = Arc::new(MockGateway::new(vec![response]));
@@ -1126,12 +1140,14 @@ mod tests {
             content: None,
             object: None,
             tool_calls: vec![tool_call],
+            thinking: None,
         };
 
         let second_response = LlmGatewayResponse {
             content: Some("After tool".to_string()),
             object: None,
             tool_calls: vec![],
+            thinking: None,
         };
 
         let gateway = Arc::new(MockGateway::new(vec![first_response, second_response]));

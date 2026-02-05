@@ -124,6 +124,11 @@ impl LlmGateway for OllamaGateway {
             body["tools"] = serde_json::to_value(tool_defs)?;
         }
 
+        // Add reasoning effort if specified (Ollama uses "think" parameter)
+        if config.reasoning_effort.is_some() {
+            body["think"] = serde_json::json!(true);
+        }
+
         // Add response format if specified
         add_response_format(&mut body, config);
 
@@ -146,6 +151,9 @@ impl LlmGateway for OllamaGateway {
 
         // Parse content
         let content = response_body["message"]["content"].as_str().map(String::from);
+
+        // Parse thinking if present (from reasoning models)
+        let thinking = response_body["message"]["thinking"].as_str().map(String::from);
 
         // Parse tool calls if present
         let tool_calls = if let Some(calls) = response_body["message"]["tool_calls"].as_array() {
@@ -173,6 +181,7 @@ impl LlmGateway for OllamaGateway {
             content,
             object: None,
             tool_calls,
+            thinking,
         })
     }
 
@@ -314,6 +323,11 @@ impl LlmGateway for OllamaGateway {
                 if let Ok(tools_value) = serde_json::to_value(tool_defs) {
                     body["tools"] = tools_value;
                 }
+            }
+
+            // Add reasoning effort if specified (Ollama uses "think" parameter)
+            if config.reasoning_effort.is_some() {
+                body["think"] = serde_json::json!(true);
             }
 
             // Add response format if specified
@@ -722,6 +736,7 @@ mod tests {
             top_p: None,
             top_k: None,
             response_format: None,
+            reasoning_effort: None,
         };
 
         let options = extract_ollama_options(&config);
@@ -743,6 +758,7 @@ mod tests {
             top_p: None,
             top_k: None,
             response_format: None,
+            reasoning_effort: None,
         };
 
         let options = extract_ollama_options(&config);
@@ -763,6 +779,7 @@ mod tests {
             top_p: None,
             top_k: None,
             response_format: None,
+            reasoning_effort: None,
         };
 
         let options = extract_ollama_options(&config);
@@ -784,6 +801,7 @@ mod tests {
             top_p: None,
             top_k: None,
             response_format: None,
+            reasoning_effort: None,
         };
 
         let options = extract_ollama_options(&config);
@@ -806,6 +824,7 @@ mod tests {
             top_p: Some(0.9),
             top_k: None,
             response_format: None,
+            reasoning_effort: None,
         };
 
         let options = extract_ollama_options(&config);
@@ -826,6 +845,7 @@ mod tests {
             top_p: None,
             top_k: Some(40),
             response_format: None,
+            reasoning_effort: None,
         };
 
         let options = extract_ollama_options(&config);
@@ -845,6 +865,7 @@ mod tests {
             top_p: Some(0.95),
             top_k: Some(50),
             response_format: None,
+            reasoning_effort: None,
         };
 
         let options = extract_ollama_options(&config);
@@ -868,6 +889,7 @@ mod tests {
             top_p: None,
             top_k: None,
             response_format: Some(ResponseFormat::Text),
+            reasoning_effort: None,
         };
 
         let mut body = serde_json::json!({
@@ -893,6 +915,7 @@ mod tests {
             top_p: None,
             top_k: None,
             response_format: Some(ResponseFormat::JsonObject { schema: None }),
+            reasoning_effort: None,
         };
 
         let mut body = serde_json::json!({
@@ -927,6 +950,7 @@ mod tests {
             response_format: Some(ResponseFormat::JsonObject {
                 schema: Some(schema.clone()),
             }),
+            reasoning_effort: None,
         };
 
         let mut body = serde_json::json!({
@@ -949,6 +973,7 @@ mod tests {
             top_p: None,
             top_k: None,
             response_format: None,
+            reasoning_effort: None,
         };
 
         let mut body = serde_json::json!({
@@ -1009,6 +1034,7 @@ mod tests {
         assert!(result.is_ok());
         let response = result.unwrap();
         assert_eq!(response.content, Some("Hello!".to_string()));
+        assert_eq!(response.thinking, None);
     }
 
     #[tokio::test]
@@ -1152,5 +1178,35 @@ mod tests {
 
         mock.assert();
         assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_complete_with_reasoning_effort() {
+        use crate::llm::gateway::ReasoningEffort;
+
+        let mut server = mockito::Server::new_async().await;
+        let mock = server
+            .mock("POST", "/api/chat")
+            .match_body(mockito::Matcher::PartialJson(
+                serde_json::json!({"think": true}),
+            ))
+            .with_status(200)
+            .with_body(r#"{"message":{"role":"assistant","content":"Response","thinking":"Internal reasoning..."}}"#)
+            .create();
+
+        let gateway = OllamaGateway::with_host(server.url());
+        let messages = vec![LlmMessage::user("Test")];
+        let config = CompletionConfig {
+            reasoning_effort: Some(ReasoningEffort::High),
+            ..Default::default()
+        };
+
+        let result = gateway.complete("qwen3:32b", &messages, None, &config).await;
+
+        mock.assert();
+        assert!(result.is_ok());
+        let response = result.unwrap();
+        assert_eq!(response.content, Some("Response".to_string()));
+        assert_eq!(response.thinking, Some("Internal reasoning...".to_string()));
     }
 }

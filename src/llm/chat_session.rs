@@ -410,6 +410,7 @@ mod tests {
                 content: Some(content),
                 object: None,
                 tool_calls: vec![],
+                thinking: None,
             })
         }
 
@@ -686,6 +687,7 @@ mod tests {
                 content: Some("default".to_string()),
                 object: None,
                 tool_calls: vec![],
+                thinking: None,
             })
         }
 

@@ -5,6 +5,16 @@ All notable changes to the Mojentic Rust implementation will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-02-05
+
+### Added
+
+- `ReasoningEffort` enum (`Low`, `Medium`, `High`) for controlling model thinking depth
+- `reasoning_effort` field on `CompletionConfig` for reasoning effort control
+  - Ollama gateway: maps to `think: true` parameter for extended thinking
+  - OpenAI gateway: maps to `reasoning_effort` API parameter for reasoning models
+- `thinking` field on `LlmGatewayResponse` for model reasoning traces (populated by Ollama)
+
 ## [1.1.0] - 2026-02-05
 
 ### Added

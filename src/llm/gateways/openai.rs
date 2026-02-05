@@ -144,6 +144,24 @@ impl OpenAIGateway {
             params.insert("top_p".to_string(), serde_json::json!(top_p));
         }
 
+        // Handle reasoning effort for reasoning models
+        if let Some(reasoning_effort) = config.reasoning_effort {
+            if capabilities.model_type == ModelType::Reasoning {
+                use crate::llm::gateway::ReasoningEffort;
+                let effort_str = match reasoning_effort {
+                    ReasoningEffort::Low => "low",
+                    ReasoningEffort::Medium => "medium",
+                    ReasoningEffort::High => "high",
+                };
+                params.insert("reasoning_effort".to_string(), serde_json::json!(effort_str));
+            } else {
+                warn!(
+                    model = model,
+                    "reasoning_effort specified but model is not a reasoning model, ignoring"
+                );
+            }
+        }
+
         (params, capabilities.supports_tools)
     }
 
@@ -281,6 +299,7 @@ impl LlmGateway for OpenAIGateway {
             content,
             object: None,
             tool_calls,
+            thinking: None,
         })
     }
 
