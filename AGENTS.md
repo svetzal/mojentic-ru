@@ -106,6 +106,38 @@ cargo deny check
 - Run `cargo tarpaulin` for code coverage (aim for >80% coverage)
 - Coverage reports are in `coverage/` directory
 
+### Development Session Workflow
+
+**Starting a session:**
+1. Pull latest changes
+2. Run quick sanity check: `cargo test`
+3. Run `cargo clippy` to identify any existing issues
+
+**During development:**
+1. Write tests alongside new functionality
+2. Run `cargo test` frequently
+3. Run `cargo clippy` to catch issues early
+4. Format code with `cargo fmt` as you go
+
+### Tool Configuration
+
+**Clippy** — add to `Cargo.toml` if stricter linting is needed:
+```toml
+[lints.clippy]
+pedantic = "warn"
+```
+
+**Tarpaulin** — create `tarpaulin.toml` for custom coverage settings:
+```toml
+[report]
+out-type = ["Html", "Lcov"]
+
+[run]
+timeout = "300s"
+```
+
+**cargo-deny** — create `deny.toml` for dependency/license configuration.
+
 ### Performance
 - Profile before optimizing: use `cargo flamegraph` or `perf`
 - Use `cargo bench` for benchmarking with criterion
@@ -300,6 +332,7 @@ cargo audit
 - [Tokio Documentation](https://tokio.rs/)
 - [Serde Documentation](https://serde.rs/)
 - [Clippy Lints](https://rust-lang.github.io/rust-clippy/)
+- Explain a compiler error: `rustc --explain <ERROR_CODE>`
 
 ---
 
