@@ -5,7 +5,7 @@
 version = 2
 ignore = [
     "RUSTSEC-2021-0141", # dotenv unmaintained - used only in dev
-    "RUSTSEC-2025-0057", # fxhash unmaintained - transitive dep via scraper/selectors, no fix available
+    # RUSTSEC-2025-0057 (fxhash unmaintained) was resolved by upgrading scraper to 0.25
 ]
 
 [licenses]
@@ -18,7 +18,9 @@ allow = [
     "BSD-3-Clause",
     "ISC",
     "Unicode-3.0",
-    "MPL-2.0", # scraper and its deps (cssparser, selectors, dtoa-short)
+    "MPL-2.0",             # scraper and its deps (cssparser, selectors, dtoa-short)
+    "OpenSSL",             # aws-lc-sys, transitive dep of reqwest 0.13 via rustls/aws-lc-rs
+    "CDLA-Permissive-2.0", # webpki-root-certs, transitive dep of reqwest 0.13 via rustls-platform-verifier
 ]
 confidence-threshold = 0.8
 
@@ -29,6 +31,24 @@ skip = [
     { crate = "windows-link@*" },
     { crate = "windows-result@*" },
     { crate = "windows-strings@*" },
+    # reqwest 0.13 pulls in aws-lc-rs/rustls which brings older windows-targets/windows_* variants
+    { crate = "windows-targets@*" },
+    { crate = "windows_aarch64_gnullvm@*" },
+    { crate = "windows_aarch64_msvc@*" },
+    { crate = "windows_i686_gnu@*" },
+    { crate = "windows_i686_msvc@*" },
+    { crate = "windows_x86_64_gnu@*" },
+    { crate = "windows_x86_64_gnullvm@*" },
+    { crate = "windows_x86_64_msvc@*" },
+    # reqwest 0.13 / rustls ecosystem brings in older core-foundation via system-configuration
+    { crate = "core-foundation@*" },
+    # Different parts of the ecosystem use different getrandom minor versions
+    { crate = "getrandom@*" },
+    # rustc-hash version mismatch between quinn (via reqwest 0.13) and other deps
+    { crate = "rustc-hash@*" },
+    # reqwest 0.13 still depends on thiserror 1.x via some transitive dep; project uses 2.x
+    { crate = "thiserror@*" },
+    { crate = "thiserror-impl@*" },
 ]
 
 [sources]

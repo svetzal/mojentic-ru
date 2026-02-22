@@ -79,7 +79,7 @@ impl TokenizerGateway {
     /// let tokens = tokenizer.encode("Hello, world!");
     /// println!("Token count: {}", tokens.len());
     /// ```
-    pub fn encode(&self, text: &str) -> Vec<usize> {
+    pub fn encode(&self, text: &str) -> Vec<u32> {
         tracing::debug!("Encoding text: {}", text);
         self.tokenizer.encode_with_special_tokens(text)
     }
@@ -100,11 +100,11 @@ impl TokenizerGateway {
     /// use mojentic::llm::gateways::TokenizerGateway;
     ///
     /// let tokenizer = TokenizerGateway::default();
-    /// let tokens = vec![9906, 11, 1917, 0];
+    /// let tokens: Vec<u32> = vec![9906, 11, 1917, 0];
     /// let text = tokenizer.decode(&tokens);
     /// println!("Decoded: {}", text);
     /// ```
-    pub fn decode(&self, tokens: &[usize]) -> String {
+    pub fn decode(&self, tokens: &[u32]) -> String {
         tracing::debug!("Decoding {} tokens", tokens.len());
         self.tokenizer.decode(tokens.to_vec()).unwrap_or_else(|e| {
             tracing::error!("Failed to decode tokens: {}", e);
@@ -157,7 +157,7 @@ mod tests {
         let tokens = tokenizer.encode(text);
 
         assert!(!tokens.is_empty());
-        // Tokens are valid usize values (some tokens can be 0, like BOS/EOS)
+        // Tokens are valid u32 values (some tokens can be 0, like BOS/EOS)
         assert!(!tokens.is_empty());
     }
 
@@ -191,7 +191,7 @@ mod tests {
     #[test]
     fn test_decode_empty() {
         let tokenizer = TokenizerGateway::default();
-        let text = tokenizer.decode(&[]);
+        let text = tokenizer.decode(&[] as &[u32]);
         assert_eq!(text, "");
     }
 
