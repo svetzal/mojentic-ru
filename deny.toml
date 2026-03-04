@@ -44,6 +44,8 @@ skip = [
     { crate = "core-foundation@*" },
     # Different parts of the ecosystem use different getrandom minor versions
     { crate = "getrandom@*" },
+    # r-efi is pulled in by both getrandom 0.3 (via older deps) and getrandom 0.4 (uuid/tempfile)
+    { crate = "r-efi@*" },
     # rustc-hash version mismatch between quinn (via reqwest 0.13) and other deps
     { crate = "rustc-hash@*" },
     # reqwest 0.13 still depends on thiserror 1.x via some transitive dep; project uses 2.x
