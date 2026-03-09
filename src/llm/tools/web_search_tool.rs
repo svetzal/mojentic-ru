@@ -1,6 +1,7 @@
 use crate::error::Result;
 use crate::llm::tools::{FunctionDescriptor, LlmTool, ToolDescriptor};
-use scraper::{Html, Selector};
+use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -62,7 +63,7 @@ impl WebSearchTool {
 
     /// Perform the web search
     async fn perform_search(&self, query: &str) -> Result<Vec<SearchResult>> {
-        let url = format!("{}?q={}", BASE_URL, urlencoding::encode(query));
+        let url = format!("{}?q={}", BASE_URL, utf8_percent_encode(query, NON_ALPHANUMERIC));
 
         let response = self
             .client
@@ -83,40 +84,30 @@ impl WebSearchTool {
         self.parse_results(&html)
     }
 
-    /// Parse HTML results from DuckDuckGo lite
+    /// Parse HTML results from DuckDuckGo lite using regex-based extraction
     fn parse_results(&self, html: &str) -> Result<Vec<SearchResult>> {
-        let document = Html::parse_document(html);
-
-        // DuckDuckGo lite uses a simple structure with result-link class
-        let link_selector = Selector::parse("a.result-link").map_err(|e| {
-            crate::error::MojenticError::ParseError(format!("Invalid selector: {:?}", e))
-        })?;
-        let snippet_selector = Selector::parse("td.result-snippet").map_err(|e| {
-            crate::error::MojenticError::ParseError(format!("Invalid selector: {:?}", e))
-        })?;
+        let link_re =
+            Regex::new(r#"<a[^>]+class="result-link"[^>]*href="([^"]+)"[^>]*>([^<]+)</a>"#)
+                .expect("Invalid link regex");
+        let snippet_re = Regex::new(r#"<td[^>]+class="result-snippet"[^>]*>([^<]*)<"#)
+            .expect("Invalid snippet regex");
 
         let mut results = Vec::new();
+        let links: Vec<_> = link_re.captures_iter(html).collect();
+        let snippets: Vec<_> = snippet_re.captures_iter(html).collect();
 
-        // Extract links and titles
-        let links: Vec<_> = document.select(&link_selector).collect();
-        let snippets: Vec<_> = document.select(&snippet_selector).collect();
+        for (i, caps) in links.iter().take(MAX_RESULTS).enumerate() {
+            let href = &caps[1];
+            let title = &caps[2];
+            let url = Self::decode_url(href);
 
-        for (i, link) in links.iter().take(MAX_RESULTS).enumerate() {
-            if let Some(href) = link.value().attr("href") {
-                let title = link.text().collect::<Vec<_>>().join(" ");
-                let url = Self::decode_url(href);
+            let snippet = snippets.get(i).map(|s| Self::clean_text(&s[1])).unwrap_or_default();
 
-                let snippet = snippets
-                    .get(i)
-                    .map(|s| Self::clean_text(&s.text().collect::<Vec<_>>().join(" ")))
-                    .unwrap_or_default();
-
-                results.push(SearchResult {
-                    title: Self::clean_text(&title),
-                    url,
-                    snippet,
-                });
-            }
+            results.push(SearchResult {
+                title: Self::clean_text(title),
+                url,
+                snippet,
+            });
         }
 
         Ok(results)
@@ -129,7 +120,7 @@ impl WebSearchTool {
             url.split("uddg=")
                 .nth(1)
                 .and_then(|s| s.split('&').next())
-                .map(|s| urlencoding::decode(s).unwrap_or_default().to_string())
+                .map(|s| percent_encoding::percent_decode_str(s).decode_utf8_lossy().to_string())
                 .unwrap_or_else(|| url.to_string())
         } else {
             url.to_string()
