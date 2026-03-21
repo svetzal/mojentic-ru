@@ -1,5 +1,7 @@
 # Usage Rules for Mojentic Rust
 
+Why this project exists and what problem does it solve: @CHARTER.md
+
 **IMPORTANT**: Consult these usage rules early and often when working with this Rust project.
 Review these guidelines to understand the correct patterns, conventions, and best practices.
 
