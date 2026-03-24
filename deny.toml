@@ -3,9 +3,7 @@
 
 [advisories]
 version = 2
-ignore = [
-    "RUSTSEC-2021-0141", # dotenv unmaintained - used only in dev
-]
+ignore = []
 
 [licenses]
 version = 2
