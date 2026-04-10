@@ -46,7 +46,7 @@ uuid = { version = "1.0", features = ["v4", "serde"] }
 chrono = "0.4"
 
 # Tokenization
-tiktoken-rs = "0.9"
+tiktoken-rs = "0.11"
 
 # File operations
 regex = "1.0"

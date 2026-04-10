@@ -106,7 +106,7 @@ impl TokenizerGateway {
     /// ```
     pub fn decode(&self, tokens: &[u32]) -> String {
         tracing::debug!("Decoding {} tokens", tokens.len());
-        self.tokenizer.decode(tokens.to_vec()).unwrap_or_else(|e| {
+        self.tokenizer.decode(tokens).unwrap_or_else(|e| {
             tracing::error!("Failed to decode tokens: {}", e);
             String::new()
         })
