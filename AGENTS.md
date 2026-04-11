@@ -274,6 +274,21 @@ Before creating a release:
 - [ ] CHANGELOG.md updated
 - [ ] Changes committed and pushed to main
 
+## Version Synchronization
+
+All mojentic ports (mojentic-py, mojentic-ts, mojentic-ex, mojentic-ru) share synchronized major and minor version numbers. When releasing:
+- Patch releases (X.Y.Z → X.Y.Z+1) can be made independently per port
+- Minor releases (X.Y.0 → X.Y+1.0) must be coordinated — all four ports bump together
+- Major releases (X.0.0 → X+1.0.0) must be coordinated — all four ports bump together
+
+Before tagging a minor or major release, verify the other three ports are also ready to release at the same version.
+
+Current ports:
+- mojentic-py (Python) — pyproject.toml
+- mojentic-ts (TypeScript) — package.json
+- mojentic-ex (Elixir) — mix.exs
+- mojentic-ru (Rust) — Cargo.toml
+
 ## Useful Commands
 
 ### Development
