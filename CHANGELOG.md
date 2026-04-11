@@ -5,6 +5,24 @@ All notable changes to the Mojentic Rust implementation will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-04-11
+
+### Changed
+
+- `TokenizerGateway::encode()` now returns `Vec<u32>` instead of `Vec<usize>` (aligns with tiktoken-rs 0.11 API)
+- `TokenizerGateway::decode()` now accepts `&[u32]` instead of `&[usize]`
+- `WebSearchTool` uses regex-based HTML parsing instead of `scraper` crate for lighter dependencies
+- Updated `reqwest` from 0.12 to 0.13
+- Updated `schemars` from 0.8 to 1.0
+- Updated `thiserror` from 1.0 to 2.0
+- Updated `tiktoken-rs` from 0.5 to 0.11
+
+### Removed
+
+- `dotenv` dependency (was unused)
+- `scraper` dependency (replaced with regex-based parsing in `WebSearchTool`)
+- `urlencoding` dependency (replaced with `percent-encoding`)
+
 ## [1.2.0] - 2026-02-05
 
 ### Added
