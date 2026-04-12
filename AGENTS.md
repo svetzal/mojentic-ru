@@ -186,6 +186,13 @@ timeout = "300s"
 - Implement `Debug`, `Clone`, `Serialize`, `Deserialize` for message types
 - Write examples for new features in `examples/` directory
 
+### Branching Workflow
+- Trunk-based development: `main` is the only long-lived branch.
+- All work lands on `main` via direct commit.
+- Feature branches are not pushed to `origin`.
+- Pull requests are not used.
+- Short-lived local working branches (e.g. hopper worktrees) are merged to `main` and deleted locally before work is considered complete.
+
 ### Features
 - Default feature: `["ollama"]`
 - Available features: `ollama`, `openai`, `anthropic`, `full`
