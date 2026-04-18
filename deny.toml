@@ -31,6 +31,8 @@ skip = [
     # reqwest 0.13 still depends on thiserror 1.x via jni/rustls-platform-verifier; project uses 2.x
     { crate = "thiserror@*" },
     { crate = "thiserror-impl@*" },
+    # getrandom 0.3 (via wasip2) and getrandom 0.4 (via wasip3/uuid/tempfile) pull in different wit-bindgen versions
+    { crate = "wit-bindgen@*" },
 ]
 
 [sources]
