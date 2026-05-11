@@ -7,7 +7,7 @@ use crate::event::{Event, TerminateEvent};
 use crate::router::Router;
 use crate::{MojenticError, Result};
 use std::collections::VecDeque;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
@@ -41,6 +41,8 @@ pub struct AsyncDispatcher {
     stop_flag: Arc<AtomicBool>,
     task_handle: Option<JoinHandle<()>>,
     batch_size: usize,
+    /// Number of agent handler tasks currently executing.
+    in_flight: Arc<AtomicUsize>,
 }
 
 impl AsyncDispatcher {
@@ -56,6 +58,7 @@ impl AsyncDispatcher {
             stop_flag: Arc::new(AtomicBool::new(false)),
             task_handle: None,
             batch_size: 5,
+            in_flight: Arc::new(AtomicUsize::new(0)),
         }
     }
 
@@ -83,10 +86,11 @@ impl AsyncDispatcher {
         let router = self.router.clone();
         let queue = self.event_queue.clone();
         let stop_flag = self.stop_flag.clone();
+        let in_flight = self.in_flight.clone();
         let batch_size = self.batch_size;
 
         let handle = tokio::spawn(async move {
-            Self::dispatch_loop(router, queue, stop_flag, batch_size).await;
+            Self::dispatch_loop(router, queue, stop_flag, in_flight, batch_size).await;
         });
 
         self.task_handle = Some(handle);
@@ -132,7 +136,8 @@ impl AsyncDispatcher {
         });
     }
 
-    /// Wait for the event queue to become empty.
+    /// Wait for the event queue to become empty **and** all in-flight agent
+    /// handlers to complete.
     ///
     /// # Arguments
     ///
@@ -140,17 +145,19 @@ impl AsyncDispatcher {
     ///
     /// # Returns
     ///
-    /// `true` if the queue is empty, `false` if timeout was reached
+    /// `true` if both the queue is empty and no handlers are running,
+    /// `false` if the timeout was reached first
     pub async fn wait_for_empty_queue(&self, timeout: Option<Duration>) -> Result<bool> {
         let start = tokio::time::Instant::now();
 
         loop {
-            let len = {
+            let queue_len = {
                 let queue = self.event_queue.lock().await;
                 queue.len()
             };
+            let in_flight = self.in_flight.load(Ordering::Acquire);
 
-            if len == 0 {
+            if queue_len == 0 && in_flight == 0 {
                 return Ok(true);
             }
 
@@ -160,7 +167,7 @@ impl AsyncDispatcher {
                 }
             }
 
-            tokio::time::sleep(Duration::from_millis(100)).await;
+            tokio::time::sleep(Duration::from_millis(10)).await;
         }
     }
 
@@ -175,6 +182,7 @@ impl AsyncDispatcher {
         router: Arc<Router>,
         queue: Arc<Mutex<VecDeque<Box<dyn Event>>>>,
         stop_flag: Arc<AtomicBool>,
+        in_flight: Arc<AtomicUsize>,
         batch_size: usize,
     ) {
         while !stop_flag.load(Ordering::Relaxed) {
@@ -204,24 +212,32 @@ impl AsyncDispatcher {
                     // Process event through each agent
                     for agent in agents {
                         debug!("Sending event to agent");
-                        match agent.receive_event_async(event.clone_box()).await {
-                            Ok(new_events) => {
-                                debug!("Agent returned {} events", new_events.len());
-                                // Add new events to queue
-                                let mut q = queue.lock().await;
-                                for new_event in new_events {
-                                    q.push_back(new_event);
+                        in_flight.fetch_add(1, Ordering::AcqRel);
+                        let queue_clone = queue.clone();
+                        let in_flight_clone = in_flight.clone();
+                        let event_box = event.clone_box();
+
+                        tokio::spawn(async move {
+                            match agent.receive_event_async(event_box).await {
+                                Ok(new_events) => {
+                                    debug!("Agent returned {} events", new_events.len());
+                                    // Add new events to queue
+                                    let mut q = queue_clone.lock().await;
+                                    for new_event in new_events {
+                                        q.push_back(new_event);
+                                    }
+                                }
+                                Err(e) => {
+                                    tracing::error!("Agent error processing event: {}", e);
                                 }
                             }
-                            Err(e) => {
-                                tracing::error!("Agent error processing event: {}", e);
-                            }
-                        }
+                            in_flight_clone.fetch_sub(1, Ordering::AcqRel);
+                        });
                     }
                 }
             }
 
-            tokio::time::sleep(Duration::from_millis(100)).await;
+            tokio::time::sleep(Duration::from_millis(10)).await;
         }
 
         debug!("Dispatch loop exiting");
@@ -427,24 +443,23 @@ mod tests {
         let mut dispatcher = AsyncDispatcher::new(Arc::new(router));
         dispatcher.start().await.unwrap();
 
-        // Dispatch multiple events that take time to process
-        for i in 0..10 {
-            let event = Box::new(TestEvent {
-                source: "Test".to_string(),
-                correlation_id: Some(format!("slow-{}", i)),
-                data: "test".to_string(),
-            }) as Box<dyn Event>;
-            dispatcher.dispatch(event);
-        }
+        // Dispatch a single event with a 500ms handler, then use a 50ms timeout.
+        // The handler will still be in-flight when the timeout expires.
+        let event = Box::new(TestEvent {
+            source: "Test".to_string(),
+            correlation_id: Some("slow-0".to_string()),
+            data: "test".to_string(),
+        }) as Box<dyn Event>;
+        dispatcher.dispatch(event);
 
-        // Give time for events to be queued
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        // Give a moment for the event to be dequeued and the handler to start
+        tokio::time::sleep(Duration::from_millis(50)).await;
 
-        // Queue should not be empty within short timeout due to slow processing
+        // Timeout is shorter than the 200ms handler, so it should return false
         let result =
-            dispatcher.wait_for_empty_queue(Some(Duration::from_millis(300))).await.unwrap();
+            dispatcher.wait_for_empty_queue(Some(Duration::from_millis(50))).await.unwrap();
 
-        assert!(!result); // Should timeout before all events are processed
+        assert!(!result); // Should timeout while handler is still in-flight
 
         dispatcher.stop().await.unwrap();
     }
@@ -540,6 +555,63 @@ mod tests {
 
         assert_eq!(*count1.lock().await, 1);
         assert_eq!(*count2.lock().await, 1);
+
+        dispatcher.stop().await.unwrap();
+    }
+
+    /// Verify that `wait_for_empty_queue` only resolves after spawned agent
+    /// handlers have finished, not just when the queue drains.
+    #[tokio::test]
+    async fn test_wait_for_empty_queue_waits_for_in_flight_handlers() {
+        use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
+
+        struct SlowCountingAgent {
+            count: Arc<AtomicUsize>,
+            delay_ms: u64,
+        }
+
+        #[async_trait]
+        impl BaseAsyncAgent for SlowCountingAgent {
+            async fn receive_event_async(
+                &self,
+                _event: Box<dyn Event>,
+            ) -> Result<Vec<Box<dyn Event>>> {
+                tokio::time::sleep(Duration::from_millis(self.delay_ms)).await;
+                self.count.fetch_add(1, AtomicOrdering::Relaxed);
+                Ok(vec![])
+            }
+        }
+
+        let mut router = Router::new();
+        let count = Arc::new(AtomicUsize::new(0));
+        let agent = Arc::new(SlowCountingAgent {
+            count: count.clone(),
+            delay_ms: 200,
+        });
+        router.add_route::<TestEvent>(agent);
+
+        let mut dispatcher = AsyncDispatcher::new(Arc::new(router));
+        dispatcher.start().await.unwrap();
+
+        let event = Box::new(TestEvent {
+            source: "Test".to_string(),
+            correlation_id: Some("in-flight-test".to_string()),
+            data: "test".to_string(),
+        }) as Box<dyn Event>;
+
+        dispatcher.dispatch(event);
+
+        // Wait enough time for the event to be dequeued (queue drains) but NOT
+        // enough for the 200ms handler to finish.
+        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        // Queue is now empty but the handler is still running.
+        // wait_for_empty_queue must block until the handler completes.
+        let result = dispatcher.wait_for_empty_queue(Some(Duration::from_secs(2))).await.unwrap();
+
+        assert!(result, "wait_for_empty_queue should return true");
+        // The handler must have completed before we returned.
+        assert_eq!(count.load(AtomicOrdering::Relaxed), 1, "Handler should have run exactly once");
 
         dispatcher.stop().await.unwrap();
     }

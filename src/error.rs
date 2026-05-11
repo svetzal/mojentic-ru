@@ -55,6 +55,12 @@ pub enum MojenticError {
 
     #[error("Runtime error: {0}")]
     RuntimeError(String),
+
+    #[error("Max tool iterations exceeded: limit {limit}")]
+    MaxToolIterationsExceeded { limit: usize },
+
+    #[error("Event handler error: {0}")]
+    HandlerError(String),
 }
 
 pub type Result<T> = std::result::Result<T, MojenticError>;
@@ -129,6 +135,18 @@ mod tests {
         let err = MojenticError::ToolError("test".to_string());
         let debug_str = format!("{:?}", err);
         assert!(debug_str.contains("ToolError"));
+    }
+
+    #[test]
+    fn test_max_tool_iterations_exceeded_display() {
+        let err = MojenticError::MaxToolIterationsExceeded { limit: 10 };
+        assert_eq!(err.to_string(), "Max tool iterations exceeded: limit 10");
+    }
+
+    #[test]
+    fn test_handler_error_display() {
+        let err = MojenticError::HandlerError("callback panicked".to_string());
+        assert_eq!(err.to_string(), "Event handler error: callback panicked");
     }
 
     #[test]

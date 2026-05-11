@@ -1,4 +1,4 @@
-use crate::error::Result;
+use crate::error::{MojenticError, Result};
 use crate::llm::gateway::{CompletionConfig, LlmGateway, StreamChunk};
 use crate::llm::models::{LlmGatewayResponse, LlmMessage, MessageRole};
 use crate::llm::tools::LlmTool;
@@ -16,6 +16,8 @@ pub struct LlmBroker {
     model: String,
     gateway: Arc<dyn LlmGateway>,
     tracer: Option<Arc<TracerSystem>>,
+    /// Maximum number of tool-call iterations before returning an error.
+    max_tool_iterations: usize,
 }
 
 impl LlmBroker {
@@ -35,7 +37,18 @@ impl LlmBroker {
             model: model.into(),
             gateway,
             tracer,
+            max_tool_iterations: 10,
         }
+    }
+
+    /// Override the maximum number of consecutive tool-call iterations.
+    ///
+    /// If the model keeps requesting tool calls without producing a final text
+    /// response, [`MojenticError::MaxToolIterationsExceeded`] is returned once
+    /// this limit is reached.  The default is `10`.
+    pub fn with_max_tool_iterations(mut self, n: usize) -> Self {
+        self.max_tool_iterations = n;
+        self
     }
 
     /// Generate text response from LLM
@@ -141,7 +154,14 @@ impl LlmBroker {
         if !response.tool_calls.is_empty() {
             if let Some(tools) = tools {
                 return self
-                    .handle_tool_calls(current_messages, response, tools, &config, &correlation_id)
+                    .handle_tool_calls(
+                        current_messages,
+                        response,
+                        tools,
+                        &config,
+                        &correlation_id,
+                        0,
+                    )
                     .await;
             }
         }
@@ -156,8 +176,15 @@ impl LlmBroker {
         tools: &'a [Box<dyn LlmTool>],
         config: &'a CompletionConfig,
         correlation_id: &'a str,
+        iteration: usize,
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<String>> + Send + 'a>> {
         Box::pin(async move {
+            if iteration >= self.max_tool_iterations {
+                return Err(MojenticError::MaxToolIterationsExceeded {
+                    limit: self.max_tool_iterations,
+                });
+            }
+
             info!("Tool calls requested: {}", response.tool_calls.len());
 
             for tool_call in &response.tool_calls {
@@ -197,15 +224,105 @@ impl LlmBroker {
                         image_paths: None,
                     });
 
-                    // Recursively call generate with updated messages, passing correlation_id
-                    return self
-                        .generate(
-                            &messages,
-                            Some(tools),
-                            Some(config.clone()),
-                            Some(correlation_id.to_string()),
-                        )
-                        .await;
+                    // Record next LLM call
+                    if let Some(tracer) = &self.tracer {
+                        let messages_json: Vec<
+                            std::collections::HashMap<String, serde_json::Value>,
+                        > = messages
+                            .iter()
+                            .map(|m| {
+                                let mut map = std::collections::HashMap::new();
+                                map.insert(
+                                    "role".to_string(),
+                                    serde_json::json!(format!("{:?}", m.role)),
+                                );
+                                if let Some(content) = &m.content {
+                                    map.insert("content".to_string(), serde_json::json!(content));
+                                }
+                                map
+                            })
+                            .collect();
+
+                        let tools_json: Vec<std::collections::HashMap<String, serde_json::Value>> =
+                            tools
+                                .iter()
+                                .map(|tool| {
+                                    let desc = tool.descriptor();
+                                    let mut map = std::collections::HashMap::new();
+                                    map.insert(
+                                        "name".to_string(),
+                                        serde_json::json!(desc.function.name),
+                                    );
+                                    map.insert(
+                                        "description".to_string(),
+                                        serde_json::json!(desc.function.description),
+                                    );
+                                    map
+                                })
+                                .collect();
+
+                        tracer.record_llm_call(
+                            &self.model,
+                            messages_json,
+                            config.temperature as f64,
+                            Some(tools_json),
+                            "LlmBroker",
+                            correlation_id,
+                        );
+                    }
+
+                    // Make next LLM call with updated messages
+                    let start = std::time::Instant::now();
+                    let next_response =
+                        self.gateway.complete(&self.model, &messages, Some(tools), config).await?;
+                    let call_duration_ms = start.elapsed().as_secs_f64() * 1000.0;
+
+                    // Record LLM response
+                    if let Some(tracer) = &self.tracer {
+                        let tool_calls_json = if !next_response.tool_calls.is_empty() {
+                            Some(
+                                next_response
+                                    .tool_calls
+                                    .iter()
+                                    .map(|tc| {
+                                        let mut map = std::collections::HashMap::new();
+                                        map.insert("name".to_string(), serde_json::json!(&tc.name));
+                                        if let Some(id) = &tc.id {
+                                            map.insert("id".to_string(), serde_json::json!(id));
+                                        }
+                                        map
+                                    })
+                                    .collect(),
+                            )
+                        } else {
+                            None
+                        };
+
+                        tracer.record_llm_response(
+                            &self.model,
+                            next_response.content.as_ref().unwrap_or(&String::new()),
+                            tool_calls_json,
+                            Some(call_duration_ms),
+                            "LlmBroker",
+                            correlation_id,
+                        );
+                    }
+
+                    // Handle further tool calls if present
+                    if !next_response.tool_calls.is_empty() {
+                        return self
+                            .handle_tool_calls(
+                                messages,
+                                next_response,
+                                tools,
+                                config,
+                                correlation_id,
+                                iteration + 1,
+                            )
+                            .await;
+                    }
+
+                    return Ok(next_response.content.unwrap_or_default());
                 } else {
                     warn!("Tool not found: {}", tool_call.name);
                 }
@@ -326,10 +443,32 @@ impl LlmBroker {
         correlation_id: Option<String>,
     ) -> Pin<Box<dyn Stream<Item = Result<String>> + 'a>> {
         let config = config.unwrap_or_default();
-        let current_messages = messages.to_vec();
         let correlation_id = correlation_id.unwrap_or_else(|| Uuid::new_v4().to_string());
+        Box::pin(self.generate_stream_with_depth(
+            messages.to_vec(),
+            tools,
+            config,
+            correlation_id,
+            0,
+        ))
+    }
 
-        Box::pin(async_stream::stream! {
+    fn generate_stream_with_depth<'a>(
+        &'a self,
+        current_messages: Vec<LlmMessage>,
+        tools: Option<&'a [Box<dyn LlmTool>]>,
+        config: CompletionConfig,
+        correlation_id: String,
+        depth: usize,
+    ) -> impl Stream<Item = Result<String>> + 'a {
+        async_stream::stream! {
+            if depth >= self.max_tool_iterations {
+                yield Err(MojenticError::MaxToolIterationsExceeded {
+                    limit: self.max_tool_iterations,
+                });
+                return;
+            }
+
             // Record LLM call
             if let Some(tracer) = &self.tracer {
                 let messages_json: Vec<std::collections::HashMap<String, serde_json::Value>> =
@@ -499,8 +638,14 @@ impl LlmBroker {
                         }
                     }
 
-                    // Recursively stream with updated messages, passing correlation_id
-                    let mut recursive_stream = self.generate_stream(&new_messages, Some(tools), Some(config.clone()), Some(correlation_id.clone()));
+                    // Continue streaming with updated messages, incrementing depth
+                    let mut recursive_stream = Box::pin(self.generate_stream_with_depth(
+                        new_messages,
+                        Some(tools),
+                        config.clone(),
+                        correlation_id.clone(),
+                        depth + 1,
+                    ));
 
                     while let Some(result) = recursive_stream.next().await {
                         yield result;
@@ -509,7 +654,7 @@ impl LlmBroker {
                     warn!("LLM requested tool calls but no tools provided");
                 }
             }
-        })
+        }
     }
 }
 
@@ -631,6 +776,138 @@ mod tests {
         let gateway = Arc::new(MockGateway::new(vec![]));
         let broker = LlmBroker::new("test-model", gateway, None);
         assert_eq!(broker.model, "test-model");
+        assert_eq!(broker.max_tool_iterations, 10);
+    }
+
+    #[tokio::test]
+    async fn test_broker_with_max_tool_iterations() {
+        let gateway = Arc::new(MockGateway::new(vec![]));
+        let broker = LlmBroker::new("test-model", gateway, None).with_max_tool_iterations(3);
+        assert_eq!(broker.max_tool_iterations, 3);
+    }
+
+    #[tokio::test]
+    async fn test_generate_max_tool_iterations_exceeded() {
+        // Every response requests a tool call — should hit the limit
+        let tool_call = LlmToolCall {
+            id: Some("call_loop".to_string()),
+            name: "loop_tool".to_string(),
+            arguments: HashMap::new(),
+        };
+
+        // Supply more responses than the limit so the gateway never runs dry
+        let responses: Vec<LlmGatewayResponse> = (0..15)
+            .map(|_| LlmGatewayResponse {
+                content: None,
+                object: None,
+                tool_calls: vec![tool_call.clone()],
+                thinking: None,
+            })
+            .collect();
+
+        let gateway = Arc::new(MockGateway::new(responses));
+        let broker = LlmBroker::new("test-model", gateway, None).with_max_tool_iterations(3);
+
+        let tool = MockTool {
+            name: "loop_tool".to_string(),
+            result: serde_json::json!({"result": "loop"}),
+        };
+        let tools: Vec<Box<dyn LlmTool>> = vec![Box::new(tool)];
+
+        let messages = vec![LlmMessage::user("Loop forever")];
+        let result = broker.generate(&messages, Some(&tools), None, None).await;
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            crate::error::MojenticError::MaxToolIterationsExceeded { limit } => {
+                assert_eq!(limit, 3);
+            }
+            e => panic!("Expected MaxToolIterationsExceeded, got: {:?}", e),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_generate_stream_max_tool_iterations_exceeded() {
+        use futures::stream;
+
+        struct InfiniteToolGateway;
+
+        #[async_trait::async_trait]
+        impl LlmGateway for InfiniteToolGateway {
+            async fn complete(
+                &self,
+                _model: &str,
+                _messages: &[LlmMessage],
+                _tools: Option<&[Box<dyn LlmTool>]>,
+                _config: &CompletionConfig,
+            ) -> Result<LlmGatewayResponse> {
+                Ok(LlmGatewayResponse {
+                    content: None,
+                    object: None,
+                    tool_calls: vec![],
+                    thinking: None,
+                })
+            }
+
+            async fn complete_json(
+                &self,
+                _model: &str,
+                _messages: &[LlmMessage],
+                _schema: serde_json::Value,
+                _config: &CompletionConfig,
+            ) -> Result<serde_json::Value> {
+                Ok(serde_json::json!({}))
+            }
+
+            async fn get_available_models(&self) -> Result<Vec<String>> {
+                Ok(vec![])
+            }
+
+            async fn calculate_embeddings(
+                &self,
+                _text: &str,
+                _model: Option<&str>,
+            ) -> Result<Vec<f32>> {
+                Ok(vec![])
+            }
+
+            fn complete_stream<'a>(
+                &'a self,
+                _model: &'a str,
+                _messages: &'a [LlmMessage],
+                _tools: Option<&'a [Box<dyn LlmTool>]>,
+                _config: &'a CompletionConfig,
+            ) -> std::pin::Pin<
+                Box<dyn futures::stream::Stream<Item = Result<StreamChunk>> + Send + 'a>,
+            > {
+                Box::pin(stream::iter(vec![Ok(StreamChunk::ToolCalls(vec![LlmToolCall {
+                    id: Some("call_loop".to_string()),
+                    name: "loop_tool".to_string(),
+                    arguments: HashMap::new(),
+                }]))]))
+            }
+        }
+
+        let gateway = Arc::new(InfiniteToolGateway);
+        let broker = LlmBroker::new("test-model", gateway, None).with_max_tool_iterations(2);
+
+        let tool = MockTool {
+            name: "loop_tool".to_string(),
+            result: serde_json::json!({"result": "loop"}),
+        };
+        let tools: Vec<Box<dyn LlmTool>> = vec![Box::new(tool)];
+
+        let messages = vec![LlmMessage::user("Loop forever")];
+        let mut stream = broker.generate_stream(&messages, Some(&tools), None, None);
+
+        let mut found_error = false;
+        while let Some(result) = stream.next().await {
+            if let Err(crate::error::MojenticError::MaxToolIterationsExceeded { .. }) = result {
+                found_error = true;
+                break;
+            }
+        }
+        assert!(found_error, "Expected MaxToolIterationsExceeded error in stream");
     }
 
     #[tokio::test]

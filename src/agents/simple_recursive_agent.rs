@@ -61,7 +61,7 @@
 //! - "DONE" - Task completed successfully
 //! - "FAIL" - Task cannot be completed
 
-use crate::error::Result;
+use crate::error::{MojenticError, Result};
 use crate::llm::chat_session::ChatSession;
 use crate::llm::tools::LlmTool;
 use crate::llm::LlmBroker;
@@ -198,9 +198,12 @@ type EventCallback = Arc<dyn Fn(AnySolverEvent) + Send + Sync>;
 /// A simple event emitter that allows subscribing to and emitting events.
 ///
 /// This implementation uses async channels to dispatch events to subscribers
-/// asynchronously without blocking the emitter.
+/// asynchronously without blocking the emitter. Handler panics or errors are
+/// routed back to any registered error sink so that callers can observe them.
 pub struct EventEmitter {
     subscribers: Arc<Mutex<Vec<EventCallback>>>,
+    /// Optional channel to forward handler errors (e.g. panics) to the solve future.
+    error_tx: Arc<Mutex<Option<mpsc::Sender<MojenticError>>>>,
 }
 
 impl EventEmitter {
@@ -208,7 +211,17 @@ impl EventEmitter {
     pub fn new() -> Self {
         Self {
             subscribers: Arc::new(Mutex::new(Vec::new())),
+            error_tx: Arc::new(Mutex::new(None)),
         }
+    }
+
+    /// Register a channel to receive handler errors.
+    ///
+    /// When a subscriber callback panics, the panic message is forwarded as a
+    /// [`MojenticError::HandlerError`] on this sender.
+    pub async fn set_error_sink(&self, tx: mpsc::Sender<MojenticError>) {
+        let mut guard = self.error_tx.lock().await;
+        *guard = Some(tx);
     }
 
     /// Subscribe to events with a callback function.
@@ -231,17 +244,37 @@ impl EventEmitter {
     /// Emit an event to all subscribers asynchronously.
     ///
     /// Events are dispatched to subscribers without blocking the emitter.
+    /// If a subscriber panics, the panic is caught and forwarded as a
+    /// [`MojenticError::HandlerError`] to the registered error sink (if any).
     pub async fn emit(&self, event: AnySolverEvent) {
         let subscribers = self.subscribers.lock().await.clone();
+        let error_tx = self.error_tx.lock().await.clone();
 
         for callback in subscribers {
             let event = event.clone();
             let callback = callback.clone();
+            let error_tx = error_tx.clone();
 
-            // Spawn a task to call the callback asynchronously
-            tokio::spawn(async move {
+            // Spawn a task to call the callback asynchronously and catch panics.
+            let handle = tokio::spawn(async move {
                 callback(event);
             });
+
+            // If we have an error sink, watch for panics from the spawned task.
+            if let Some(tx) = error_tx.clone() {
+                tokio::spawn(async move {
+                    if let Err(join_err) = handle.await {
+                        if join_err.is_panic() {
+                            let msg = join_err
+                                .into_panic()
+                                .downcast::<&str>()
+                                .map(|s| s.to_string())
+                                .unwrap_or_else(|_| "handler panicked".to_string());
+                            let _ = tx.send(MojenticError::HandlerError(msg)).await;
+                        }
+                    }
+                });
+            }
         }
     }
 }
@@ -337,6 +370,10 @@ impl SimpleRecursiveAgent {
         // Create a channel to receive the solution
         let (solution_tx, mut solution_rx) = mpsc::channel::<String>(1);
 
+        // Create an error channel so handler panics surface to this future
+        let (error_tx, mut error_rx) = mpsc::channel::<MojenticError>(8);
+        self.emitter.set_error_sink(error_tx).await;
+
         // Create the initial goal state
         let state = GoalState::new(problem.clone(), self.max_iterations);
 
@@ -371,25 +408,22 @@ impl SimpleRecursiveAgent {
             agent.handle_goal_submitted(state).await;
         });
 
-        // Wait for solution or timeout (300 seconds)
-        match timeout(Duration::from_secs(300), solution_rx.recv()).await {
-            Ok(Some(solution)) => Ok(solution),
-            Ok(None) => {
-                let timeout_message =
-                    "Timeout: Could not solve the problem within 300 seconds.".to_string();
-                let mut timeout_state = GoalState::new(problem, self.max_iterations);
-                timeout_state.solution = Some(timeout_message.clone());
-                timeout_state.is_complete = true;
-
-                self.emitter
-                    .emit(AnySolverEvent::Timeout(TimeoutEvent {
-                        state: timeout_state,
-                    }))
-                    .await;
-
-                Ok(timeout_message)
+        // Wait for solution, handler error, or timeout (300 seconds)
+        match timeout(Duration::from_secs(300), async {
+            tokio::select! {
+                solution = solution_rx.recv() => {
+                    Ok(solution)
+                }
+                Some(err) = error_rx.recv() => {
+                    Err(err)
+                }
             }
-            Err(_) => {
+        })
+        .await
+        {
+            Ok(Ok(Some(solution))) => Ok(solution),
+            Ok(Err(handler_err)) => Err(handler_err),
+            Ok(Ok(None)) | Err(_) => {
                 let timeout_message =
                     "Timeout: Could not solve the problem within 300 seconds.".to_string();
                 let mut timeout_state = GoalState::new(problem, self.max_iterations);
@@ -960,5 +994,36 @@ mod tests {
         tokio::time::sleep(Duration::from_millis(100)).await;
 
         assert!(*goal_failed.lock().await, "GoalFailed event not fired");
+    }
+
+    #[tokio::test]
+    async fn test_handler_panic_surfaces_as_error() {
+        let emitter = EventEmitter::new();
+
+        // Subscribe a callback that panics
+        emitter
+            .subscribe(|_event: AnySolverEvent| {
+                panic!("intentional test panic");
+            })
+            .await;
+
+        let (error_tx, mut error_rx) = mpsc::channel::<MojenticError>(8);
+        emitter.set_error_sink(error_tx).await;
+
+        let state = GoalState::new("Test", 5);
+        emitter.emit(AnySolverEvent::GoalSubmitted(GoalSubmittedEvent { state })).await;
+
+        // Give the spawned tasks time to run and forward the panic
+        let err = tokio::time::timeout(Duration::from_secs(2), error_rx.recv())
+            .await
+            .expect("timed out waiting for handler error")
+            .expect("channel closed without error");
+
+        match err {
+            MojenticError::HandlerError(msg) => {
+                assert!(msg.contains("intentional test panic"), "unexpected error message: {msg}");
+            }
+            other => panic!("Expected HandlerError, got: {:?}", other),
+        }
     }
 }
