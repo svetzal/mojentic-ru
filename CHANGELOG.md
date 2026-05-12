@@ -5,6 +5,22 @@ All notable changes to the Mojentic Rust implementation will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-05-11
+
+### Added
+
+- `max_tool_iterations` field on `CompletionConfig` (default `10`) — bounds recursive tool-calling in both `generate` and `generate_stream`; returns `MojenticError::MaxToolIterationsExceeded` when the limit is reached. Previously both paths could recurse without bound on repeated tool-call responses.
+- Integration test exercising the OpenAI tool-calling HTTP round-trip (assistant tool-call → tool result → final response), backed by a shared fixture set used across all four mojentic ports.
+
+### Changed
+
+- `SimpleRecursiveAgent` completion detection requires a strict whole-string match for `DONE`/`FAIL` (case-insensitive, trimmed); responses that merely contain those words as substrings no longer trigger completion.
+
+### Fixed
+
+- `AsyncDispatcher::wait_for_empty_queue` could return while agent handlers were still in flight; it now waits for both the queue to drain and all in-flight handlers to complete.
+- Asynchronous event-handler errors and panics in `SimpleRecursiveAgent` were swallowed, leaving `solve` to hang until its timeout; handler errors now surface via `MojenticError::HandlerError`.
+
 ## [1.3.0] - 2026-04-11
 
 ### Changed
