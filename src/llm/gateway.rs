@@ -36,6 +36,7 @@ pub struct CompletionConfig {
     pub top_k: Option<u32>,
     pub response_format: Option<ResponseFormat>,
     pub reasoning_effort: Option<ReasoningEffort>,
+    pub max_tool_iterations: usize,
 }
 
 impl Default for CompletionConfig {
@@ -49,6 +50,7 @@ impl Default for CompletionConfig {
             top_k: None,
             response_format: None,
             reasoning_effort: None,
+            max_tool_iterations: 10,
         }
     }
 }
@@ -118,6 +120,7 @@ mod tests {
         assert_eq!(config.top_k, None);
         assert!(config.response_format.is_none());
         assert!(config.reasoning_effort.is_none());
+        assert_eq!(config.max_tool_iterations, 10);
     }
 
     #[test]
@@ -131,6 +134,7 @@ mod tests {
             top_k: Some(40),
             response_format: Some(ResponseFormat::Text),
             reasoning_effort: None,
+            max_tool_iterations: 10,
         };
 
         assert_eq!(config.temperature, 0.5);
@@ -153,6 +157,7 @@ mod tests {
             top_k: Some(50),
             response_format: Some(ResponseFormat::JsonObject { schema: None }),
             reasoning_effort: None,
+            max_tool_iterations: 10,
         };
 
         let config2 = config1.clone();
@@ -210,6 +215,7 @@ mod tests {
                 schema: Some(serde_json::json!({"type": "object"})),
             }),
             reasoning_effort: None,
+            max_tool_iterations: 10,
         };
 
         assert_eq!(config.temperature, 0.8);
@@ -252,6 +258,7 @@ mod tests {
             top_k: None,
             response_format: None,
             reasoning_effort: Some(ReasoningEffort::High),
+            max_tool_iterations: 10,
         };
 
         assert_eq!(config.reasoning_effort, Some(ReasoningEffort::High));

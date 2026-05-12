@@ -1,0 +1,14 @@
+{
+  "id": "chatcmpl-fixture-roundtrip-2",
+  "object": "chat.completion",
+  "created": 1740000001,
+  "model": "gpt-4o-2024-08-06",
+  "choices": [
+    {
+      "index": 0,
+      "message": { "role": "assistant", "content": "It's currently 22°C and sunny in Paris." },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": { "prompt_tokens": 80, "completion_tokens": 11, "total_tokens": 91 }
+}

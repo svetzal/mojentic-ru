@@ -737,6 +737,7 @@ mod tests {
             top_k: None,
             response_format: None,
             reasoning_effort: None,
+            max_tool_iterations: 10,
         };
 
         let options = extract_ollama_options(&config);
@@ -759,6 +760,7 @@ mod tests {
             top_k: None,
             response_format: None,
             reasoning_effort: None,
+            max_tool_iterations: 10,
         };
 
         let options = extract_ollama_options(&config);
@@ -780,6 +782,7 @@ mod tests {
             top_k: None,
             response_format: None,
             reasoning_effort: None,
+            max_tool_iterations: 10,
         };
 
         let options = extract_ollama_options(&config);
@@ -802,6 +805,7 @@ mod tests {
             top_k: None,
             response_format: None,
             reasoning_effort: None,
+            max_tool_iterations: 10,
         };
 
         let options = extract_ollama_options(&config);
@@ -825,6 +829,7 @@ mod tests {
             top_k: None,
             response_format: None,
             reasoning_effort: None,
+            max_tool_iterations: 10,
         };
 
         let options = extract_ollama_options(&config);
@@ -846,6 +851,7 @@ mod tests {
             top_k: Some(40),
             response_format: None,
             reasoning_effort: None,
+            max_tool_iterations: 10,
         };
 
         let options = extract_ollama_options(&config);
@@ -866,6 +872,7 @@ mod tests {
             top_k: Some(50),
             response_format: None,
             reasoning_effort: None,
+            max_tool_iterations: 10,
         };
 
         let options = extract_ollama_options(&config);
@@ -890,6 +897,7 @@ mod tests {
             top_k: None,
             response_format: Some(ResponseFormat::Text),
             reasoning_effort: None,
+            max_tool_iterations: 10,
         };
 
         let mut body = serde_json::json!({
@@ -916,6 +924,7 @@ mod tests {
             top_k: None,
             response_format: Some(ResponseFormat::JsonObject { schema: None }),
             reasoning_effort: None,
+            max_tool_iterations: 10,
         };
 
         let mut body = serde_json::json!({
@@ -951,6 +960,7 @@ mod tests {
                 schema: Some(schema.clone()),
             }),
             reasoning_effort: None,
+            max_tool_iterations: 10,
         };
 
         let mut body = serde_json::json!({
@@ -974,6 +984,7 @@ mod tests {
             top_k: None,
             response_format: None,
             reasoning_effort: None,
+            max_tool_iterations: 10,
         };
 
         let mut body = serde_json::json!({

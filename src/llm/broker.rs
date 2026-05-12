@@ -16,8 +16,6 @@ pub struct LlmBroker {
     model: String,
     gateway: Arc<dyn LlmGateway>,
     tracer: Option<Arc<TracerSystem>>,
-    /// Maximum number of tool-call iterations before returning an error.
-    max_tool_iterations: usize,
 }
 
 impl LlmBroker {
@@ -37,18 +35,7 @@ impl LlmBroker {
             model: model.into(),
             gateway,
             tracer,
-            max_tool_iterations: 10,
         }
-    }
-
-    /// Override the maximum number of consecutive tool-call iterations.
-    ///
-    /// If the model keeps requesting tool calls without producing a final text
-    /// response, [`MojenticError::MaxToolIterationsExceeded`] is returned once
-    /// this limit is reached.  The default is `10`.
-    pub fn with_max_tool_iterations(mut self, n: usize) -> Self {
-        self.max_tool_iterations = n;
-        self
     }
 
     /// Generate text response from LLM
@@ -179,9 +166,9 @@ impl LlmBroker {
         iteration: usize,
     ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<String>> + Send + 'a>> {
         Box::pin(async move {
-            if iteration >= self.max_tool_iterations {
+            if iteration >= config.max_tool_iterations {
                 return Err(MojenticError::MaxToolIterationsExceeded {
-                    limit: self.max_tool_iterations,
+                    limit: config.max_tool_iterations,
                 });
             }
 
@@ -462,9 +449,9 @@ impl LlmBroker {
         depth: usize,
     ) -> impl Stream<Item = Result<String>> + 'a {
         async_stream::stream! {
-            if depth >= self.max_tool_iterations {
+            if depth >= config.max_tool_iterations {
                 yield Err(MojenticError::MaxToolIterationsExceeded {
-                    limit: self.max_tool_iterations,
+                    limit: config.max_tool_iterations,
                 });
                 return;
             }
@@ -776,14 +763,19 @@ mod tests {
         let gateway = Arc::new(MockGateway::new(vec![]));
         let broker = LlmBroker::new("test-model", gateway, None);
         assert_eq!(broker.model, "test-model");
-        assert_eq!(broker.max_tool_iterations, 10);
+        assert_eq!(CompletionConfig::default().max_tool_iterations, 10);
     }
 
     #[tokio::test]
     async fn test_broker_with_max_tool_iterations() {
-        let gateway = Arc::new(MockGateway::new(vec![]));
-        let broker = LlmBroker::new("test-model", gateway, None).with_max_tool_iterations(3);
-        assert_eq!(broker.max_tool_iterations, 3);
+        assert_eq!(
+            CompletionConfig {
+                max_tool_iterations: 3,
+                ..Default::default()
+            }
+            .max_tool_iterations,
+            3
+        );
     }
 
     #[tokio::test]
@@ -806,7 +798,7 @@ mod tests {
             .collect();
 
         let gateway = Arc::new(MockGateway::new(responses));
-        let broker = LlmBroker::new("test-model", gateway, None).with_max_tool_iterations(3);
+        let broker = LlmBroker::new("test-model", gateway, None);
 
         let tool = MockTool {
             name: "loop_tool".to_string(),
@@ -815,7 +807,17 @@ mod tests {
         let tools: Vec<Box<dyn LlmTool>> = vec![Box::new(tool)];
 
         let messages = vec![LlmMessage::user("Loop forever")];
-        let result = broker.generate(&messages, Some(&tools), None, None).await;
+        let result = broker
+            .generate(
+                &messages,
+                Some(&tools),
+                Some(CompletionConfig {
+                    max_tool_iterations: 3,
+                    ..Default::default()
+                }),
+                None,
+            )
+            .await;
 
         assert!(result.is_err());
         match result.unwrap_err() {
@@ -889,7 +891,7 @@ mod tests {
         }
 
         let gateway = Arc::new(InfiniteToolGateway);
-        let broker = LlmBroker::new("test-model", gateway, None).with_max_tool_iterations(2);
+        let broker = LlmBroker::new("test-model", gateway, None);
 
         let tool = MockTool {
             name: "loop_tool".to_string(),
@@ -898,7 +900,15 @@ mod tests {
         let tools: Vec<Box<dyn LlmTool>> = vec![Box::new(tool)];
 
         let messages = vec![LlmMessage::user("Loop forever")];
-        let mut stream = broker.generate_stream(&messages, Some(&tools), None, None);
+        let mut stream = broker.generate_stream(
+            &messages,
+            Some(&tools),
+            Some(CompletionConfig {
+                max_tool_iterations: 2,
+                ..Default::default()
+            }),
+            None,
+        );
 
         let mut found_error = false;
         while let Some(result) = stream.next().await {
@@ -956,6 +966,7 @@ mod tests {
             top_k: None,
             response_format: None,
             reasoning_effort: None,
+            max_tool_iterations: 10,
         };
 
         let messages = vec![LlmMessage::user("Hi")];
@@ -1079,6 +1090,7 @@ mod tests {
             top_k: None,
             response_format: None,
             reasoning_effort: None,
+            max_tool_iterations: 10,
         };
 
         let messages = vec![LlmMessage::user("Generate")];

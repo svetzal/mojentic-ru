@@ -167,7 +167,7 @@ impl AsyncDispatcher {
                 }
             }
 
-            tokio::time::sleep(Duration::from_millis(10)).await;
+            tokio::time::sleep(Duration::from_millis(100)).await;
         }
     }
 
@@ -209,35 +209,30 @@ impl AsyncDispatcher {
                     let agents = router.get_agents(type_id);
                     debug!("Found {} agents for event type", agents.len());
 
-                    // Process event through each agent
+                    // Process event through each agent serially (deterministic, no races on SharedWorkingMemory)
                     for agent in agents {
                         debug!("Sending event to agent");
                         in_flight.fetch_add(1, Ordering::AcqRel);
-                        let queue_clone = queue.clone();
-                        let in_flight_clone = in_flight.clone();
                         let event_box = event.clone_box();
 
-                        tokio::spawn(async move {
-                            match agent.receive_event_async(event_box).await {
-                                Ok(new_events) => {
-                                    debug!("Agent returned {} events", new_events.len());
-                                    // Add new events to queue
-                                    let mut q = queue_clone.lock().await;
-                                    for new_event in new_events {
-                                        q.push_back(new_event);
-                                    }
-                                }
-                                Err(e) => {
-                                    tracing::error!("Agent error processing event: {}", e);
+                        match agent.receive_event_async(event_box).await {
+                            Ok(new_events) => {
+                                debug!("Agent returned {} events", new_events.len());
+                                let mut q = queue.lock().await;
+                                for new_event in new_events {
+                                    q.push_back(new_event);
                                 }
                             }
-                            in_flight_clone.fetch_sub(1, Ordering::AcqRel);
-                        });
+                            Err(e) => {
+                                tracing::error!("Agent error processing event: {}", e);
+                            }
+                        }
+                        in_flight.fetch_sub(1, Ordering::AcqRel);
                     }
                 }
             }
 
-            tokio::time::sleep(Duration::from_millis(10)).await;
+            tokio::time::sleep(Duration::from_millis(100)).await;
         }
 
         debug!("Dispatch loop exiting");

@@ -57,7 +57,8 @@
 //!
 //! # Completion Indicators
 //!
-//! The agent monitors responses for these keywords (case-insensitive, word boundaries):
+//! The agent monitors responses for exact matches (trimmed, case-insensitive):
+//! the response must be exactly `DONE` or `FAIL` (trimmed, case-insensitive)
 //! - "DONE" - Task completed successfully
 //! - "FAIL" - Task cannot be completed
 
@@ -65,7 +66,6 @@ use crate::error::{MojenticError, Result};
 use crate::llm::chat_session::ChatSession;
 use crate::llm::tools::LlmTool;
 use crate::llm::LlmBroker;
-use regex::Regex;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -458,14 +458,10 @@ impl SimpleRecursiveAgent {
         response: String,
     ) -> Pin<Box<dyn Future<Output = ()> + Send + '_>> {
         Box::pin(async move {
-            let response_lower = response.to_lowercase();
-
-            // Create regex patterns for word boundary matching
-            let done_pattern = Regex::new(r"\bdone\b").unwrap();
-            let fail_pattern = Regex::new(r"\bfail\b").unwrap();
+            let normalized = response.trim().to_uppercase();
 
             // Check if the task failed
-            if fail_pattern.is_match(&response_lower) {
+            if normalized == "FAIL" {
                 state.solution = Some(format!(
                     "Failed to solve after {} iterations:\n{}",
                     state.iteration, response
@@ -477,7 +473,7 @@ impl SimpleRecursiveAgent {
             }
 
             // Check if the task succeeded
-            if done_pattern.is_match(&response_lower) {
+            if normalized == "DONE" {
                 state.solution = Some(response);
                 state.is_complete = true;
 
@@ -874,24 +870,32 @@ mod tests {
 
     #[tokio::test]
     async fn test_solve_word_boundary_done() {
+        // "I'm DONE with this task" is NOT a strict match — should not trigger completion.
+        // The agent will exhaust max_iterations (default 5) using the single response.
         let gateway = Arc::new(MockGateway::new(vec!["I'm DONE with this task".to_string()]));
         let broker = Arc::new(LlmBroker::new("test-model", gateway, None));
-        let agent = SimpleRecursiveAgent::new(broker);
+        let agent = SimpleRecursiveAgent::builder(broker).max_iterations(1).build();
 
         let result = agent.solve("Test problem").await.unwrap();
 
-        assert_eq!(result, "I'm DONE with this task");
+        // Strict match: substring "DONE" does NOT trigger GoalAchieved
+        assert!(result.contains("Best solution after 1 iterations"));
+        assert!(result.contains("I'm DONE with this task"));
     }
 
     #[tokio::test]
     async fn test_solve_word_boundary_fail() {
+        // "This will FAIL" is NOT a strict match — should not trigger GoalFailed.
+        // The agent will exhaust max_iterations (default 5) using the single response.
         let gateway = Arc::new(MockGateway::new(vec!["This will FAIL".to_string()]));
         let broker = Arc::new(LlmBroker::new("test-model", gateway, None));
-        let agent = SimpleRecursiveAgent::new(broker);
+        let agent = SimpleRecursiveAgent::builder(broker).max_iterations(1).build();
 
         let result = agent.solve("Test problem").await.unwrap();
 
-        assert!(result.contains("Failed to solve"));
+        // Strict match: substring "FAIL" does NOT trigger GoalFailed
+        assert!(result.contains("Best solution after 1 iterations"));
+        assert!(result.contains("This will FAIL"));
     }
 
     #[tokio::test]
