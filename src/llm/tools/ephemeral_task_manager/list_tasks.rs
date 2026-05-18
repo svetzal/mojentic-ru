@@ -1,6 +1,7 @@
 use super::task_list::TaskList;
 use crate::error::Result;
 use crate::llm::tools::{FunctionDescriptor, LlmTool, ToolDescriptor};
+use async_trait::async_trait;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -31,8 +32,13 @@ impl ListTasksTool {
     }
 }
 
+#[async_trait]
 impl LlmTool for ListTasksTool {
-    fn run(&self, _args: &HashMap<String, Value>) -> Result<Value> {
+    async fn run(
+        &self,
+        _args: &HashMap<String, Value>,
+        _ctx: &crate::llm::tools::ToolRunCtx,
+    ) -> Result<Value> {
         let task_list = self.task_list.lock().unwrap();
         let tasks = task_list.list_tasks();
         let task_list_str = self.format_tasks(&tasks);

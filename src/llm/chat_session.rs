@@ -366,6 +366,7 @@ mod tests {
     use crate::llm::gateway::{LlmGateway, StreamChunk};
     use crate::llm::models::LlmGatewayResponse;
     use crate::llm::tools::{FunctionDescriptor, ToolDescriptor};
+    use async_trait::async_trait;
     use futures::stream::{self, Stream};
     use serde_json::{json, Value};
     use std::collections::HashMap;
@@ -453,8 +454,14 @@ mod tests {
         name: String,
     }
 
+    #[async_trait]
+
     impl LlmTool for MockTool {
-        fn run(&self, _args: &HashMap<String, Value>) -> Result<Value> {
+        async fn run(
+            &self,
+            _args: &HashMap<String, Value>,
+            _ctx: &crate::llm::tools::ToolRunCtx,
+        ) -> Result<Value> {
             Ok(json!({"result": "success"}))
         }
 

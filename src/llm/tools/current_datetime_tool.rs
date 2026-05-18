@@ -1,5 +1,6 @@
 use crate::error::Result;
 use crate::llm::tools::{FunctionDescriptor, LlmTool, ToolDescriptor};
+use async_trait::async_trait;
 use chrono::Local;
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -17,7 +18,7 @@ use std::collections::HashMap;
 /// let tool = CurrentDatetimeTool;
 /// let args = HashMap::new();
 ///
-/// let result = tool.run(&args)?;
+/// let result = tool.run(&args, &crate::llm::tools::ToolRunCtx::default()).await?;
 /// // result contains current_datetime, timestamp, and timezone
 /// ```
 #[derive(Clone)]
@@ -36,8 +37,13 @@ impl Default for CurrentDatetimeTool {
     }
 }
 
+#[async_trait]
 impl LlmTool for CurrentDatetimeTool {
-    fn run(&self, args: &HashMap<String, Value>) -> Result<Value> {
+    async fn run(
+        &self,
+        args: &HashMap<String, Value>,
+        _ctx: &crate::llm::tools::ToolRunCtx,
+    ) -> Result<Value> {
         let format_string = args
             .get("format_string")
             .and_then(|v| v.as_str())
@@ -94,12 +100,12 @@ mod tests {
         assert!(descriptor.function.description.contains("current date and time"));
     }
 
-    #[test]
-    fn test_run_with_default_format() {
+    #[tokio::test]
+    async fn test_run_with_default_format() {
         let tool = CurrentDatetimeTool::new();
         let args = HashMap::new();
 
-        let result = tool.run(&args).unwrap();
+        let result = tool.run(&args, &crate::llm::tools::ToolRunCtx::default()).await.unwrap();
 
         assert!(result.is_object());
         assert!(result.get("current_datetime").is_some());
@@ -112,25 +118,25 @@ mod tests {
         assert!(re.is_match(datetime_str));
     }
 
-    #[test]
-    fn test_run_with_custom_format() {
+    #[tokio::test]
+    async fn test_run_with_custom_format() {
         let tool = CurrentDatetimeTool::new();
         let mut args = HashMap::new();
         args.insert("format_string".to_string(), json!("%Y-%m-%d"));
 
-        let result = tool.run(&args).unwrap();
+        let result = tool.run(&args, &crate::llm::tools::ToolRunCtx::default()).await.unwrap();
 
         let datetime_str = result.get("current_datetime").unwrap().as_str().unwrap();
         let re = regex::Regex::new(r"^\d{4}-\d{2}-\d{2}$").unwrap();
         assert!(re.is_match(datetime_str));
     }
 
-    #[test]
-    fn test_timestamp_is_reasonable() {
+    #[tokio::test]
+    async fn test_timestamp_is_reasonable() {
         let tool = CurrentDatetimeTool::new();
         let args = HashMap::new();
 
-        let result = tool.run(&args).unwrap();
+        let result = tool.run(&args, &crate::llm::tools::ToolRunCtx::default()).await.unwrap();
         let timestamp = result.get("timestamp").unwrap().as_i64().unwrap();
 
         // Timestamp should be reasonable (after 2020, before 2030)
@@ -138,12 +144,12 @@ mod tests {
         assert!(timestamp < 1_893_456_000);
     }
 
-    #[test]
-    fn test_timezone_is_present() {
+    #[tokio::test]
+    async fn test_timezone_is_present() {
         let tool = CurrentDatetimeTool::new();
         let args = HashMap::new();
 
-        let result = tool.run(&args).unwrap();
+        let result = tool.run(&args, &crate::llm::tools::ToolRunCtx::default()).await.unwrap();
         let timezone = result.get("timezone").unwrap().as_str().unwrap();
 
         assert!(!timezone.is_empty());
@@ -156,13 +162,13 @@ mod tests {
         assert!(!tool.matches("other_tool"));
     }
 
-    #[test]
-    fn test_format_with_day_name() {
+    #[tokio::test]
+    async fn test_format_with_day_name() {
         let tool = CurrentDatetimeTool::new();
         let mut args = HashMap::new();
         args.insert("format_string".to_string(), json!("%A"));
 
-        let result = tool.run(&args).unwrap();
+        let result = tool.run(&args, &crate::llm::tools::ToolRunCtx::default()).await.unwrap();
         let day_name = result.get("current_datetime").unwrap().as_str().unwrap();
 
         let valid_days = [
@@ -177,13 +183,13 @@ mod tests {
         assert!(valid_days.contains(&day_name));
     }
 
-    #[test]
-    fn test_format_with_month_name() {
+    #[tokio::test]
+    async fn test_format_with_month_name() {
         let tool = CurrentDatetimeTool::new();
         let mut args = HashMap::new();
         args.insert("format_string".to_string(), json!("%B"));
 
-        let result = tool.run(&args).unwrap();
+        let result = tool.run(&args, &crate::llm::tools::ToolRunCtx::default()).await.unwrap();
         let month_name = result.get("current_datetime").unwrap().as_str().unwrap();
 
         let valid_months = [

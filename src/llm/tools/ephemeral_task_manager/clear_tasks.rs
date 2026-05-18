@@ -1,6 +1,7 @@
 use super::task_list::TaskList;
 use crate::error::Result;
 use crate::llm::tools::{FunctionDescriptor, LlmTool, ToolDescriptor};
+use async_trait::async_trait;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -18,8 +19,13 @@ impl ClearTasksTool {
     }
 }
 
+#[async_trait]
 impl LlmTool for ClearTasksTool {
-    fn run(&self, _args: &HashMap<String, Value>) -> Result<Value> {
+    async fn run(
+        &self,
+        _args: &HashMap<String, Value>,
+        _ctx: &crate::llm::tools::ToolRunCtx,
+    ) -> Result<Value> {
         let mut task_list = self.task_list.lock().unwrap();
         let count = task_list.clear_tasks();
 

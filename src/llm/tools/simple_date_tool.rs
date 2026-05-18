@@ -1,5 +1,6 @@
 use crate::error::Result;
 use crate::llm::tools::{FunctionDescriptor, LlmTool, ToolDescriptor};
+use async_trait::async_trait;
 use chrono::{Local, NaiveDate};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -19,7 +20,7 @@ use std::collections::HashMap;
 ///     ("relative_date".to_string(), json!("tomorrow"))
 /// ]);
 ///
-/// let result = tool.run(&args)?;
+/// let result = tool.run(&args, &crate::llm::tools::ToolRunCtx::default()).await?;
 /// // result contains absolute date for tomorrow
 /// ```
 #[derive(Clone)]
@@ -105,8 +106,13 @@ impl SimpleDateTool {
     }
 }
 
+#[async_trait]
 impl LlmTool for SimpleDateTool {
-    fn run(&self, args: &HashMap<String, Value>) -> Result<Value> {
+    async fn run(
+        &self,
+        args: &HashMap<String, Value>,
+        _ctx: &crate::llm::tools::ToolRunCtx,
+    ) -> Result<Value> {
         let relative_date =
             args.get("relative_date").and_then(|v| v.as_str()).ok_or_else(|| {
                 crate::error::MojenticError::ToolError(
@@ -166,24 +172,24 @@ mod tests {
         assert!(desc.function.description.contains("relative date"));
     }
 
-    #[test]
-    fn test_resolve_today() {
+    #[tokio::test]
+    async fn test_resolve_today() {
         let tool = SimpleDateTool;
         let args = HashMap::from([("relative_date".to_string(), json!("today"))]);
 
-        let result = tool.run(&args).unwrap();
+        let result = tool.run(&args, &crate::llm::tools::ToolRunCtx::default()).await.unwrap();
         let today = Local::now().date_naive().format("%Y-%m-%d").to_string();
 
         assert_eq!(result["relative_date"], "today");
         assert_eq!(result["resolved_date"], today);
     }
 
-    #[test]
-    fn test_resolve_tomorrow() {
+    #[tokio::test]
+    async fn test_resolve_tomorrow() {
         let tool = SimpleDateTool;
         let args = HashMap::from([("relative_date".to_string(), json!("tomorrow"))]);
 
-        let result = tool.run(&args).unwrap();
+        let result = tool.run(&args, &crate::llm::tools::ToolRunCtx::default()).await.unwrap();
         let tomorrow = (Local::now().date_naive() + chrono::Duration::days(1))
             .format("%Y-%m-%d")
             .to_string();
@@ -192,12 +198,12 @@ mod tests {
         assert_eq!(result["resolved_date"], tomorrow);
     }
 
-    #[test]
-    fn test_resolve_days_from_now() {
+    #[tokio::test]
+    async fn test_resolve_days_from_now() {
         let tool = SimpleDateTool;
         let args = HashMap::from([("relative_date".to_string(), json!("3 days from now"))]);
 
-        let result = tool.run(&args).unwrap();
+        let result = tool.run(&args, &crate::llm::tools::ToolRunCtx::default()).await.unwrap();
         let expected = (Local::now().date_naive() + chrono::Duration::days(3))
             .format("%Y-%m-%d")
             .to_string();
@@ -205,12 +211,12 @@ mod tests {
         assert_eq!(result["resolved_date"], expected);
     }
 
-    #[test]
-    fn test_resolve_days_ago() {
+    #[tokio::test]
+    async fn test_resolve_days_ago() {
         let tool = SimpleDateTool;
         let args = HashMap::from([("relative_date".to_string(), json!("2 days ago"))]);
 
-        let result = tool.run(&args).unwrap();
+        let result = tool.run(&args, &crate::llm::tools::ToolRunCtx::default()).await.unwrap();
         let expected = (Local::now().date_naive() - chrono::Duration::days(2))
             .format("%Y-%m-%d")
             .to_string();
@@ -218,12 +224,12 @@ mod tests {
         assert_eq!(result["resolved_date"], expected);
     }
 
-    #[test]
-    fn test_missing_argument() {
+    #[tokio::test]
+    async fn test_missing_argument() {
         let tool = SimpleDateTool;
         let args = HashMap::new();
 
-        let result = tool.run(&args);
+        let result = tool.run(&args, &crate::llm::tools::ToolRunCtx::default()).await;
         assert!(result.is_err());
     }
 

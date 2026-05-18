@@ -9,7 +9,8 @@ use mojentic::llm::tools::{web_search_tool::WebSearchTool, LlmTool};
 use serde_json::json;
 use std::collections::HashMap;
 
-fn main() {
+#[tokio::main]
+async fn main() {
     println!("Web Search Tool Example");
     println!("=======================\n");
 
@@ -23,7 +24,7 @@ fn main() {
     let mut args = HashMap::new();
     args.insert("query".to_string(), json!("Rust programming language"));
 
-    match tool.run(&args) {
+    match tool.run(&args, &mojentic::llm::tools::ToolRunCtx::default()).await {
         Ok(results) => {
             if let Some(results_array) = results.as_array() {
                 println!("Found {} results:\n", results_array.len());
@@ -49,7 +50,7 @@ fn main() {
     let mut args = HashMap::new();
     args.insert("query".to_string(), json!("systems programming & memory safety"));
 
-    match tool.run(&args) {
+    match tool.run(&args, &mojentic::llm::tools::ToolRunCtx::default()).await {
         Ok(results) => {
             if let Some(results_array) = results.as_array() {
                 println!("Found {} results:\n", results_array.len());
@@ -85,7 +86,7 @@ fn main() {
 
     let args = HashMap::new(); // Empty args - should fail
 
-    match tool.run(&args) {
+    match tool.run(&args, &mojentic::llm::tools::ToolRunCtx::default()).await {
         Ok(_) => {
             println!("Unexpected success");
         }

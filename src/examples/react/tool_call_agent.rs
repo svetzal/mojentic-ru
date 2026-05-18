@@ -47,7 +47,8 @@ impl BaseAsyncAgent for ToolCallAgent {
         println!("Arguments: {:?}", arguments);
 
         // Execute the tool
-        let result = match tool.run(arguments) {
+        let ctx = crate::llm::tools::ToolRunCtx::default();
+        let result = match tool.run(arguments, &ctx).await {
             Ok(r) => r,
             Err(e) => {
                 eprintln!("Tool execution error: {}", e);

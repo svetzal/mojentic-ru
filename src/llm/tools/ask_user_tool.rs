@@ -1,5 +1,6 @@
 use crate::error::Result;
 use crate::llm::tools::{FunctionDescriptor, LlmTool, ToolDescriptor};
+use async_trait::async_trait;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::io::{self, Write};
@@ -23,7 +24,7 @@ use std::io::{self, Write};
 /// args.insert("user_request".to_string(), json!("What is your favorite color?"));
 ///
 /// // This would prompt the user for input
-/// // let result = tool.run(&args).unwrap();
+/// // let result = tool.run(&args, &crate::llm::tools::ToolRunCtx::default()).await.unwrap();
 /// ```
 #[derive(Clone)]
 pub struct AskUserTool;
@@ -55,8 +56,13 @@ impl Default for AskUserTool {
     }
 }
 
+#[async_trait]
 impl LlmTool for AskUserTool {
-    fn run(&self, args: &HashMap<String, Value>) -> Result<Value> {
+    async fn run(
+        &self,
+        args: &HashMap<String, Value>,
+        _ctx: &crate::llm::tools::ToolRunCtx,
+    ) -> Result<Value> {
         let user_request = args.get("user_request").and_then(|v| v.as_str()).ok_or_else(|| {
             crate::error::MojenticError::ToolError(
                 "Missing required argument: user_request".to_string(),
@@ -120,12 +126,12 @@ mod tests {
         assert!(!tool.matches("other_tool"));
     }
 
-    #[test]
-    fn test_missing_argument() {
+    #[tokio::test]
+    async fn test_missing_argument() {
         let tool = AskUserTool::new();
         let args = HashMap::new();
 
-        let result = tool.run(&args);
+        let result = tool.run(&args, &crate::llm::tools::ToolRunCtx::default()).await;
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), crate::error::MojenticError::ToolError(_)));
     }

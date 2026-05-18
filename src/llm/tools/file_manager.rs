@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use regex::Regex;
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -268,6 +269,7 @@ impl ListFilesTool {
     }
 }
 
+#[async_trait]
 impl LlmTool for ListFilesTool {
     fn descriptor(&self) -> ToolDescriptor {
         ToolDescriptor {
@@ -294,7 +296,11 @@ impl LlmTool for ListFilesTool {
         }
     }
 
-    fn run(&self, args: &HashMap<String, Value>) -> Result<Value> {
+    async fn run(
+        &self,
+        args: &HashMap<String, Value>,
+        _ctx: &crate::llm::tools::ToolRunCtx,
+    ) -> Result<Value> {
         let path = args
             .get("path")
             .and_then(|v| v.as_str())
@@ -329,6 +335,7 @@ impl ReadFileTool {
     }
 }
 
+#[async_trait]
 impl LlmTool for ReadFileTool {
     fn descriptor(&self) -> ToolDescriptor {
         ToolDescriptor {
@@ -351,7 +358,11 @@ impl LlmTool for ReadFileTool {
         }
     }
 
-    fn run(&self, args: &HashMap<String, Value>) -> Result<Value> {
+    async fn run(
+        &self,
+        args: &HashMap<String, Value>,
+        _ctx: &crate::llm::tools::ToolRunCtx,
+    ) -> Result<Value> {
         let path = args
             .get("path")
             .and_then(|v| v.as_str())
@@ -378,6 +389,7 @@ impl WriteFileTool {
     }
 }
 
+#[async_trait]
 impl LlmTool for WriteFileTool {
     fn descriptor(&self) -> ToolDescriptor {
         ToolDescriptor {
@@ -404,7 +416,11 @@ impl LlmTool for WriteFileTool {
         }
     }
 
-    fn run(&self, args: &HashMap<String, Value>) -> Result<Value> {
+    async fn run(
+        &self,
+        args: &HashMap<String, Value>,
+        _ctx: &crate::llm::tools::ToolRunCtx,
+    ) -> Result<Value> {
         let path = args
             .get("path")
             .and_then(|v| v.as_str())
@@ -436,6 +452,7 @@ impl ListAllFilesTool {
     }
 }
 
+#[async_trait]
 impl LlmTool for ListAllFilesTool {
     fn descriptor(&self) -> ToolDescriptor {
         ToolDescriptor {
@@ -458,7 +475,11 @@ impl LlmTool for ListAllFilesTool {
         }
     }
 
-    fn run(&self, args: &HashMap<String, Value>) -> Result<Value> {
+    async fn run(
+        &self,
+        args: &HashMap<String, Value>,
+        _ctx: &crate::llm::tools::ToolRunCtx,
+    ) -> Result<Value> {
         let path = args
             .get("path")
             .and_then(|v| v.as_str())
@@ -484,6 +505,7 @@ impl FindFilesByGlobTool {
     }
 }
 
+#[async_trait]
 impl LlmTool for FindFilesByGlobTool {
     fn descriptor(&self) -> ToolDescriptor {
         ToolDescriptor {
@@ -510,7 +532,11 @@ impl LlmTool for FindFilesByGlobTool {
         }
     }
 
-    fn run(&self, args: &HashMap<String, Value>) -> Result<Value> {
+    async fn run(
+        &self,
+        args: &HashMap<String, Value>,
+        _ctx: &crate::llm::tools::ToolRunCtx,
+    ) -> Result<Value> {
         let path = args
             .get("path")
             .and_then(|v| v.as_str())
@@ -541,6 +567,7 @@ impl FindFilesContainingTool {
     }
 }
 
+#[async_trait]
 impl LlmTool for FindFilesContainingTool {
     fn descriptor(&self) -> ToolDescriptor {
         ToolDescriptor {
@@ -567,7 +594,11 @@ impl LlmTool for FindFilesContainingTool {
         }
     }
 
-    fn run(&self, args: &HashMap<String, Value>) -> Result<Value> {
+    async fn run(
+        &self,
+        args: &HashMap<String, Value>,
+        _ctx: &crate::llm::tools::ToolRunCtx,
+    ) -> Result<Value> {
         let path = args
             .get("path")
             .and_then(|v| v.as_str())
@@ -598,6 +629,7 @@ impl FindLinesMatchingTool {
     }
 }
 
+#[async_trait]
 impl LlmTool for FindLinesMatchingTool {
     fn descriptor(&self) -> ToolDescriptor {
         ToolDescriptor {
@@ -624,7 +656,11 @@ impl LlmTool for FindLinesMatchingTool {
         }
     }
 
-    fn run(&self, args: &HashMap<String, Value>) -> Result<Value> {
+    async fn run(
+        &self,
+        args: &HashMap<String, Value>,
+        _ctx: &crate::llm::tools::ToolRunCtx,
+    ) -> Result<Value> {
         let path = args
             .get("path")
             .and_then(|v| v.as_str())
@@ -656,6 +692,7 @@ impl CreateDirectoryTool {
     }
 }
 
+#[async_trait]
 impl LlmTool for CreateDirectoryTool {
     fn descriptor(&self) -> ToolDescriptor {
         ToolDescriptor {
@@ -678,7 +715,11 @@ impl LlmTool for CreateDirectoryTool {
         }
     }
 
-    fn run(&self, args: &HashMap<String, Value>) -> Result<Value> {
+    async fn run(
+        &self,
+        args: &HashMap<String, Value>,
+        _ctx: &crate::llm::tools::ToolRunCtx,
+    ) -> Result<Value> {
         let path = args
             .get("path")
             .and_then(|v| v.as_str())

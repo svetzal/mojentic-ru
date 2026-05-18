@@ -1,6 +1,8 @@
 use crate::error::Result;
+use async_trait::async_trait;
 use serde_json::Value;
 use std::collections::HashMap;
+use tokio_util::sync::CancellationToken;
 
 /// Descriptor for tool function parameters
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -16,10 +18,33 @@ pub struct FunctionDescriptor {
     pub parameters: Value,
 }
 
-/// Trait for LLM tools
+/// Context passed to a tool runner (and, optionally, to the tools it runs)
+/// for a single batch.
+///
+/// Carries a [`CancellationToken`] so long-running async tools can opt in to
+/// cooperative cancellation. Tools that ignore the context continue to work
+/// unchanged.
+#[derive(Debug, Clone, Default)]
+pub struct ToolRunCtx {
+    /// Cancellation token signalled when the batch is aborted (e.g. by
+    /// barge-in or a manual `interrupt()`).
+    pub cancel: CancellationToken,
+    /// Optional correlation id propagated to per-tool tracing.
+    pub correlation_id: Option<String>,
+    /// Optional source identifier propagated to per-tool tracing.
+    pub source: Option<String>,
+}
+
+/// Trait for LLM tools.
+///
+/// **2.0 change:** `run` is now async and accepts an optional [`ToolRunCtx`].
+/// Existing tools that previously implemented sync `run(&self, args)` need to
+/// be ported to the new signature. The minimal migration is to wrap the body
+/// in `async {}` and add an unused `_ctx` parameter; see `book/src/migration.md`.
+#[async_trait]
 pub trait LlmTool: Send + Sync {
-    /// Execute the tool with given arguments
-    fn run(&self, args: &HashMap<String, Value>) -> Result<Value>;
+    /// Execute the tool with given arguments.
+    async fn run(&self, args: &HashMap<String, Value>, ctx: &ToolRunCtx) -> Result<Value>;
 
     /// Get tool descriptor for LLM
     fn descriptor(&self) -> ToolDescriptor;
@@ -100,8 +125,9 @@ mod tests {
 
     struct MockTool;
 
+    #[async_trait]
     impl LlmTool for MockTool {
-        fn run(&self, _args: &HashMap<String, Value>) -> Result<Value> {
+        async fn run(&self, _args: &HashMap<String, Value>, _ctx: &ToolRunCtx) -> Result<Value> {
             Ok(json!("result"))
         }
 
@@ -128,11 +154,12 @@ mod tests {
         assert!(!tool.matches("other_tool"));
     }
 
-    #[test]
-    fn test_tool_run() {
+    #[tokio::test]
+    async fn test_tool_run() {
         let tool = MockTool;
         let args = HashMap::new();
-        let result = tool.run(&args).unwrap();
+        let ctx = ToolRunCtx::default();
+        let result = tool.run(&args, &ctx).await.unwrap();
         assert_eq!(result, json!("result"));
     }
 }

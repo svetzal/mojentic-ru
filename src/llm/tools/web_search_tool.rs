@@ -1,5 +1,6 @@
 use crate::error::Result;
 use crate::llm::tools::{FunctionDescriptor, LlmTool, ToolDescriptor};
+use async_trait::async_trait;
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -36,7 +37,7 @@ pub struct SearchResult {
 /// let mut args = HashMap::new();
 /// args.insert("query".to_string(), serde_json::json!("Rust programming"));
 ///
-/// let results = tool.run(&args)?;
+/// let results = tool.run(&args, &crate::llm::tools::ToolRunCtx::default()).await?;
 /// // results contains an array of search results with title, url, and snippet
 /// ```
 #[derive(Clone)]
@@ -147,8 +148,13 @@ impl Default for WebSearchTool {
     }
 }
 
+#[async_trait]
 impl LlmTool for WebSearchTool {
-    fn run(&self, args: &HashMap<String, Value>) -> Result<Value> {
+    async fn run(
+        &self,
+        args: &HashMap<String, Value>,
+        _ctx: &crate::llm::tools::ToolRunCtx,
+    ) -> Result<Value> {
         let query = args.get("query").and_then(|v| v.as_str()).ok_or_else(|| {
             crate::error::MojenticError::InvalidArgument("query parameter is required".to_string())
         })?;
@@ -305,23 +311,23 @@ mod tests {
         assert!(!tool.matches("other_tool"));
     }
 
-    #[test]
-    fn test_run_missing_query() {
+    #[tokio::test]
+    async fn test_run_missing_query() {
         let tool = WebSearchTool::new();
         let args = HashMap::new();
 
-        let result = tool.run(&args);
+        let result = tool.run(&args, &crate::llm::tools::ToolRunCtx::default()).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("query parameter is required"));
     }
 
-    #[test]
-    fn test_run_empty_query() {
+    #[tokio::test]
+    async fn test_run_empty_query() {
         let tool = WebSearchTool::new();
         let mut args = HashMap::new();
         args.insert("query".to_string(), json!(""));
 
-        let result = tool.run(&args);
+        let result = tool.run(&args, &crate::llm::tools::ToolRunCtx::default()).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("query parameter cannot be empty"));
     }

@@ -181,7 +181,12 @@ impl LlmBroker {
 
                     // Measure tool execution time
                     let start = std::time::Instant::now();
-                    let output = tool.run(&tool_call.arguments)?;
+                    let ctx = crate::llm::tools::ToolRunCtx {
+                        correlation_id: Some(correlation_id.to_string()),
+                        source: Some("LlmBroker".to_string()),
+                        ..Default::default()
+                    };
+                    let output = tool.run(&tool_call.arguments, &ctx).await?;
                     let tool_duration_ms = start.elapsed().as_secs_f64() * 1000.0;
 
                     // Record tool call
@@ -581,8 +586,13 @@ impl LlmBroker {
 
                             // Measure tool execution time
                             let tool_start = std::time::Instant::now();
+                            let stream_ctx = crate::llm::tools::ToolRunCtx {
+                                correlation_id: Some(correlation_id.clone()),
+                                source: Some("LlmBroker::generate_stream".to_string()),
+                                ..Default::default()
+                            };
 
-                            match tool.run(&tool_call.arguments) {
+                            match tool.run(&tool_call.arguments, &stream_ctx).await {
                                 Ok(output) => {
                                     let tool_duration_ms = tool_start.elapsed().as_secs_f64() * 1000.0;
 
@@ -650,6 +660,7 @@ mod tests {
     use super::*;
     use crate::llm::models::LlmToolCall;
     use crate::llm::tools::{FunctionDescriptor, ToolDescriptor};
+    use async_trait::async_trait;
     use serde::{Deserialize, Serialize};
     use serde_json::Value;
     use std::collections::HashMap;
@@ -734,8 +745,14 @@ mod tests {
         result: Value,
     }
 
+    #[async_trait]
+
     impl LlmTool for MockTool {
-        fn run(&self, _args: &HashMap<String, Value>) -> Result<Value> {
+        async fn run(
+            &self,
+            _args: &HashMap<String, Value>,
+            _ctx: &crate::llm::tools::ToolRunCtx,
+        ) -> Result<Value> {
             Ok(self.result.clone())
         }
 

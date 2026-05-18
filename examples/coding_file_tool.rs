@@ -199,7 +199,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create a new list tool instance to display final files
     let final_list_tool = ListAllFilesTool::new(fs_gateway.clone());
     let list_result = final_list_tool
-        .run(&std::collections::HashMap::from([("path".to_string(), serde_json::json!("."))]))?;
+        .run(
+            &std::collections::HashMap::from([("path".to_string(), serde_json::json!("."))]),
+            &mojentic::llm::tools::ToolRunCtx::default(),
+        )
+        .await?;
 
     println!("{}", list_result);
     println!();

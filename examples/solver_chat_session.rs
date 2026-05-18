@@ -6,6 +6,7 @@
 //!
 //! Run with: cargo run --example solver_chat_session
 
+use async_trait::async_trait;
 use mojentic::agents::IterativeProblemSolver;
 use mojentic::llm::gateways::OllamaGateway;
 use mojentic::llm::tools::simple_date_tool::SimpleDateTool;
@@ -46,8 +47,13 @@ impl Clone for IterativeProblemSolverTool {
     }
 }
 
+#[async_trait]
 impl LlmTool for IterativeProblemSolverTool {
-    fn run(&self, args: &HashMap<String, Value>) -> mojentic::error::Result<Value> {
+    async fn run(
+        &self,
+        args: &HashMap<String, Value>,
+        _ctx: &mojentic::llm::tools::ToolRunCtx,
+    ) -> mojentic::Result<Value> {
         let problem_to_solve =
             args.get("problem_to_solve").and_then(|v| v.as_str()).ok_or_else(|| {
                 mojentic::error::MojenticError::ToolError(

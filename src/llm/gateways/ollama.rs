@@ -1068,8 +1068,13 @@ mod tests {
 
         #[derive(Clone)]
         struct MockTool;
+        #[async_trait]
         impl LlmTool for MockTool {
-            fn run(&self, _args: &HashMap<String, Value>) -> Result<Value> {
+            async fn run(
+                &self,
+                _args: &HashMap<String, Value>,
+                _ctx: &crate::llm::tools::ToolRunCtx,
+            ) -> Result<Value> {
                 Ok(serde_json::json!({}))
             }
             fn descriptor(&self) -> ToolDescriptor {

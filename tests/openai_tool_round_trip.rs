@@ -12,6 +12,7 @@
 //! Fixture files are byte-identical across all four mojentic ports (ts/py/ex/ru).
 //! If you change a fixture, update all four ports.
 
+use async_trait::async_trait;
 use mojentic::error::Result;
 use mojentic::llm::gateway::CompletionConfig;
 use mojentic::llm::gateways::OpenAIGateway;
@@ -34,8 +35,13 @@ struct GetWeatherTool {
     calls: Arc<std::sync::Mutex<Vec<HashMap<String, Value>>>>,
 }
 
+#[async_trait]
 impl LlmTool for GetWeatherTool {
-    fn run(&self, args: &HashMap<String, Value>) -> Result<Value> {
+    async fn run(
+        &self,
+        args: &HashMap<String, Value>,
+        _ctx: &mojentic::llm::tools::ToolRunCtx,
+    ) -> Result<Value> {
         self.calls.lock().unwrap().push(args.clone());
         Ok(serde_json::from_str::<Value>(TOOL_RESULT).expect("valid tool-result.json"))
     }

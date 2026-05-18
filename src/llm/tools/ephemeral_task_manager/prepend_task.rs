@@ -1,6 +1,7 @@
 use super::task_list::TaskList;
 use crate::error::Result;
 use crate::llm::tools::{FunctionDescriptor, LlmTool, ToolDescriptor};
+use async_trait::async_trait;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -18,8 +19,13 @@ impl PrependTaskTool {
     }
 }
 
+#[async_trait]
 impl LlmTool for PrependTaskTool {
-    fn run(&self, args: &HashMap<String, Value>) -> Result<Value> {
+    async fn run(
+        &self,
+        args: &HashMap<String, Value>,
+        _ctx: &crate::llm::tools::ToolRunCtx,
+    ) -> Result<Value> {
         let description =
             args.get("description").and_then(|v| v.as_str()).unwrap_or("").to_string();
 

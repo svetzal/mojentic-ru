@@ -15,6 +15,7 @@
 //     - qwen3:32b (for text, structured, tools)
 //     - qwen3-vl:30b (for image analysis)
 
+use async_trait::async_trait;
 use mojentic::prelude::*;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -32,8 +33,13 @@ struct SentimentAnalysis {
 #[derive(Clone)]
 struct SimpleDateTool;
 
+#[async_trait]
 impl LlmTool for SimpleDateTool {
-    fn run(&self, _args: &HashMap<String, Value>) -> mojentic::Result<Value> {
+    async fn run(
+        &self,
+        _args: &HashMap<String, Value>,
+        _ctx: &mojentic::llm::tools::ToolRunCtx,
+    ) -> mojentic::Result<Value> {
         // Return a simple mock result
         Ok(json!({
             "date": "2025-12-25",

@@ -1,6 +1,7 @@
 use super::task_list::TaskList;
 use crate::error::Result;
 use crate::llm::tools::{FunctionDescriptor, LlmTool, ToolDescriptor};
+use async_trait::async_trait;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -18,8 +19,13 @@ impl InsertTaskAfterTool {
     }
 }
 
+#[async_trait]
 impl LlmTool for InsertTaskAfterTool {
-    fn run(&self, args: &HashMap<String, Value>) -> Result<Value> {
+    async fn run(
+        &self,
+        args: &HashMap<String, Value>,
+        _ctx: &crate::llm::tools::ToolRunCtx,
+    ) -> Result<Value> {
         let existing_task_id =
             args.get("existing_task_id").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
 

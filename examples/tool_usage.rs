@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use mojentic::prelude::*;
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -7,8 +8,13 @@ use std::sync::Arc;
 #[derive(Clone)]
 struct GetWeatherTool;
 
+#[async_trait]
 impl LlmTool for GetWeatherTool {
-    fn run(&self, args: &HashMap<String, Value>) -> mojentic::Result<Value> {
+    async fn run(
+        &self,
+        args: &HashMap<String, Value>,
+        _ctx: &mojentic::llm::tools::ToolRunCtx,
+    ) -> mojentic::Result<Value> {
         let location = args.get("location").and_then(|v| v.as_str()).unwrap_or("unknown");
 
         // In a real implementation, you would call a weather API here

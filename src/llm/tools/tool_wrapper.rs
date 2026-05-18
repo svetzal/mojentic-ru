@@ -2,6 +2,7 @@ use crate::error::Result;
 use crate::llm::broker::LlmBroker;
 use crate::llm::models::{LlmMessage, MessageRole};
 use crate::llm::tools::{FunctionDescriptor, LlmTool, ToolDescriptor};
+use async_trait::async_trait;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -56,8 +57,13 @@ impl ToolWrapper {
     }
 }
 
+#[async_trait]
 impl LlmTool for ToolWrapper {
-    fn run(&self, args: &HashMap<String, Value>) -> Result<Value> {
+    async fn run(
+        &self,
+        args: &HashMap<String, Value>,
+        _ctx: &crate::llm::tools::ToolRunCtx,
+    ) -> Result<Value> {
         // Extract input from arguments
         let input = args.get("input").and_then(|v| v.as_str()).ok_or_else(|| {
             crate::error::MojenticError::ToolError("Missing 'input' parameter".to_string())
@@ -251,7 +257,7 @@ mod tests {
         let mut args = HashMap::new();
         args.insert("input".to_string(), json!("Help me with something"));
 
-        let result = wrapper.run(&args).unwrap();
+        let result = wrapper.run(&args, &crate::llm::tools::ToolRunCtx::default()).await.unwrap();
 
         // Result should be a JSON string value
         assert_eq!(result, json!("I can help with that!"));
@@ -268,7 +274,7 @@ mod tests {
             ToolWrapper::new(broker, tools, "You are a test agent", "test_agent", "A test agent");
 
         let args = HashMap::new();
-        let result = wrapper.run(&args);
+        let result = wrapper.run(&args, &crate::llm::tools::ToolRunCtx::default()).await;
 
         assert!(result.is_err());
         match result {
@@ -284,8 +290,14 @@ mod tests {
         // Mock tool for the wrapped agent
         struct MockTool;
 
+        #[async_trait]
+
         impl LlmTool for MockTool {
-            fn run(&self, _args: &HashMap<String, Value>) -> Result<Value> {
+            async fn run(
+                &self,
+                _args: &HashMap<String, Value>,
+                _ctx: &crate::llm::tools::ToolRunCtx,
+            ) -> Result<Value> {
                 Ok(json!({"result": "tool executed"}))
             }
 
@@ -323,7 +335,7 @@ mod tests {
         let mut args = HashMap::new();
         args.insert("input".to_string(), json!("Use your tools"));
 
-        let result = wrapper.run(&args).unwrap();
+        let result = wrapper.run(&args, &crate::llm::tools::ToolRunCtx::default()).await.unwrap();
 
         assert_eq!(result, json!("Task completed using tools"));
     }

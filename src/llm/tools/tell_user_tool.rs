@@ -1,5 +1,6 @@
 use crate::error::Result;
 use crate::llm::tools::{FunctionDescriptor, LlmTool, ToolDescriptor};
+use async_trait::async_trait;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 
@@ -13,15 +14,17 @@ use std::collections::HashMap;
 ///
 /// ```
 /// use mojentic::llm::tools::tell_user_tool::TellUserTool;
-/// use mojentic::llm::tools::LlmTool;
+/// use mojentic::llm::tools::{LlmTool, ToolRunCtx};
 /// use std::collections::HashMap;
 /// use serde_json::json;
 ///
+/// # tokio_test::block_on(async {
 /// let tool = TellUserTool;
 /// let mut args = HashMap::new();
 /// args.insert("message".to_string(), json!("Processing your request..."));
 ///
-/// let result = tool.run(&args).unwrap();
+/// let result = tool.run(&args, &ToolRunCtx::default()).await.unwrap();
+/// # });
 /// // Prints to stdout:
 /// //
 /// //
@@ -47,8 +50,13 @@ impl Default for TellUserTool {
     }
 }
 
+#[async_trait]
 impl LlmTool for TellUserTool {
-    fn run(&self, args: &HashMap<String, Value>) -> Result<Value> {
+    async fn run(
+        &self,
+        args: &HashMap<String, Value>,
+        _ctx: &crate::llm::tools::ToolRunCtx,
+    ) -> Result<Value> {
         let message = args.get("message").and_then(|v| v.as_str()).unwrap_or("");
 
         println!("\n\n\nMESSAGE FROM ASSISTANT:\n{}", message);
@@ -101,23 +109,23 @@ mod tests {
         assert!(params["required"].as_array().unwrap().contains(&json!("message")));
     }
 
-    #[test]
-    fn test_run_with_message() {
+    #[tokio::test]
+    async fn test_run_with_message() {
         let tool = TellUserTool::new();
         let mut args = HashMap::new();
         args.insert("message".to_string(), json!("This is an important update"));
 
-        let result = tool.run(&args).unwrap();
+        let result = tool.run(&args, &crate::llm::tools::ToolRunCtx::default()).await.unwrap();
 
         assert_eq!(result, json!("Message delivered to user."));
     }
 
-    #[test]
-    fn test_run_without_message() {
+    #[tokio::test]
+    async fn test_run_without_message() {
         let tool = TellUserTool::new();
         let args = HashMap::new();
 
-        let result = tool.run(&args).unwrap();
+        let result = tool.run(&args, &crate::llm::tools::ToolRunCtx::default()).await.unwrap();
 
         assert_eq!(result, json!("Message delivered to user."));
     }
@@ -129,13 +137,13 @@ mod tests {
         assert!(!tool.matches("other_tool"));
     }
 
-    #[test]
-    fn test_multiline_message() {
+    #[tokio::test]
+    async fn test_multiline_message() {
         let tool = TellUserTool::new();
         let mut args = HashMap::new();
         args.insert("message".to_string(), json!("Line 1\nLine 2\nLine 3"));
 
-        let result = tool.run(&args).unwrap();
+        let result = tool.run(&args, &crate::llm::tools::ToolRunCtx::default()).await.unwrap();
 
         assert_eq!(result, json!("Message delivered to user."));
     }
