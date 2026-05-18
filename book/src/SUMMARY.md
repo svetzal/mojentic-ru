@@ -22,6 +22,8 @@
   - [Reasoning Effort Control](core/reasoning_effort.md)
   - [Building Tools](core/building_tools.md)
   - [Tool Usage](core/tool_usage.md)
+  - [Parallel Tools](parallel_tools.md)
+  - [Realtime Voice](realtime.md)
   - [Agent Delegation](core/agent_delegation.md)
   - [Chat Sessions with Tools](core/chat_sessions_with_tools.md)
   - [OpenAI Model Registry](core/openai_model_registry.md)
