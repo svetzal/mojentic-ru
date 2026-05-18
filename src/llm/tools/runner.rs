@@ -145,7 +145,7 @@ fn aborted_outcome(call: &ToolCallExecution) -> ToolCallOutcome {
         name: call.name.clone(),
         ok: false,
         result: None,
-        error: Some("Tool batch aborted".to_string()),
+        error: Some(crate::error::MojenticError::Cancelled.to_string()),
         duration_ms: 0,
     }
 }
@@ -197,6 +197,7 @@ pub fn fresh_cancel_token() -> CancellationToken {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::llm::tools::tool::{FunctionDescriptor, ToolDescriptor};
     use serde_json::json;
 
     struct EchoTool;
@@ -211,52 +212,19 @@ mod tests {
             Ok(json!({ "echo": args.get("value").cloned().unwrap_or_default() }))
         }
 
-        fn descriptor(&self) -> ToolDescriptorPlaceholder {
-            unimplemented!()
-        }
-
-        fn clone_box(&self) -> Box<dyn LlmTool> {
-            Box::new(EchoTool)
-        }
-    }
-
-    // Helper alias to avoid pulling the real descriptor type into the test;
-    // the test only exercises run() and matches() through the runner.
-    use crate::llm::tools::tool::ToolDescriptor as ToolDescriptorPlaceholder;
-
-    impl EchoTool {
-        fn boxed_descriptor() -> crate::llm::tools::tool::ToolDescriptor {
-            crate::llm::tools::tool::ToolDescriptor {
+        fn descriptor(&self) -> ToolDescriptor {
+            ToolDescriptor {
                 r#type: "function".to_string(),
-                function: crate::llm::tools::tool::FunctionDescriptor {
+                function: FunctionDescriptor {
                     name: "echo".to_string(),
                     description: "Echo".to_string(),
                     parameters: json!({}),
                 },
             }
         }
-    }
-
-    // We re-implement descriptor() above as unimplemented to keep the impl
-    // minimal; provide a working impl here for `matches()` to succeed.
-    struct EchoToolReal;
-
-    #[async_trait]
-    impl LlmTool for EchoToolReal {
-        async fn run(
-            &self,
-            args: &HashMap<String, Value>,
-            _ctx: &ToolRunCtx,
-        ) -> crate::error::Result<Value> {
-            Ok(json!({ "echo": args.get("value").cloned().unwrap_or_default() }))
-        }
-
-        fn descriptor(&self) -> crate::llm::tools::tool::ToolDescriptor {
-            EchoTool::boxed_descriptor()
-        }
 
         fn clone_box(&self) -> Box<dyn LlmTool> {
-            Box::new(EchoToolReal)
+            Box::new(EchoTool)
         }
     }
 
@@ -273,7 +241,7 @@ mod tests {
     #[tokio::test]
     async fn serial_preserves_input_order() {
         let runner = SerialToolRunner;
-        let tools: Vec<Box<dyn LlmTool>> = vec![Box::new(EchoToolReal)];
+        let tools: Vec<Box<dyn LlmTool>> = vec![Box::new(EchoTool)];
         let calls = vec![
             exec("1", "echo", "a"),
             exec("2", "echo", "b"),
@@ -290,7 +258,7 @@ mod tests {
     #[tokio::test]
     async fn parallel_preserves_output_order() {
         let runner = ParallelToolRunner::new(4);
-        let tools: Vec<Box<dyn LlmTool>> = vec![Box::new(EchoToolReal)];
+        let tools: Vec<Box<dyn LlmTool>> = vec![Box::new(EchoTool)];
         let calls = vec![
             exec("a", "echo", "1"),
             exec("b", "echo", "2"),
@@ -306,7 +274,7 @@ mod tests {
     #[tokio::test]
     async fn unknown_tools_return_not_found() {
         let runner = SerialToolRunner;
-        let tools: Vec<Box<dyn LlmTool>> = vec![Box::new(EchoToolReal)];
+        let tools: Vec<Box<dyn LlmTool>> = vec![Box::new(EchoTool)];
         let calls = vec![exec("1", "missing", "x")];
 
         let outcomes = runner.run_batch(&calls, &tools, &ToolRunCtx::default()).await;
@@ -318,7 +286,7 @@ mod tests {
     #[tokio::test]
     async fn pre_cancelled_batch_skips_dispatch() {
         let runner = ParallelToolRunner::new(2);
-        let tools: Vec<Box<dyn LlmTool>> = vec![Box::new(EchoToolReal)];
+        let tools: Vec<Box<dyn LlmTool>> = vec![Box::new(EchoTool)];
         let calls = vec![exec("1", "echo", "x"), exec("2", "echo", "y")];
         let ctx = ToolRunCtx::default();
         ctx.cancel.cancel();
@@ -326,6 +294,6 @@ mod tests {
         let outcomes = runner.run_batch(&calls, &tools, &ctx).await;
 
         assert!(outcomes.iter().all(|o| !o.ok));
-        assert!(outcomes.iter().all(|o| o.error.as_deref() == Some("Tool batch aborted")));
+        assert!(outcomes.iter().all(|o| o.error.as_deref() == Some("Cancelled")));
     }
 }

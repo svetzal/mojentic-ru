@@ -50,30 +50,11 @@ impl RealtimeVoiceBroker {
 
         Ok(RealtimeSession::run(
             gateway_session,
-            self.clone_config(),
+            self.config.clone(),
             self.tool_runner.clone(),
             self.tracer.clone(),
             correlation_id,
         )
         .await)
-    }
-
-    fn clone_config(&self) -> RealtimeVoiceConfig {
-        RealtimeVoiceConfig {
-            instructions: self.config.instructions.clone(),
-            voice: self.config.voice.clone(),
-            modalities: self.config.modalities.clone(),
-            input_audio_format: self.config.input_audio_format,
-            output_audio_format: self.config.output_audio_format,
-            turn_detection: self.config.turn_detection.clone(),
-            input_audio_transcription: self.config.input_audio_transcription.clone(),
-            disable_input_audio_transcription: self.config.disable_input_audio_transcription,
-            tools: self.config.tools.as_ref().map(|ts| ts.iter().map(|t| t.clone_box()).collect()),
-            tool_choice: self.config.tool_choice.clone(),
-            temperature: self.config.temperature,
-            max_response_output_tokens: self.config.max_response_output_tokens,
-            on_interrupt: self.config.on_interrupt,
-            provider_extras: self.config.provider_extras.clone(),
-        }
     }
 }

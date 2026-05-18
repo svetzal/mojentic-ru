@@ -566,6 +566,17 @@ impl SessionDriver {
         }
 
         if let Some(tracer) = &self.tracer {
+            for (exec, outcome) in executions.iter().zip(outcomes.iter()) {
+                tracer.record_tool_call(
+                    &outcome.name,
+                    exec.args.clone(),
+                    outcome.result.clone().unwrap_or(Value::Null),
+                    Some("RealtimeVoiceBroker".to_string()),
+                    Some(outcome.duration_ms as f64),
+                    "RealtimeVoiceBroker",
+                    &self.correlation_id,
+                );
+            }
             let ok = outcomes.iter().filter(|o| o.ok).count();
             let fail = outcomes.len() - ok;
             tracer.record_tool_batch(
@@ -773,9 +784,6 @@ fn encode_tool_choice(choice: &RealtimeToolChoice) -> Value {
         RealtimeToolChoice::Function(name) => json!({ "type": "function", "name": name }),
     }
 }
-
-#[allow(unused_imports)]
-use crate::realtime::config::RealtimeVoiceConfig as _RealtimeVoiceConfig;
 
 #[cfg(test)]
 mod tests {

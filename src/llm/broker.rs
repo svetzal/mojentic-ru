@@ -1,7 +1,7 @@
 use crate::error::{MojenticError, Result};
 use crate::llm::gateway::{CompletionConfig, LlmGateway, StreamChunk};
 use crate::llm::models::{LlmGatewayResponse, LlmMessage, MessageRole};
-use crate::llm::tools::LlmTool;
+use crate::llm::tools::{LlmTool, SerialToolRunner, ToolCallExecution, ToolRunCtx, ToolRunner};
 use crate::tracer::TracerSystem;
 use futures::stream::{Stream, StreamExt};
 use serde::{Deserialize, Serialize};
@@ -16,10 +16,14 @@ pub struct LlmBroker {
     model: String,
     gateway: Arc<dyn LlmGateway>,
     tracer: Option<Arc<TracerSystem>>,
+    tool_runner: Arc<dyn ToolRunner>,
 }
 
 impl LlmBroker {
     /// Create a new LLM broker
+    ///
+    /// Uses [`SerialToolRunner`] as the tool execution strategy. Callers that
+    /// want parallel fan-out should use [`LlmBroker::with_tool_runner`].
     ///
     /// # Arguments
     ///
@@ -35,6 +39,25 @@ impl LlmBroker {
             model: model.into(),
             gateway,
             tracer,
+            tool_runner: Arc::new(SerialToolRunner),
+        }
+    }
+
+    /// Create a new LLM broker with an explicit tool runner.
+    ///
+    /// Use this when you want [`crate::llm::tools::ParallelToolRunner`] (or a
+    /// custom strategy) instead of the default serial runner.
+    pub fn with_tool_runner(
+        model: impl Into<String>,
+        gateway: Arc<dyn LlmGateway>,
+        tracer: Option<Arc<TracerSystem>>,
+        tool_runner: Arc<dyn ToolRunner>,
+    ) -> Self {
+        Self {
+            model: model.into(),
+            gateway,
+            tracer,
+            tool_runner,
         }
     }
 
@@ -174,154 +197,201 @@ impl LlmBroker {
 
             info!("Tool calls requested: {}", response.tool_calls.len());
 
-            for tool_call in &response.tool_calls {
-                // Find matching tool
-                if let Some(tool) = tools.iter().find(|t| t.matches(&tool_call.name)) {
-                    info!("Executing tool: {}", tool_call.name);
+            // Record the assistant turn that asked for tools so subsequent
+            // messages have a coherent history.
+            messages.push(LlmMessage {
+                role: MessageRole::Assistant,
+                content: response.content.clone(),
+                tool_calls: Some(response.tool_calls.clone()),
+                image_paths: None,
+            });
 
-                    // Measure tool execution time
-                    let start = std::time::Instant::now();
-                    let ctx = crate::llm::tools::ToolRunCtx {
-                        correlation_id: Some(correlation_id.to_string()),
-                        source: Some("LlmBroker".to_string()),
-                        ..Default::default()
-                    };
-                    let output = tool.run(&tool_call.arguments, &ctx).await?;
-                    let tool_duration_ms = start.elapsed().as_secs_f64() * 1000.0;
+            let outcomes = self
+                .run_tool_batch(&response.tool_calls, tools, correlation_id, "LlmBroker")
+                .await?;
 
-                    // Record tool call
-                    if let Some(tracer) = &self.tracer {
-                        tracer.record_tool_call(
-                            &tool_call.name,
-                            tool_call.arguments.clone(),
-                            output.clone(),
-                            Some("LlmBroker".to_string()),
-                            Some(tool_duration_ms),
-                            "LlmBroker",
-                            correlation_id,
+            for (call, outcome) in response.tool_calls.iter().zip(outcomes.iter()) {
+                let content = if outcome.ok {
+                    serde_json::to_string(
+                        outcome.result.as_ref().unwrap_or(&serde_json::Value::Null),
+                    )?
+                } else {
+                    serde_json::json!({
+                        "error": outcome.error.clone().unwrap_or_default(),
+                    })
+                    .to_string()
+                };
+                messages.push(LlmMessage {
+                    role: MessageRole::Tool,
+                    content: Some(content),
+                    tool_calls: Some(vec![call.clone()]),
+                    image_paths: None,
+                });
+            }
+
+            // Record next LLM call
+            if let Some(tracer) = &self.tracer {
+                let messages_json: Vec<std::collections::HashMap<String, serde_json::Value>> =
+                    messages
+                        .iter()
+                        .map(|m| {
+                            let mut map = std::collections::HashMap::new();
+                            map.insert(
+                                "role".to_string(),
+                                serde_json::json!(format!("{:?}", m.role)),
+                            );
+                            if let Some(content) = &m.content {
+                                map.insert("content".to_string(), serde_json::json!(content));
+                            }
+                            map
+                        })
+                        .collect();
+
+                let tools_json: Vec<std::collections::HashMap<String, serde_json::Value>> = tools
+                    .iter()
+                    .map(|tool| {
+                        let desc = tool.descriptor();
+                        let mut map = std::collections::HashMap::new();
+                        map.insert("name".to_string(), serde_json::json!(desc.function.name));
+                        map.insert(
+                            "description".to_string(),
+                            serde_json::json!(desc.function.description),
                         );
-                    }
+                        map
+                    })
+                    .collect();
 
-                    // Add tool call and response to messages
-                    messages.push(LlmMessage {
-                        role: MessageRole::Assistant,
-                        content: None,
-                        tool_calls: Some(vec![tool_call.clone()]),
-                        image_paths: None,
-                    });
-                    messages.push(LlmMessage {
-                        role: MessageRole::Tool,
-                        content: Some(serde_json::to_string(&output)?),
-                        tool_calls: Some(vec![tool_call.clone()]),
-                        image_paths: None,
-                    });
+                tracer.record_llm_call(
+                    &self.model,
+                    messages_json,
+                    config.temperature as f64,
+                    Some(tools_json),
+                    "LlmBroker",
+                    correlation_id,
+                );
+            }
 
-                    // Record next LLM call
-                    if let Some(tracer) = &self.tracer {
-                        let messages_json: Vec<
-                            std::collections::HashMap<String, serde_json::Value>,
-                        > = messages
+            let start = std::time::Instant::now();
+            let next_response =
+                self.gateway.complete(&self.model, &messages, Some(tools), config).await?;
+            let call_duration_ms = start.elapsed().as_secs_f64() * 1000.0;
+
+            if let Some(tracer) = &self.tracer {
+                let tool_calls_json = if !next_response.tool_calls.is_empty() {
+                    Some(
+                        next_response
+                            .tool_calls
                             .iter()
-                            .map(|m| {
+                            .map(|tc| {
                                 let mut map = std::collections::HashMap::new();
-                                map.insert(
-                                    "role".to_string(),
-                                    serde_json::json!(format!("{:?}", m.role)),
-                                );
-                                if let Some(content) = &m.content {
-                                    map.insert("content".to_string(), serde_json::json!(content));
+                                map.insert("name".to_string(), serde_json::json!(&tc.name));
+                                if let Some(id) = &tc.id {
+                                    map.insert("id".to_string(), serde_json::json!(id));
                                 }
                                 map
                             })
-                            .collect();
-
-                        let tools_json: Vec<std::collections::HashMap<String, serde_json::Value>> =
-                            tools
-                                .iter()
-                                .map(|tool| {
-                                    let desc = tool.descriptor();
-                                    let mut map = std::collections::HashMap::new();
-                                    map.insert(
-                                        "name".to_string(),
-                                        serde_json::json!(desc.function.name),
-                                    );
-                                    map.insert(
-                                        "description".to_string(),
-                                        serde_json::json!(desc.function.description),
-                                    );
-                                    map
-                                })
-                                .collect();
-
-                        tracer.record_llm_call(
-                            &self.model,
-                            messages_json,
-                            config.temperature as f64,
-                            Some(tools_json),
-                            "LlmBroker",
-                            correlation_id,
-                        );
-                    }
-
-                    // Make next LLM call with updated messages
-                    let start = std::time::Instant::now();
-                    let next_response =
-                        self.gateway.complete(&self.model, &messages, Some(tools), config).await?;
-                    let call_duration_ms = start.elapsed().as_secs_f64() * 1000.0;
-
-                    // Record LLM response
-                    if let Some(tracer) = &self.tracer {
-                        let tool_calls_json = if !next_response.tool_calls.is_empty() {
-                            Some(
-                                next_response
-                                    .tool_calls
-                                    .iter()
-                                    .map(|tc| {
-                                        let mut map = std::collections::HashMap::new();
-                                        map.insert("name".to_string(), serde_json::json!(&tc.name));
-                                        if let Some(id) = &tc.id {
-                                            map.insert("id".to_string(), serde_json::json!(id));
-                                        }
-                                        map
-                                    })
-                                    .collect(),
-                            )
-                        } else {
-                            None
-                        };
-
-                        tracer.record_llm_response(
-                            &self.model,
-                            next_response.content.as_ref().unwrap_or(&String::new()),
-                            tool_calls_json,
-                            Some(call_duration_ms),
-                            "LlmBroker",
-                            correlation_id,
-                        );
-                    }
-
-                    // Handle further tool calls if present
-                    if !next_response.tool_calls.is_empty() {
-                        return self
-                            .handle_tool_calls(
-                                messages,
-                                next_response,
-                                tools,
-                                config,
-                                correlation_id,
-                                iteration + 1,
-                            )
-                            .await;
-                    }
-
-                    return Ok(next_response.content.unwrap_or_default());
+                            .collect(),
+                    )
                 } else {
-                    warn!("Tool not found: {}", tool_call.name);
-                }
+                    None
+                };
+
+                tracer.record_llm_response(
+                    &self.model,
+                    next_response.content.as_ref().unwrap_or(&String::new()),
+                    tool_calls_json,
+                    Some(call_duration_ms),
+                    "LlmBroker",
+                    correlation_id,
+                );
             }
 
-            Ok(response.content.unwrap_or_default())
+            if !next_response.tool_calls.is_empty() {
+                return self
+                    .handle_tool_calls(
+                        messages,
+                        next_response,
+                        tools,
+                        config,
+                        correlation_id,
+                        iteration + 1,
+                    )
+                    .await;
+            }
+
+            Ok(next_response.content.unwrap_or_default())
         })
+    }
+
+    /// Dispatch a batch of tool calls through the configured [`ToolRunner`]
+    /// and record per-call + batch tracer events.
+    async fn run_tool_batch(
+        &self,
+        tool_calls: &[crate::llm::models::LlmToolCall],
+        tools: &[Box<dyn LlmTool>],
+        correlation_id: &str,
+        source: &'static str,
+    ) -> Result<Vec<crate::llm::tools::ToolCallOutcome>> {
+        let executions: Vec<ToolCallExecution> = tool_calls
+            .iter()
+            .enumerate()
+            .map(|(idx, tc)| ToolCallExecution {
+                id: tc.id.clone().unwrap_or_else(|| format!("call_{idx}")),
+                name: tc.name.clone(),
+                args: tc.arguments.clone(),
+            })
+            .collect();
+
+        let ctx = ToolRunCtx {
+            correlation_id: Some(correlation_id.to_string()),
+            source: Some(source.to_string()),
+            ..Default::default()
+        };
+
+        let batch_start = std::time::Instant::now();
+        let outcomes = self.tool_runner.run_batch(&executions, tools, &ctx).await;
+        let batch_duration_ms = batch_start.elapsed().as_secs_f64() * 1000.0;
+
+        if let Some(tracer) = &self.tracer {
+            for (exec, outcome) in executions.iter().zip(outcomes.iter()) {
+                tracer.record_tool_call(
+                    &outcome.name,
+                    exec.args.clone(),
+                    outcome.result.clone().unwrap_or(serde_json::Value::Null),
+                    Some(source.to_string()),
+                    Some(outcome.duration_ms as f64),
+                    source,
+                    correlation_id,
+                );
+            }
+            if outcomes.len() > 1 {
+                let ok = outcomes.iter().filter(|o| o.ok).count();
+                let fail = outcomes.len() - ok;
+                tracer.record_tool_batch(
+                    uuid::Uuid::new_v4().to_string(),
+                    outcomes.iter().map(|o| o.name.clone()).collect(),
+                    ok,
+                    fail,
+                    batch_duration_ms,
+                    Some(source.to_string()),
+                    source,
+                    correlation_id,
+                );
+            }
+        }
+
+        // Tool execution errors surface inside outcomes; we only short-circuit
+        // if no outcomes were produced (which the runner shouldn't do, but
+        // belt-and-braces).
+        if outcomes.len() != tool_calls.len() {
+            return Err(MojenticError::ToolError(format!(
+                "tool runner returned {} outcomes for {} calls",
+                outcomes.len(),
+                tool_calls.len()
+            )));
+        }
+
+        Ok(outcomes)
     }
 
     /// Generate structured object response from LLM
@@ -579,60 +649,45 @@ impl LlmBroker {
                         image_paths: None,
                     });
 
-                    // Execute tools and add results
-                    for tool_call in &accumulated_tool_calls {
-                        if let Some(tool) = tools.iter().find(|t| t.matches(&tool_call.name)) {
-                            info!("Executing tool: {}", tool_call.name);
+                    let outcomes = match self
+                        .run_tool_batch(
+                            &accumulated_tool_calls,
+                            tools,
+                            &correlation_id,
+                            "LlmBroker::generate_stream",
+                        )
+                        .await
+                    {
+                        Ok(o) => o,
+                        Err(e) => {
+                            yield Err(e);
+                            return;
+                        }
+                    };
 
-                            // Measure tool execution time
-                            let tool_start = std::time::Instant::now();
-                            let stream_ctx = crate::llm::tools::ToolRunCtx {
-                                correlation_id: Some(correlation_id.clone()),
-                                source: Some("LlmBroker::generate_stream".to_string()),
-                                ..Default::default()
-                            };
-
-                            match tool.run(&tool_call.arguments, &stream_ctx).await {
-                                Ok(output) => {
-                                    let tool_duration_ms = tool_start.elapsed().as_secs_f64() * 1000.0;
-
-                                    // Record tool call
-                                    if let Some(tracer) = &self.tracer {
-                                        tracer.record_tool_call(
-                                            &tool_call.name,
-                                            tool_call.arguments.clone(),
-                                            output.clone(),
-                                            Some("LlmBroker::generate_stream".to_string()),
-                                            Some(tool_duration_ms),
-                                            "LlmBroker::generate_stream",
-                                            &correlation_id,
-                                        );
-                                    }
-
-                                    let output_str = match serde_json::to_string(&output) {
-                                        Ok(s) => s,
-                                        Err(e) => {
-                                            yield Err(e.into());
-                                            return;
-                                        }
-                                    };
-
-                                    new_messages.push(LlmMessage {
-                                        role: MessageRole::Tool,
-                                        content: Some(output_str),
-                                        tool_calls: Some(vec![tool_call.clone()]),
-                                        image_paths: None,
-                                    });
-                                }
+                    for (call, outcome) in accumulated_tool_calls.iter().zip(outcomes.iter()) {
+                        let content = if outcome.ok {
+                            match serde_json::to_string(
+                                outcome.result.as_ref().unwrap_or(&serde_json::Value::Null),
+                            ) {
+                                Ok(s) => s,
                                 Err(e) => {
-                                    warn!("Tool execution failed: {}", e);
-                                    yield Err(e);
+                                    yield Err(e.into());
                                     return;
                                 }
                             }
                         } else {
-                            warn!("Tool not found: {}", tool_call.name);
-                        }
+                            serde_json::json!({
+                                "error": outcome.error.clone().unwrap_or_default(),
+                            })
+                            .to_string()
+                        };
+                        new_messages.push(LlmMessage {
+                            role: MessageRole::Tool,
+                            content: Some(content),
+                            tool_calls: Some(vec![call.clone()]),
+                            image_paths: None,
+                        });
                     }
 
                     // Continue streaming with updated messages, incrementing depth

@@ -20,7 +20,7 @@ pub use broker::RealtimeVoiceBroker;
 pub use codec::{decode_base64_pcm16, encode_base64_pcm16};
 pub use config::{
     InterruptOutputPolicy, RealtimeAudioFormat, RealtimeModality, RealtimeToolChoice,
-    RealtimeVoiceConfig, SemanticVadConfig, ServerVadConfig, TurnDetectionMode, REALTIME_DEFAULTS,
+    RealtimeVoiceConfig, SemanticVadConfig, ServerVadConfig, TurnDetectionMode,
 };
 pub use events::{RealtimeEvent, RealtimeItem, TokenUsage};
 pub use gateway::{

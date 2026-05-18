@@ -8,6 +8,21 @@ brokers don't grow their own concurrency code:
 | `SerialToolRunner` | Sequential, in input order. | `LlmBroker` (backward-compatible) |
 | `ParallelToolRunner` | `FuturesUnordered` + `Semaphore`, default `max_concurrency = 4`. Output order preserved. | `RealtimeVoiceBroker` |
 
+`LlmBroker::new` wires `SerialToolRunner` by default; opt in to
+parallel fan-out with `LlmBroker::with_tool_runner`:
+
+```rust,ignore
+use mojentic::llm::{LlmBroker, tools::ParallelToolRunner};
+use std::sync::Arc;
+
+let broker = LlmBroker::with_tool_runner(
+    "qwen3:32b",
+    gateway,
+    None,
+    Arc::new(ParallelToolRunner::default()),
+);
+```
+
 ## Cancellation
 
 `LlmTool::run` accepts a `&ToolRunCtx` carrying a
@@ -26,10 +41,14 @@ async fn run(&self, args: &HashMap<String, Value>, ctx: &ToolRunCtx) -> Result<V
 }
 ```
 
-Tools that ignore the context continue to work unchanged.
+Tools that ignore the context continue to work unchanged. The
+`SerialToolRunner` and `ParallelToolRunner` themselves surface a
+cancelled batch as `ToolCallOutcome { ok: false, error: Some("Cancelled"), .. }`
+without invoking the tool.
 
 ## Batch tracer event
 
-The realtime broker (and any caller that drives `ParallelToolRunner`)
-emits a `ToolBatchTracerEvent` alongside the per-call
-`ToolCallTracerEvent`s, so observers can measure parallelism gains.
+`LlmBroker` and `RealtimeVoiceBroker` both emit a
+`ToolBatchTracerEvent` alongside the per-call `ToolCallTracerEvent`s
+whenever a batch executes more than one tool, so observers can measure
+parallelism gains.

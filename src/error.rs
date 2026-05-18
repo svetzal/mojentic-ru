@@ -61,6 +61,11 @@ pub enum MojenticError {
 
     #[error("Event handler error: {0}")]
     HandlerError(String),
+
+    /// Returned when a tool aborts early because its [`crate::llm::tools::ToolRunCtx`]
+    /// cancellation token was signalled (e.g. barge-in, manual `interrupt()`).
+    #[error("Cancelled")]
+    Cancelled,
 }
 
 pub type Result<T> = std::result::Result<T, MojenticError>;

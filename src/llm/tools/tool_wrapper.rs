@@ -80,13 +80,7 @@ impl LlmTool for ToolWrapper {
             image_paths: None,
         });
 
-        // Call the broker with the messages and tools
-        // We need to handle the async call in a way that works with the sync trait
-        let response = tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(async {
-                self.broker.generate(&messages, Some(&self.tools), None, None).await
-            })
-        })?;
+        let response = self.broker.generate(&messages, Some(&self.tools), None, None).await?;
 
         Ok(json!(response))
     }
@@ -237,7 +231,7 @@ mod tests {
         assert_eq!(params["additionalProperties"], false);
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_tool_wrapper_execution() {
         let gateway = Arc::new(MockGateway::new(
             "You are a helpful assistant".to_string(),
@@ -285,7 +279,7 @@ mod tests {
         }
     }
 
-    #[tokio::test(flavor = "multi_thread")]
+    #[tokio::test]
     async fn test_tool_wrapper_with_tools() {
         // Mock tool for the wrapped agent
         struct MockTool;

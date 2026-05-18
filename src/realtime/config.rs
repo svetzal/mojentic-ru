@@ -79,6 +79,30 @@ pub struct RealtimeVoiceConfig {
     pub provider_extras: Option<HashMap<String, serde_json::Value>>,
 }
 
+// Manual `Clone` impl: `Box<dyn LlmTool>` isn't `Clone`, so we route tool
+// cloning through `LlmTool::clone_box`. Keep this in sync with the
+// `RealtimeVoiceConfig` fields above.
+impl Clone for RealtimeVoiceConfig {
+    fn clone(&self) -> Self {
+        Self {
+            instructions: self.instructions.clone(),
+            voice: self.voice.clone(),
+            modalities: self.modalities.clone(),
+            input_audio_format: self.input_audio_format,
+            output_audio_format: self.output_audio_format,
+            turn_detection: self.turn_detection.clone(),
+            input_audio_transcription: self.input_audio_transcription.clone(),
+            disable_input_audio_transcription: self.disable_input_audio_transcription,
+            tools: self.tools.as_ref().map(|ts| ts.iter().map(|t| t.clone_box()).collect()),
+            tool_choice: self.tool_choice.clone(),
+            temperature: self.temperature,
+            max_response_output_tokens: self.max_response_output_tokens,
+            on_interrupt: self.on_interrupt,
+            provider_extras: self.provider_extras.clone(),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct InputAudioTranscriptionConfig {
     pub model: String,
@@ -109,5 +133,3 @@ pub fn defaults() -> Defaults {
         on_interrupt: InterruptOutputPolicy::Drop,
     }
 }
-
-pub const REALTIME_DEFAULTS: &str = "Use defaults() to access default values at runtime.";
