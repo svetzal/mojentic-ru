@@ -63,3 +63,27 @@ impl LlmTool for PrependTaskTool {
         Box::new(self.clone())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::llm::tools::ToolRunCtx;
+
+    #[tokio::test]
+    async fn test_prepend_task_run() {
+        let task_list = Arc::new(Mutex::new(TaskList::new()));
+        let tool = PrependTaskTool::new(Arc::clone(&task_list));
+        let mut args = HashMap::new();
+        args.insert("description".to_string(), serde_json::Value::from("first task"));
+        let result = tool.run(&args, &ToolRunCtx::default()).await.unwrap();
+        assert_eq!(result["description"], "first task");
+        assert_eq!(result["status"], "pending");
+    }
+
+    #[test]
+    fn test_descriptor() {
+        let task_list = Arc::new(Mutex::new(TaskList::new()));
+        let tool = PrependTaskTool::new(task_list);
+        assert_eq!(tool.descriptor().function.name, "prepend_task");
+    }
+}

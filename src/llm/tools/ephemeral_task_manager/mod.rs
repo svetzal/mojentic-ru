@@ -45,3 +45,15 @@ pub fn all_tools(task_list: Arc<Mutex<TaskList>>) -> Vec<Box<dyn LlmTool>> {
         Box::new(ClearTasksTool::new(Arc::clone(&task_list))),
     ]
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_all_tools_returns_seven_tools() {
+        let task_list = Arc::new(Mutex::new(TaskList::new()));
+        let tools = all_tools(task_list);
+        assert_eq!(tools.len(), 7);
+    }
+}

@@ -65,3 +65,30 @@ impl LlmTool for StartTaskTool {
         Box::new(self.clone())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::llm::tools::ToolRunCtx;
+
+    #[tokio::test]
+    async fn test_start_task_run() {
+        let task_list = Arc::new(Mutex::new(TaskList::new()));
+        {
+            let mut list = task_list.lock().unwrap();
+            list.append_task("pending task".to_string());
+        }
+        let tool = StartTaskTool::new(Arc::clone(&task_list));
+        let mut args = HashMap::new();
+        args.insert("id".to_string(), serde_json::Value::from(1u64));
+        let result = tool.run(&args, &ToolRunCtx::default()).await.unwrap();
+        assert_eq!(result["status"], "in_progress");
+    }
+
+    #[test]
+    fn test_descriptor() {
+        let task_list = Arc::new(Mutex::new(TaskList::new()));
+        let tool = StartTaskTool::new(task_list);
+        assert_eq!(tool.descriptor().function.name, "start_task");
+    }
+}

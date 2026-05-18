@@ -70,3 +70,31 @@ impl LlmTool for InsertTaskAfterTool {
         Box::new(self.clone())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::llm::tools::ToolRunCtx;
+
+    #[tokio::test]
+    async fn test_insert_task_after_run() {
+        let task_list = Arc::new(Mutex::new(TaskList::new()));
+        {
+            let mut list = task_list.lock().unwrap();
+            list.append_task("first".to_string());
+        }
+        let tool = InsertTaskAfterTool::new(Arc::clone(&task_list));
+        let mut args = HashMap::new();
+        args.insert("existing_task_id".to_string(), serde_json::Value::from(1u64));
+        args.insert("description".to_string(), serde_json::Value::from("second"));
+        let result = tool.run(&args, &ToolRunCtx::default()).await.unwrap();
+        assert_eq!(result["description"], "second");
+    }
+
+    #[test]
+    fn test_descriptor() {
+        let task_list = Arc::new(Mutex::new(TaskList::new()));
+        let tool = InsertTaskAfterTool::new(task_list);
+        assert_eq!(tool.descriptor().function.name, "insert_task_after");
+    }
+}

@@ -66,3 +66,32 @@ impl LlmTool for CompleteTaskTool {
         Box::new(self.clone())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::llm::tools::ToolRunCtx;
+
+    #[tokio::test]
+    async fn test_complete_task_run() {
+        let task_list = Arc::new(Mutex::new(TaskList::new()));
+        {
+            let mut list = task_list.lock().unwrap();
+            let task = list.append_task("do something".to_string());
+            list.start_task(task.id).unwrap();
+        }
+        let tool = CompleteTaskTool::new(Arc::clone(&task_list));
+        let mut args = HashMap::new();
+        args.insert("id".to_string(), serde_json::Value::from(1u64));
+        let result = tool.run(&args, &ToolRunCtx::default()).await.unwrap();
+        assert_eq!(result["status"], "completed");
+    }
+
+    #[test]
+    fn test_descriptor() {
+        let task_list = Arc::new(Mutex::new(TaskList::new()));
+        let tool = CompleteTaskTool::new(task_list);
+        let desc = tool.descriptor();
+        assert_eq!(desc.function.name, "complete_task");
+    }
+}

@@ -67,3 +67,36 @@ impl LlmTool for ListTasksTool {
         Box::new(self.clone())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::llm::tools::ToolRunCtx;
+
+    #[tokio::test]
+    async fn test_list_tasks_empty() {
+        let task_list = Arc::new(Mutex::new(TaskList::new()));
+        let tool = ListTasksTool::new(Arc::clone(&task_list));
+        let result = tool.run(&HashMap::new(), &ToolRunCtx::default()).await.unwrap();
+        assert_eq!(result["count"], 0);
+    }
+
+    #[tokio::test]
+    async fn test_list_tasks_with_items() {
+        let task_list = Arc::new(Mutex::new(TaskList::new()));
+        {
+            let mut list = task_list.lock().unwrap();
+            list.append_task("task one".to_string());
+        }
+        let tool = ListTasksTool::new(Arc::clone(&task_list));
+        let result = tool.run(&HashMap::new(), &ToolRunCtx::default()).await.unwrap();
+        assert_eq!(result["count"], 1);
+    }
+
+    #[test]
+    fn test_descriptor() {
+        let task_list = Arc::new(Mutex::new(TaskList::new()));
+        let tool = ListTasksTool::new(task_list);
+        assert_eq!(tool.descriptor().function.name, "list_tasks");
+    }
+}
