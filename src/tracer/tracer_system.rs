@@ -174,6 +174,38 @@ impl TracerSystem {
         self.event_store.store(event);
     }
 
+    /// Record a parallel tool batch event.
+    #[allow(clippy::too_many_arguments)]
+    pub fn record_tool_batch(
+        &self,
+        batch_id: impl Into<String>,
+        tool_names: Vec<String>,
+        success_count: usize,
+        failure_count: usize,
+        call_duration_ms: f64,
+        caller: Option<String>,
+        source: impl Into<String>,
+        correlation_id: impl Into<String>,
+    ) {
+        if !self.is_enabled() {
+            return;
+        }
+
+        let event = Box::new(ToolBatchTracerEvent {
+            timestamp: current_timestamp(),
+            correlation_id: correlation_id.into(),
+            source: source.into(),
+            batch_id: batch_id.into(),
+            tool_names,
+            success_count,
+            failure_count,
+            call_duration_ms,
+            caller,
+        });
+
+        self.event_store.store(event);
+    }
+
     /// Record an agent interaction event
     ///
     /// # Arguments

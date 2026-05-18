@@ -247,6 +247,55 @@ impl TracerEvent for ToolCallTracerEvent {
     }
 }
 
+/// Records the end-to-end execution of a parallel tool batch.
+///
+/// Per-call detail still lands as `ToolCallTracerEvent` events; the
+/// batch event lets observers measure parallelism gains and correlate
+/// calls dispatched together.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolBatchTracerEvent {
+    pub timestamp: f64,
+    pub correlation_id: String,
+    pub source: String,
+    pub batch_id: String,
+    pub tool_names: Vec<String>,
+    pub success_count: usize,
+    pub failure_count: usize,
+    pub call_duration_ms: f64,
+    pub caller: Option<String>,
+}
+
+impl TracerEvent for ToolBatchTracerEvent {
+    fn timestamp(&self) -> f64 {
+        self.timestamp
+    }
+
+    fn correlation_id(&self) -> &str {
+        &self.correlation_id
+    }
+
+    fn source(&self) -> &str {
+        &self.source
+    }
+
+    fn printable_summary(&self) -> String {
+        let dt = DateTime::from_timestamp(self.timestamp as i64, 0)
+            .unwrap_or_else(|| DateTime::from_timestamp(0, 0).unwrap())
+            .with_timezone(&Local);
+        let time_str = dt.format("%H:%M:%S%.3f").to_string();
+        format!(
+            "[{}] ToolBatchTracerEvent (correlation_id: {})\n   Batch: {}\n   Tools: {}\n   Outcome: {} ok / {} failed\n   Duration: {:.2}ms",
+            time_str,
+            self.correlation_id,
+            self.batch_id,
+            self.tool_names.join(", "),
+            self.success_count,
+            self.failure_count,
+            self.call_duration_ms
+        )
+    }
+}
+
 /// Records interactions between agents
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentInteractionTracerEvent {

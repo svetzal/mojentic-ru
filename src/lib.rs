@@ -4,6 +4,7 @@ pub mod context;
 pub mod error;
 pub mod event;
 pub mod llm;
+pub mod realtime;
 pub mod router;
 pub mod tracer;
 
