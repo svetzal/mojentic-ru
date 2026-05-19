@@ -72,7 +72,7 @@ impl WebSocketTransport {
             loop {
                 tokio::select! {
                     Some(out) = outbound_rx.recv() => {
-                        if let Err(err) = sink.send(tokio_tungstenite::tungstenite::Message::Text(out)).await {
+                        if let Err(err) = sink.send(tokio_tungstenite::tungstenite::Message::text(out)).await {
                             let _ = inbound_tx.send(Err(TransportError(format!("ws send: {err}")))).await;
                             break;
                         }
