@@ -7,9 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-05-21
+
 ### Added
 
+- `RealtimeVoiceBroker` and OpenAI Realtime gateway over WebSocket for low-latency voice interactions
+- `LlmTool` trait and `ToolRunner` abstraction with serial execution default, enabling async tool calling patterns decoupled from the broker
+- `LlmBroker` is now wired through `ToolRunner` for unified tool dispatch
 - OpenAI model registry now recognizes the GPT-5.4 and GPT-5.5 reasoning families (`gpt-5.4`, `gpt-5.4-mini`, `gpt-5.4-nano`, `gpt-5.5`, `gpt-5.5-pro`, plus dated snapshots). Each is registered explicitly with its true 1.05M-token context window (400K for `mini`/`nano`) and 128K output cap, rather than falling through to substring pattern matching, which inferred wrong token limits. Pattern mappings for `gpt-5.3`/`gpt-5.4`/`gpt-5.5` were also added so future unlisted variants resolve to the reasoning type.
+- mdBook documentation chapters for Realtime voice and Parallel Tools patterns
+
+### Fixed
+
+- Race condition in `AsyncDispatcher::dispatch()` / `wait_for_empty_queue()` — concurrent dispatches could cause spurious "queue empty" signals before all in-flight handlers completed
+
+### Changed
+
+- Upgraded `tokio-tungstenite` from 0.24 to 0.29
 
 ## [1.4.0] - 2026-05-11
 
