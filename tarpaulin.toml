@@ -10,6 +10,8 @@ output-dir = "coverage"
 [run]
 # Timeout for test execution (in seconds)
 timeout = "300s"
+# Skip cleaning before each run to reuse compiled artifacts from prior cargo test/clippy runs
+skip-clean = true
 
 # Note: Module re-export files (mod.rs, lib.rs with only pub mod/pub use)
 # are automatically excluded by tarpaulin as they contain no executable code.

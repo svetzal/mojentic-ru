@@ -8,9 +8,8 @@ use crate::router::Router;
 use crate::{MojenticError, Result};
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 use tracing::{debug, info};
 use uuid::Uuid;
@@ -128,12 +127,9 @@ impl AsyncDispatcher {
             event.set_correlation_id(Uuid::new_v4().to_string());
         }
 
-        let queue = self.event_queue.clone();
-        tokio::spawn(async move {
-            let mut q = queue.lock().await;
-            debug!("Dispatching event: {:?}", event);
-            q.push_back(event);
-        });
+        debug!("Dispatching event: {:?}", event);
+        let mut q = self.event_queue.lock().unwrap();
+        q.push_back(event);
     }
 
     /// Wait for the event queue to become empty **and** all in-flight agent
@@ -151,10 +147,7 @@ impl AsyncDispatcher {
         let start = tokio::time::Instant::now();
 
         loop {
-            let queue_len = {
-                let queue = self.event_queue.lock().await;
-                queue.len()
-            };
+            let queue_len = self.event_queue.lock().unwrap().len();
             let in_flight = self.in_flight.load(Ordering::Acquire);
 
             if queue_len == 0 && in_flight == 0 {
@@ -172,9 +165,8 @@ impl AsyncDispatcher {
     }
 
     /// Get the current queue length.
-    pub async fn queue_len(&self) -> usize {
-        let queue = self.event_queue.lock().await;
-        queue.len()
+    pub fn queue_len(&self) -> usize {
+        self.event_queue.lock().unwrap().len()
     }
 
     /// Background dispatch loop.
@@ -188,7 +180,7 @@ impl AsyncDispatcher {
         while !stop_flag.load(Ordering::Relaxed) {
             for _ in 0..batch_size {
                 let event = {
-                    let mut q = queue.lock().await;
+                    let mut q = queue.lock().unwrap();
                     q.pop_front()
                 };
 
@@ -218,7 +210,7 @@ impl AsyncDispatcher {
                         match agent.receive_event_async(event_box).await {
                             Ok(new_events) => {
                                 debug!("Agent returned {} events", new_events.len());
-                                let mut q = queue.lock().await;
+                                let mut q = queue.lock().unwrap();
                                 for new_event in new_events {
                                     q.push_back(new_event);
                                 }
@@ -285,7 +277,7 @@ mod tests {
     #[async_trait]
     impl BaseAsyncAgent for CountingAgent {
         async fn receive_event_async(&self, _event: Box<dyn Event>) -> Result<Vec<Box<dyn Event>>> {
-            let mut count = self.count.lock().await;
+            let mut count = self.count.lock().unwrap();
             *count += 1;
             Ok(vec![])
         }
@@ -351,10 +343,9 @@ mod tests {
 
         dispatcher.dispatch(event);
 
-        // Wait for processing
-        tokio::time::sleep(Duration::from_millis(500)).await;
+        dispatcher.wait_for_empty_queue(Some(Duration::from_secs(2))).await.unwrap();
 
-        let final_count = *count.lock().await;
+        let final_count = *count.lock().unwrap();
         assert_eq!(final_count, 1);
 
         dispatcher.stop().await.unwrap();
@@ -374,8 +365,7 @@ mod tests {
 
         dispatcher.dispatch(event);
 
-        // Give time for the event to be queued
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        dispatcher.wait_for_empty_queue(Some(Duration::from_secs(2))).await.unwrap();
 
         dispatcher.stop().await.unwrap();
     }
@@ -404,6 +394,7 @@ mod tests {
         let result = dispatcher.wait_for_empty_queue(Some(Duration::from_secs(2))).await.unwrap();
 
         assert!(result);
+        assert_eq!(*count.lock().unwrap(), 1, "event should have been processed");
         dispatcher.stop().await.unwrap();
     }
 
@@ -438,7 +429,7 @@ mod tests {
         let mut dispatcher = AsyncDispatcher::new(Arc::new(router));
         dispatcher.start().await.unwrap();
 
-        // Dispatch a single event with a 500ms handler, then use a 50ms timeout.
+        // Dispatch a single event with a 200ms handler, then use a 50ms timeout.
         // The handler will still be in-flight when the timeout expires.
         let event = Box::new(TestEvent {
             source: "Test".to_string(),
@@ -464,7 +455,7 @@ mod tests {
         let router = Arc::new(Router::new());
         let mut dispatcher = AsyncDispatcher::new(router);
 
-        assert_eq!(dispatcher.queue_len().await, 0);
+        assert_eq!(dispatcher.queue_len(), 0);
 
         dispatcher.start().await.unwrap();
 
@@ -476,8 +467,7 @@ mod tests {
 
         dispatcher.dispatch(event);
 
-        // Give time for the event to be queued
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        dispatcher.wait_for_empty_queue(Some(Duration::from_secs(2))).await.unwrap();
 
         dispatcher.stop().await.unwrap();
     }
@@ -509,8 +499,8 @@ mod tests {
         let terminate = Box::new(TerminateEvent::new("System")) as Box<dyn Event>;
         dispatcher.dispatch(terminate);
 
-        // Wait for dispatcher to stop itself
-        tokio::time::sleep(Duration::from_secs(1)).await;
+        // Wait for dispatcher to process both events (TerminateEvent sets stop_flag)
+        dispatcher.wait_for_empty_queue(Some(Duration::from_secs(5))).await.unwrap();
 
         // Dispatcher should have stopped
         assert!(dispatcher.stop_flag.load(Ordering::Relaxed));
@@ -545,11 +535,10 @@ mod tests {
 
         dispatcher.dispatch(event);
 
-        // Wait for processing
-        tokio::time::sleep(Duration::from_millis(500)).await;
+        dispatcher.wait_for_empty_queue(Some(Duration::from_secs(2))).await.unwrap();
 
-        assert_eq!(*count1.lock().await, 1);
-        assert_eq!(*count2.lock().await, 1);
+        assert_eq!(*count1.lock().unwrap(), 1);
+        assert_eq!(*count2.lock().unwrap(), 1);
 
         dispatcher.stop().await.unwrap();
     }
