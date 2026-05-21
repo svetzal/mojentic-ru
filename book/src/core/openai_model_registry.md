@@ -23,7 +23,7 @@ Models that use internal reasoning steps before generating responses. These mode
 ModelType::Reasoning
 ```
 
-Examples: `o1`, `o1-mini`, `o3`, `o3-mini`, `gpt-5`, `gpt-5.1`
+Examples: `o1`, `o1-mini`, `o3`, `o3-mini`, `gpt-5`, `gpt-5.1`, `gpt-5.4`, `gpt-5.5`
 
 ### Chat Models
 
@@ -272,6 +272,15 @@ Most GPT-4, reasoning, and base GPT-5 models:
 - `gpt-4o`, `gpt-4-turbo`, `gpt-4`
 - `o1`, `o1-mini`, `o3`, `o3-mini`, `o4-mini`
 - `gpt-5`, `gpt-5.1`
+
+### Chat + Responses API Models
+
+The GPT-5.4 and GPT-5.5 reasoning families support both the Chat
+Completions and Responses APIs. They expose a 1.05M-token context
+window (400K for `mini`/`nano` variants) with a 128K output cap,
+support tools, streaming, and vision, and accept only temperature 1.0:
+- `gpt-5.4`, `gpt-5.4-mini`, `gpt-5.4-nano`
+- `gpt-5.5`, `gpt-5.5-pro`
 
 ### Completions-Only Models
 

@@ -391,10 +391,56 @@ impl OpenAIModelRegistry {
             },
         );
 
+        // GPT-5.4 and GPT-5.5 reasoning families (added 2026-05-21,
+        // verified against OpenAI developer docs).
+        //
+        // These are registered explicitly rather than via the reasoning
+        // loop above: that loop computes context/output token limits from
+        // the model name (300K/50K for gpt-5 base), which would produce
+        // wrong values for these models. GPT-5.4/5.5 expose a 1.05M context
+        // window (400K for mini/nano) with a 128K output cap.
+        //
+        // Common capabilities: support tools, streaming, and vision; accept
+        // only temperature 1.0; support the Chat Completions and Responses
+        // APIs but not the legacy Completions API.
+        let gpt54_and_55_models = vec![
+            ("gpt-5.4", 1_050_000_u32),
+            ("gpt-5.4-2026-03-05", 1_050_000),
+            ("gpt-5.4-mini", 400_000),
+            ("gpt-5.4-mini-2026-03-17", 400_000),
+            ("gpt-5.4-nano", 400_000),
+            ("gpt-5.4-nano-2026-03-17", 400_000),
+            ("gpt-5.5", 1_050_000),
+            ("gpt-5.5-2026-04-23", 1_050_000),
+            ("gpt-5.5-pro", 1_050_000),
+            ("gpt-5.5-pro-2026-04-23", 1_050_000),
+        ];
+
+        for (model, context_tokens) in gpt54_and_55_models {
+            self.models.insert(
+                model.to_string(),
+                ModelCapabilities {
+                    model_type: ModelType::Reasoning,
+                    supports_tools: true,
+                    supports_streaming: true,
+                    supports_vision: true,
+                    max_context_tokens: Some(context_tokens),
+                    max_output_tokens: Some(128_000),
+                    supported_temperatures: Some(vec![1.0]),
+                    supports_chat_api: true,
+                    supports_completions_api: false,
+                    supports_responses_api: true,
+                },
+            );
+        }
+
         // Pattern mappings for unknown models
         self.pattern_mappings.insert("o1".to_string(), ModelType::Reasoning);
         self.pattern_mappings.insert("o3".to_string(), ModelType::Reasoning);
         self.pattern_mappings.insert("o4".to_string(), ModelType::Reasoning);
+        self.pattern_mappings.insert("gpt-5.5".to_string(), ModelType::Reasoning);
+        self.pattern_mappings.insert("gpt-5.4".to_string(), ModelType::Reasoning);
+        self.pattern_mappings.insert("gpt-5.3".to_string(), ModelType::Reasoning);
         self.pattern_mappings.insert("gpt-5.2".to_string(), ModelType::Reasoning);
         self.pattern_mappings.insert("gpt-5.1".to_string(), ModelType::Reasoning);
         self.pattern_mappings.insert("gpt-5".to_string(), ModelType::Reasoning);
@@ -841,6 +887,145 @@ mod tests {
     fn test_gpt52_pattern_matching() {
         let registry = OpenAIModelRegistry::new();
         let caps = registry.get_model_capabilities("gpt-5.2-unknown");
+        assert_eq!(caps.model_type, ModelType::Reasoning);
+    }
+
+    // Tests for GPT-5.4 and GPT-5.5 families (added 2026-05-21)
+
+    #[test]
+    fn test_gpt54_base_capabilities() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("gpt-5.4");
+        assert_eq!(caps.model_type, ModelType::Reasoning);
+        assert_eq!(caps.max_context_tokens, Some(1_050_000));
+        assert_eq!(caps.max_output_tokens, Some(128_000));
+        assert!(caps.supports_tools);
+        assert!(caps.supports_streaming);
+        assert!(caps.supports_vision);
+        assert_eq!(caps.supported_temperatures, Some(vec![1.0]));
+        assert!(caps.supports_chat_api);
+        assert!(!caps.supports_completions_api);
+        assert!(caps.supports_responses_api);
+    }
+
+    #[test]
+    fn test_gpt54_dated_capabilities() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("gpt-5.4-2026-03-05");
+        assert_eq!(caps.model_type, ModelType::Reasoning);
+        assert_eq!(caps.max_context_tokens, Some(1_050_000));
+        assert_eq!(caps.max_output_tokens, Some(128_000));
+    }
+
+    #[test]
+    fn test_gpt54_mini_capabilities() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("gpt-5.4-mini");
+        assert_eq!(caps.model_type, ModelType::Reasoning);
+        assert_eq!(caps.max_context_tokens, Some(400_000));
+        assert_eq!(caps.max_output_tokens, Some(128_000));
+        assert!(caps.supports_tools);
+        assert!(caps.supports_vision);
+    }
+
+    #[test]
+    fn test_gpt54_mini_dated_capabilities() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("gpt-5.4-mini-2026-03-17");
+        assert_eq!(caps.model_type, ModelType::Reasoning);
+        assert_eq!(caps.max_context_tokens, Some(400_000));
+        assert_eq!(caps.max_output_tokens, Some(128_000));
+    }
+
+    #[test]
+    fn test_gpt54_nano_capabilities() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("gpt-5.4-nano");
+        assert_eq!(caps.model_type, ModelType::Reasoning);
+        assert_eq!(caps.max_context_tokens, Some(400_000));
+        assert_eq!(caps.max_output_tokens, Some(128_000));
+    }
+
+    #[test]
+    fn test_gpt54_nano_dated_capabilities() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("gpt-5.4-nano-2026-03-17");
+        assert_eq!(caps.model_type, ModelType::Reasoning);
+        assert_eq!(caps.max_context_tokens, Some(400_000));
+        assert_eq!(caps.max_output_tokens, Some(128_000));
+    }
+
+    #[test]
+    fn test_gpt55_base_capabilities() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("gpt-5.5");
+        assert_eq!(caps.model_type, ModelType::Reasoning);
+        assert_eq!(caps.max_context_tokens, Some(1_050_000));
+        assert_eq!(caps.max_output_tokens, Some(128_000));
+        assert!(caps.supports_tools);
+        assert!(caps.supports_streaming);
+        assert!(caps.supports_vision);
+        assert_eq!(caps.supported_temperatures, Some(vec![1.0]));
+        assert!(caps.supports_chat_api);
+        assert!(!caps.supports_completions_api);
+        assert!(caps.supports_responses_api);
+    }
+
+    #[test]
+    fn test_gpt55_dated_capabilities() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("gpt-5.5-2026-04-23");
+        assert_eq!(caps.model_type, ModelType::Reasoning);
+        assert_eq!(caps.max_context_tokens, Some(1_050_000));
+        assert_eq!(caps.max_output_tokens, Some(128_000));
+    }
+
+    #[test]
+    fn test_gpt55_pro_capabilities() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("gpt-5.5-pro");
+        assert_eq!(caps.model_type, ModelType::Reasoning);
+        assert_eq!(caps.max_context_tokens, Some(1_050_000));
+        assert_eq!(caps.max_output_tokens, Some(128_000));
+        assert!(caps.supports_tools);
+        assert!(caps.supports_vision);
+        assert!(caps.supports_responses_api);
+    }
+
+    #[test]
+    fn test_gpt55_pro_dated_capabilities() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("gpt-5.5-pro-2026-04-23");
+        assert_eq!(caps.model_type, ModelType::Reasoning);
+        assert_eq!(caps.max_context_tokens, Some(1_050_000));
+        assert_eq!(caps.max_output_tokens, Some(128_000));
+    }
+
+    #[test]
+    fn test_gpt54_uses_completion_token_param() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("gpt-5.4");
+        assert_eq!(caps.get_token_limit_param(), "max_completion_tokens");
+    }
+
+    #[test]
+    fn test_gpt54_pattern_matching() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("gpt-5.4-unknown-variant");
+        assert_eq!(caps.model_type, ModelType::Reasoning);
+    }
+
+    #[test]
+    fn test_gpt55_pattern_matching() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("gpt-5.5-unknown-variant");
+        assert_eq!(caps.model_type, ModelType::Reasoning);
+    }
+
+    #[test]
+    fn test_gpt53_pattern_matching() {
+        let registry = OpenAIModelRegistry::new();
+        let caps = registry.get_model_capabilities("gpt-5.3-future-model");
         assert_eq!(caps.model_type, ModelType::Reasoning);
     }
 

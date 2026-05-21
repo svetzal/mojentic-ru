@@ -5,6 +5,12 @@ All notable changes to the Mojentic Rust implementation will be documented in th
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- OpenAI model registry now recognizes the GPT-5.4 and GPT-5.5 reasoning families (`gpt-5.4`, `gpt-5.4-mini`, `gpt-5.4-nano`, `gpt-5.5`, `gpt-5.5-pro`, plus dated snapshots). Each is registered explicitly with its true 1.05M-token context window (400K for `mini`/`nano`) and 128K output cap, rather than falling through to substring pattern matching, which inferred wrong token limits. Pattern mappings for `gpt-5.3`/`gpt-5.4`/`gpt-5.5` were also added so future unlisted variants resolve to the reasoning type.
+
 ## [1.4.0] - 2026-05-11
 
 ### Added
