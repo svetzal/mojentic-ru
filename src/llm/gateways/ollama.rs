@@ -549,9 +549,13 @@ fn add_response_format(body: &mut Value, config: &CompletionConfig) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
+
+    static ENV_MUTEX: Mutex<()> = Mutex::new(());
 
     #[test]
     fn test_ollama_config_default() {
+        let _guard = ENV_MUTEX.lock().unwrap();
         std::env::remove_var("OLLAMA_HOST");
         let config = OllamaConfig::default();
         assert_eq!(config.host, "http://localhost:11434");
@@ -561,6 +565,7 @@ mod tests {
 
     #[test]
     fn test_ollama_config_from_env() {
+        let _guard = ENV_MUTEX.lock().unwrap();
         std::env::set_var("OLLAMA_HOST", "http://custom:8080");
         let config = OllamaConfig::default();
         assert_eq!(config.host, "http://custom:8080");
