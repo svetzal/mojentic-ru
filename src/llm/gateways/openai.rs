@@ -676,9 +676,13 @@ fn build_complete_tool_calls(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
+
+    static ENV_MUTEX: Mutex<()> = Mutex::new(());
 
     #[test]
     fn test_openai_config_default() {
+        let _guard = ENV_MUTEX.lock().unwrap();
         std::env::remove_var("OPENAI_API_KEY");
         std::env::remove_var("OPENAI_API_ENDPOINT");
         let config = OpenAIConfig::default();
@@ -689,6 +693,7 @@ mod tests {
 
     #[test]
     fn test_openai_config_from_env() {
+        let _guard = ENV_MUTEX.lock().unwrap();
         std::env::set_var("OPENAI_API_KEY", "test-key");
         std::env::set_var("OPENAI_API_ENDPOINT", "https://custom.openai.com");
         let config = OpenAIConfig::default();
