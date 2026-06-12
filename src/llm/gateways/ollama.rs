@@ -1,5 +1,7 @@
 use crate::error::{MojenticError, Result};
-use crate::llm::gateway::{CompletionConfig, LlmGateway, StreamChunk};
+use crate::llm::gateway::{
+    CompletionConfig, LlmGateway, StreamChunk, StreamMetrics, StreamProgress,
+};
 use crate::llm::models::{LlmGatewayResponse, LlmMessage, LlmToolCall, MessageRole};
 use crate::llm::tools::LlmTool;
 use async_trait::async_trait;
@@ -360,6 +362,7 @@ impl LlmGateway for OllamaGateway {
             let mut stream = response.bytes_stream();
             let mut buffer = String::new();
             let mut accumulated_tool_calls: Vec<LlmToolCall> = Vec::new();
+            let mut frame_index = 0usize;
 
             while let Some(chunk_result) = stream.next().await {
                 match chunk_result {
@@ -380,8 +383,22 @@ impl LlmGateway for OllamaGateway {
                                 // Parse JSON line
                                 match serde_json::from_str::<Value>(&line) {
                                     Ok(json) => {
+                                        frame_index += 1;
+                                        let done = json["done"].as_bool().unwrap_or(false);
+                                        let (content_chars, tool_call_count) =
+                                            frame_progress_counts(&json);
+                                        yield Ok(StreamChunk::Progress(StreamProgress {
+                                            provider: "ollama".to_string(),
+                                            frame_index,
+                                            done,
+                                            content_chars,
+                                            tool_call_count,
+                                            accumulated_tool_call_count: accumulated_tool_calls.len(),
+                                        }));
+
                                         // Check if streaming is done
-                                        if json["done"].as_bool().unwrap_or(false) {
+                                        if done {
+                                            yield Ok(StreamChunk::Metrics(ollama_stream_metrics(&json)));
                                             // Final chunk - yield accumulated tool calls if any
                                             if !accumulated_tool_calls.is_empty() {
                                                 yield Ok(StreamChunk::ToolCalls(accumulated_tool_calls.clone()));
@@ -438,6 +455,43 @@ impl LlmGateway for OllamaGateway {
             }
         })
     }
+}
+
+fn frame_progress_counts(json: &Value) -> (usize, usize) {
+    let Some(message) = json["message"].as_object() else {
+        return (0, 0);
+    };
+    let content_chars = message["content"].as_str().map(str::len).unwrap_or_default();
+    let tool_call_count = message
+        .get("tool_calls")
+        .and_then(|value| value.as_array())
+        .map(Vec::len)
+        .unwrap_or_default();
+    (content_chars, tool_call_count)
+}
+
+fn ollama_stream_metrics(json: &Value) -> StreamMetrics {
+    let eval_count = json["eval_count"].as_u64();
+    let eval_duration_ns = json["eval_duration"].as_u64();
+    StreamMetrics {
+        provider: "ollama".to_string(),
+        total_duration_ns: json["total_duration"].as_u64(),
+        load_duration_ns: json["load_duration"].as_u64(),
+        prompt_eval_count: json["prompt_eval_count"].as_u64(),
+        prompt_eval_duration_ns: json["prompt_eval_duration"].as_u64(),
+        eval_count,
+        eval_duration_ns,
+        tokens_per_second: tokens_per_second(eval_count, eval_duration_ns),
+    }
+}
+
+fn tokens_per_second(eval_count: Option<u64>, eval_duration_ns: Option<u64>) -> Option<f64> {
+    let tokens = eval_count?;
+    let duration = eval_duration_ns?;
+    if duration == 0 {
+        return None;
+    }
+    Some(tokens as f64 / (duration as f64 / 1_000_000_000.0))
 }
 
 // Message adapter for Ollama format

@@ -594,6 +594,7 @@ impl LlmBroker {
                     Ok(StreamChunk::ToolCalls(tool_calls)) => {
                         accumulated_tool_calls = tool_calls;
                     }
+                    Ok(StreamChunk::Progress(_)) | Ok(StreamChunk::Metrics(_)) => {}
                     Err(e) => {
                         yield Err(e);
                         return;

@@ -102,6 +102,34 @@ pub enum StreamChunk {
     Content(String),
     /// Complete tool calls (accumulated from stream)
     ToolCalls(Vec<crate::llm::models::LlmToolCall>),
+    /// Provider-neutral heartbeat/progress for a streamed provider frame.
+    Progress(StreamProgress),
+    /// Provider-neutral final generation metrics when the provider exposes them.
+    Metrics(StreamMetrics),
+}
+
+/// Provider-neutral progress for a streamed provider frame.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct StreamProgress {
+    pub provider: String,
+    pub frame_index: usize,
+    pub done: bool,
+    pub content_chars: usize,
+    pub tool_call_count: usize,
+    pub accumulated_tool_call_count: usize,
+}
+
+/// Provider-neutral final generation metrics.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct StreamMetrics {
+    pub provider: String,
+    pub total_duration_ns: Option<u64>,
+    pub load_duration_ns: Option<u64>,
+    pub prompt_eval_count: Option<u64>,
+    pub prompt_eval_duration_ns: Option<u64>,
+    pub eval_count: Option<u64>,
+    pub eval_duration_ns: Option<u64>,
+    pub tokens_per_second: Option<f64>,
 }
 
 #[cfg(test)]
