@@ -385,13 +385,14 @@ impl LlmGateway for OllamaGateway {
                                     Ok(json) => {
                                         frame_index += 1;
                                         let done = json["done"].as_bool().unwrap_or(false);
-                                        let (content_chars, tool_call_count) =
+                                        let (content_chars, thinking_chars, tool_call_count) =
                                             frame_progress_counts(&json);
                                         yield Ok(StreamChunk::Progress(StreamProgress {
                                             provider: "ollama".to_string(),
                                             frame_index,
                                             done,
                                             content_chars,
+                                            thinking_chars,
                                             tool_call_count,
                                             accumulated_tool_call_count: accumulated_tool_calls.len(),
                                         }));
@@ -408,7 +409,17 @@ impl LlmGateway for OllamaGateway {
 
                                         // Extract content
                                         if let Some(message) = json["message"].as_object() {
-                                            if let Some(content) = message["content"].as_str() {
+                                            if let Some(thinking) =
+                                                message.get("thinking").and_then(|v| v.as_str())
+                                            {
+                                                if !thinking.is_empty() {
+                                                    yield Ok(StreamChunk::Thinking(thinking.to_string()));
+                                                }
+                                            }
+
+                                            if let Some(content) =
+                                                message.get("content").and_then(|v| v.as_str())
+                                            {
                                                 if !content.is_empty() {
                                                     yield Ok(StreamChunk::Content(content.to_string()));
                                                 }
@@ -457,17 +468,26 @@ impl LlmGateway for OllamaGateway {
     }
 }
 
-fn frame_progress_counts(json: &Value) -> (usize, usize) {
+fn frame_progress_counts(json: &Value) -> (usize, usize, usize) {
     let Some(message) = json["message"].as_object() else {
-        return (0, 0);
+        return (0, 0, 0);
     };
-    let content_chars = message["content"].as_str().map(str::len).unwrap_or_default();
+    let content_chars = message
+        .get("content")
+        .and_then(|value| value.as_str())
+        .map(str::len)
+        .unwrap_or_default();
+    let thinking_chars = message
+        .get("thinking")
+        .and_then(|value| value.as_str())
+        .map(str::len)
+        .unwrap_or_default();
     let tool_call_count = message
         .get("tool_calls")
         .and_then(|value| value.as_array())
         .map(Vec::len)
         .unwrap_or_default();
-    (content_chars, tool_call_count)
+    (content_chars, thinking_chars, tool_call_count)
 }
 
 fn ollama_stream_metrics(json: &Value) -> StreamMetrics {
@@ -1283,5 +1303,57 @@ mod tests {
         let response = result.unwrap();
         assert_eq!(response.content, Some("Response".to_string()));
         assert_eq!(response.thinking, Some("Internal reasoning...".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_complete_stream_surfaces_thinking_chunks() {
+        use crate::llm::gateway::ReasoningEffort;
+
+        let mut server = mockito::Server::new_async().await;
+        let mock = server
+            .mock("POST", "/api/chat")
+            .match_body(mockito::Matcher::PartialJson(
+                serde_json::json!({"stream": true, "think": true}),
+            ))
+            .with_status(200)
+            .with_body(
+                r#"{"message":{"role":"assistant","thinking":"Internal reasoning...","content":""},"done":false}
+{"message":{"role":"assistant","content":"Final"},"done":false}
+{"done":true,"eval_count":2,"eval_duration":1000000000}
+"#,
+            )
+            .create();
+
+        let gateway = OllamaGateway::with_host(server.url());
+        let messages = vec![LlmMessage::user("Test")];
+        let config = CompletionConfig {
+            reasoning_effort: Some(ReasoningEffort::High),
+            ..Default::default()
+        };
+
+        let mut stream = gateway.complete_stream("qwen3:32b", &messages, None, &config);
+        let mut chunks = Vec::new();
+        while let Some(chunk) = stream.next().await {
+            chunks.push(chunk.unwrap());
+        }
+
+        mock.assert();
+        assert!(chunks.iter().any(|chunk| matches!(
+            chunk,
+            StreamChunk::Progress(StreamProgress {
+                thinking_chars,
+                ..
+            }) if *thinking_chars == "Internal reasoning...".len()
+        )));
+        assert!(chunks.iter().any(|chunk| matches!(
+            chunk,
+            StreamChunk::Thinking(thinking) if thinking == "Internal reasoning..."
+        )));
+        assert!(chunks
+            .iter()
+            .any(|chunk| matches!(chunk, StreamChunk::Content(content) if content == "Final")));
+        assert!(chunks.iter().any(
+            |chunk| matches!(chunk, StreamChunk::Metrics(metrics) if metrics.eval_count == Some(2))
+        ));
     }
 }

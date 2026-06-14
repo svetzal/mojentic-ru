@@ -100,6 +100,8 @@ pub trait LlmGateway: Send + Sync {
 pub enum StreamChunk {
     /// Content text chunk
     Content(String),
+    /// Reasoning/thinking text chunk that providers expose separately from assistant content.
+    Thinking(String),
     /// Complete tool calls (accumulated from stream)
     ToolCalls(Vec<crate::llm::models::LlmToolCall>),
     /// Provider-neutral heartbeat/progress for a streamed provider frame.
@@ -115,6 +117,7 @@ pub struct StreamProgress {
     pub frame_index: usize,
     pub done: bool,
     pub content_chars: usize,
+    pub thinking_chars: usize,
     pub tool_call_count: usize,
     pub accumulated_tool_call_count: usize,
 }
