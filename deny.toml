@@ -27,8 +27,6 @@ skip = [
     { crate = "getrandom@*" },
     # r-efi is pulled in by both getrandom 0.3 (via cc/aws-lc-sys build deps) and getrandom 0.4 (uuid/tempfile)
     { crate = "r-efi@*" },
-    # getrandom 0.3 (via wasip2) and getrandom 0.4 (via wasip3/uuid/tempfile) pull in different wit-bindgen versions
-    { crate = "wit-bindgen@*" },
 ]
 
 [sources]
