@@ -23,10 +23,6 @@ multiple-versions = "warn"
 skip = [
     # reqwest 0.13 / rustls ecosystem brings in older core-foundation via system-configuration
     { crate = "core-foundation@*" },
-    # Different parts of the ecosystem use different getrandom minor versions
-    { crate = "getrandom@*" },
-    # r-efi is pulled in by both getrandom 0.3 (via cc/aws-lc-sys build deps) and getrandom 0.4 (uuid/tempfile)
-    { crate = "r-efi@*" },
 ]
 
 [sources]
