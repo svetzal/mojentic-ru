@@ -20,6 +20,8 @@ pub enum ResponseFormat {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ReasoningEffort {
+    /// Disable provider-native extended thinking when the provider supports it.
+    Disabled,
     Low,
     Medium,
     High,
@@ -257,6 +259,7 @@ mod tests {
 
     #[test]
     fn test_reasoning_effort_serialization() {
+        assert_eq!(serde_json::to_string(&ReasoningEffort::Disabled).unwrap(), "\"disabled\"");
         assert_eq!(serde_json::to_string(&ReasoningEffort::Low).unwrap(), "\"low\"");
         assert_eq!(serde_json::to_string(&ReasoningEffort::Medium).unwrap(), "\"medium\"");
         assert_eq!(serde_json::to_string(&ReasoningEffort::High).unwrap(), "\"high\"");
@@ -264,6 +267,10 @@ mod tests {
 
     #[test]
     fn test_reasoning_effort_deserialization() {
+        assert_eq!(
+            serde_json::from_str::<ReasoningEffort>("\"disabled\"").unwrap(),
+            ReasoningEffort::Disabled
+        );
         assert_eq!(
             serde_json::from_str::<ReasoningEffort>("\"low\"").unwrap(),
             ReasoningEffort::Low

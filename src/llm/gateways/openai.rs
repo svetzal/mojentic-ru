@@ -6,7 +6,7 @@
 use crate::error::{MojenticError, Result};
 use crate::llm::gateway::{CompletionConfig, LlmGateway, StreamChunk};
 use crate::llm::gateways::openai_messages_adapter::{adapt_messages_to_openai, convert_tool_calls};
-use crate::llm::gateways::openai_model_registry::{get_model_registry, ModelType};
+use crate::llm::gateways::openai_model_registry::{ModelType, get_model_registry};
 use crate::llm::models::{LlmGatewayResponse, LlmMessage, LlmToolCall};
 use crate::llm::tools::LlmTool;
 use async_trait::async_trait;
@@ -145,10 +145,14 @@ impl OpenAIGateway {
         }
 
         // Handle reasoning effort for reasoning models
-        if let Some(reasoning_effort) = config.reasoning_effort {
+        if let Some(reasoning_effort) = config
+            .reasoning_effort
+            .filter(|effort| *effort != crate::llm::gateway::ReasoningEffort::Disabled)
+        {
             if capabilities.model_type == ModelType::Reasoning {
                 use crate::llm::gateway::ReasoningEffort;
                 let effort_str = match reasoning_effort {
+                    ReasoningEffort::Disabled => unreachable!("disabled effort was filtered"),
                     ReasoningEffort::Low => "low",
                     ReasoningEffort::Medium => "medium",
                     ReasoningEffort::High => "high",

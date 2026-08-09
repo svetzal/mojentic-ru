@@ -126,9 +126,12 @@ impl LlmGateway for OllamaGateway {
             body["tools"] = serde_json::to_value(tool_defs)?;
         }
 
-        // Add reasoning effort if specified (Ollama uses "think" parameter)
-        if config.reasoning_effort.is_some() {
-            body["think"] = serde_json::json!(true);
+        // Ollama uses a boolean `think` parameter and supports explicit disablement.
+        if let Some(reasoning_effort) = config.reasoning_effort {
+            body["think"] = serde_json::json!(!matches!(
+                reasoning_effort,
+                crate::llm::gateway::ReasoningEffort::Disabled
+            ));
         }
 
         // Add response format if specified
@@ -327,9 +330,12 @@ impl LlmGateway for OllamaGateway {
                 }
             }
 
-            // Add reasoning effort if specified (Ollama uses "think" parameter)
-            if config.reasoning_effort.is_some() {
-                body["think"] = serde_json::json!(true);
+            // Ollama uses a boolean `think` parameter and supports explicit disablement.
+            if let Some(reasoning_effort) = config.reasoning_effort {
+                body["think"] = serde_json::json!(!matches!(
+                    reasoning_effort,
+                    crate::llm::gateway::ReasoningEffort::Disabled
+                ));
             }
 
             // Add response format if specified
@@ -1306,6 +1312,46 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_complete_stream_disables_thinking() {
+        use crate::llm::gateway::ReasoningEffort;
+
+        let mut server = mockito::Server::new_async().await;
+        let mock = server
+            .mock("POST", "/api/chat")
+            .match_body(mockito::Matcher::PartialJson(
+                serde_json::json!({"stream": true, "think": false}),
+            ))
+            .with_status(200)
+            .with_body(
+                r#"{"message":{"role":"assistant","content":"Final"},"done":false}
+{"done":true,"eval_count":1,"eval_duration":1000000000}
+"#,
+            )
+            .create();
+
+        let gateway = OllamaGateway::with_host(server.url());
+        let messages = vec![LlmMessage::user("Act")];
+        let config = CompletionConfig {
+            reasoning_effort: Some(ReasoningEffort::Disabled),
+            ..Default::default()
+        };
+
+        let mut stream = gateway.complete_stream("qwen3:32b", &messages, None, &config);
+        let mut chunks = Vec::new();
+        while let Some(chunk) = stream.next().await {
+            chunks.push(chunk.unwrap());
+        }
+
+        mock.assert();
+        assert!(
+            chunks
+                .iter()
+                .any(|chunk| matches!(chunk, StreamChunk::Content(content) if content == "Final"))
+        );
+        assert!(!chunks.iter().any(|chunk| matches!(chunk, StreamChunk::Thinking(_))));
+    }
+
+    #[tokio::test]
     async fn test_complete_stream_surfaces_thinking_chunks() {
         use crate::llm::gateway::ReasoningEffort;
 
@@ -1349,9 +1395,11 @@ mod tests {
             chunk,
             StreamChunk::Thinking(thinking) if thinking == "Internal reasoning..."
         )));
-        assert!(chunks
-            .iter()
-            .any(|chunk| matches!(chunk, StreamChunk::Content(content) if content == "Final")));
+        assert!(
+            chunks
+                .iter()
+                .any(|chunk| matches!(chunk, StreamChunk::Content(content) if content == "Final"))
+        );
         assert!(chunks.iter().any(
             |chunk| matches!(chunk, StreamChunk::Metrics(metrics) if metrics.eval_count == Some(2))
         ));
