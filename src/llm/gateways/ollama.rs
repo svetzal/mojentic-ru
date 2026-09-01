@@ -1343,11 +1343,9 @@ mod tests {
         }
 
         mock.assert();
-        assert!(
-            chunks
-                .iter()
-                .any(|chunk| matches!(chunk, StreamChunk::Content(content) if content == "Final"))
-        );
+        assert!(chunks
+            .iter()
+            .any(|chunk| matches!(chunk, StreamChunk::Content(content) if content == "Final")));
         assert!(!chunks.iter().any(|chunk| matches!(chunk, StreamChunk::Thinking(_))));
     }
 
@@ -1395,11 +1393,9 @@ mod tests {
             chunk,
             StreamChunk::Thinking(thinking) if thinking == "Internal reasoning..."
         )));
-        assert!(
-            chunks
-                .iter()
-                .any(|chunk| matches!(chunk, StreamChunk::Content(content) if content == "Final"))
-        );
+        assert!(chunks
+            .iter()
+            .any(|chunk| matches!(chunk, StreamChunk::Content(content) if content == "Final")));
         assert!(chunks.iter().any(
             |chunk| matches!(chunk, StreamChunk::Metrics(metrics) if metrics.eval_count == Some(2))
         ));
