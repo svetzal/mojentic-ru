@@ -7,8 +7,10 @@ use base64::Engine;
 pub fn decode_base64_pcm16(b64: &str) -> Result<Vec<i16>, base64::DecodeError> {
     let bytes = general_purpose::STANDARD.decode(b64)?;
     let mut samples = Vec::with_capacity(bytes.len() / 2);
-    for chunk in bytes.chunks_exact(2) {
-        samples.push(i16::from_le_bytes([chunk[0], chunk[1]]));
+    let mut remaining = bytes.as_slice();
+    while let Some((sample, rest)) = remaining.split_first_chunk::<2>() {
+        samples.push(i16::from_le_bytes(*sample));
+        remaining = rest;
     }
     Ok(samples)
 }
