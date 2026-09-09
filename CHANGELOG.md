@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Add a single-response broker API for caller-owned context and native tool requests.
+- Support explicit unlimited tool rounds while retaining finite defaults.
+- The unlimited builder uses `usize::MAX` as a symbolic value and bypasses the iteration check; existing numeric configuration remains compatible.
+
 ## [1.5.0] - 2026-05-21
 
 ### Added
@@ -110,6 +114,7 @@ This release marks the first stable version of Mojentic for Rust, released simul
 ### Added
 
 #### Layer 1: LLM Integration
+
 - `LlmBroker` - Main interface for LLM interactions with recursive tool calling
 - `LlmGateway` trait - Abstract interface for LLM providers
 - `OllamaGateway` - Full Ollama implementation with async streaming
@@ -120,12 +125,14 @@ This release marks the first stable version of Mojentic for Rust, released simul
 - Async streaming with `Pin<Box<dyn Stream>>`
 
 #### Layer 2: Tracer System
+
 - `TracerSystem` - Event recording with thread-safe access
 - `EventStore` - Event persistence and querying
 - `TracerEvent` variants for LLM calls, responses, and tools
 - Correlation ID tracking with `Arc` sharing
 
 #### Layer 3: Agent System
+
 - `BaseLlmAgent` - LLM-enabled agent foundation
 - `AsyncLlmAgent` - Async agent with tokio runtime
 - `AsyncAggregatorAgent` - Result aggregation
@@ -137,6 +144,7 @@ This release marks the first stable version of Mojentic for Rust, released simul
 - ReAct pattern implementation
 
 #### Tools
+
 - `DateResolverTool` - Natural language date parsing
 - `CurrentDatetimeTool` - Current time access
 - `ToolWrapper` - Agent as tool delegation
@@ -146,6 +154,7 @@ This release marks the first stable version of Mojentic for Rust, released simul
 - `WebSearchTool` - Organic web search
 
 #### Infrastructure
+
 - 365 tests passing
 - Zero clippy warnings
 - rustdoc + mdBook documentation

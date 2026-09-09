@@ -26,10 +26,12 @@ async fn main() -> anyhow::Result<()> {
 ```
 
 ## Gateways
+
 - Ollama: local models for fast iteration.
 - HTTP-based gateways: add your own by implementing the `Gateway` trait.
 
 ## Structured output
+
 Use typed schemas to parse the model output into structs. See [Structured Output](core/structured_output.md).
 
 ## Configuration
@@ -79,3 +81,24 @@ let config = CompletionConfig {
 - **OpenAI**: Maps to `reasoning_effort` API parameter for reasoning models (o1, o3 series). Ignored with a warning for non-reasoning models.
 
 For full details, see [Reasoning Effort Control](core/reasoning_effort.md).
+
+## Caller-owned context and native responses
+
+Use `broker.generate_response(&messages, Some(&tools), Some(config), None).await` to receive one native gateway response without
+executing tools, extending history or making a follow-up request. Assemble the
+complete message array before each call. The broker traces the supplied request
+and returned response; it does not read repository guidance or apply a context policy.
+
+The existing convenience completion method still executes tools and follows up.
+Choose a serial or parallel runner according to the tools' effects. Parallel
+execution does not make dependent edits safe.
+
+Set `CompletionConfig::default().with_unlimited_tool_iterations()` to disable the tool-round limit.
+Existing finite defaults remain unchanged. Concurrency controls simultaneous
+work; it is not a task budget or a loop detector.
+
+The unlimited builder uses `usize::MAX` as a symbolic value and bypasses the iteration check; existing numeric configuration remains compatible.
+
+Native responses preserve the fields supplied by the gateway. Missing provider
+usage or termination evidence must remain unknown; configured model names and
+text length are not substitutes for reported metadata.

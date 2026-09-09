@@ -38,7 +38,21 @@ pub struct CompletionConfig {
     pub top_k: Option<u32>,
     pub response_format: Option<ResponseFormat>,
     pub reasoning_effort: Option<ReasoningEffort>,
+    /// Maximum tool rounds; use `with_unlimited_tool_iterations` to disable the limit.
     pub max_tool_iterations: usize,
+}
+
+impl CompletionConfig {
+    /// Disable the tool-round limit while retaining the existing numeric configuration API.
+    /// `usize::MAX` is a symbolic unlimited value; the broker skips its limit check.
+    pub fn with_unlimited_tool_iterations(mut self) -> Self {
+        self.max_tool_iterations = usize::MAX;
+        self
+    }
+
+    pub(crate) fn tool_iteration_limit_reached(&self, iteration: usize) -> bool {
+        self.max_tool_iterations != usize::MAX && iteration >= self.max_tool_iterations
+    }
 }
 
 impl Default for CompletionConfig {
