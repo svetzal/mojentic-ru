@@ -184,6 +184,13 @@ Stream responses chunk-by-chunk with tool calling support.
 cargo run --example streaming
 ```
 
+#### `stream_events.rs`
+Stream one turn as events and read the terminal completion evidence (finish reason, usage, provider model).
+
+```bash
+cargo run --example stream_events
+```
+
 #### `chat_session.rs`
 Interactive chat session maintaining conversation history.
 

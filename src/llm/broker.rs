@@ -1,6 +1,7 @@
 use crate::error::{MojenticError, Result};
 use crate::llm::gateway::{CompletionConfig, LlmGateway, StreamChunk};
-use crate::llm::models::{LlmGatewayResponse, LlmMessage, MessageRole};
+use crate::llm::models::{LlmGatewayResponse, LlmMessage, MessageRole, ResponseEvidence};
+use crate::llm::stream_events::{StreamEvent, StreamEventError, StreamEventStream};
 use crate::llm::tools::{LlmTool, SerialToolRunner, ToolCallExecution, ToolRunCtx, ToolRunner};
 use crate::tracer::TracerSystem;
 use futures::stream::{Stream, StreamExt};
@@ -77,17 +78,7 @@ impl LlmBroker {
         let correlation_id = correlation_id.unwrap_or_else(|| Uuid::new_v4().to_string());
         // Record LLM call
         if let Some(tracer) = &self.tracer {
-            let messages_json: Vec<std::collections::HashMap<String, serde_json::Value>> = messages
-                .iter()
-                .map(|m| {
-                    let mut map = std::collections::HashMap::new();
-                    map.insert("role".to_string(), serde_json::json!(format!("{:?}", m.role)));
-                    if let Some(content) = &m.content {
-                        map.insert("content".to_string(), serde_json::json!(content));
-                    }
-                    map
-                })
-                .collect();
+            let messages_json = messages_for_trace(messages);
 
             let tools_json = tools.map(|t| {
                 t.iter()
@@ -370,17 +361,7 @@ impl LlmBroker {
 
         // Record LLM call
         if let Some(tracer) = &self.tracer {
-            let messages_json: Vec<std::collections::HashMap<String, serde_json::Value>> = messages
-                .iter()
-                .map(|m| {
-                    let mut map = std::collections::HashMap::new();
-                    map.insert("role".to_string(), serde_json::json!(format!("{:?}", m.role)));
-                    if let Some(content) = &m.content {
-                        map.insert("content".to_string(), serde_json::json!(content));
-                    }
-                    map
-                })
-                .collect();
+            let messages_json = messages_for_trace(messages);
 
             tracer.record_llm_call(
                 &self.model,
@@ -492,18 +473,7 @@ impl LlmBroker {
 
             // Record LLM call
             if let Some(tracer) = &self.tracer {
-                let messages_json: Vec<std::collections::HashMap<String, serde_json::Value>> =
-                    current_messages
-                        .iter()
-                        .map(|m| {
-                            let mut map = std::collections::HashMap::new();
-                            map.insert("role".to_string(), serde_json::json!(format!("{:?}", m.role)));
-                            if let Some(content) = &m.content {
-                                map.insert("content".to_string(), serde_json::json!(content));
-                            }
-                            map
-                        })
-                        .collect();
+                let messages_json = messages_for_trace(&current_messages);
 
                 let tools_json = tools.map(|t| {
                     t.iter()
@@ -669,6 +639,139 @@ impl LlmBroker {
                 }
             }
         }
+    }
+
+    /// Stream one turn as [`StreamEvent`]s, ending with terminal completion evidence.
+    ///
+    /// The stream yields [`StreamEvent::Content`] in order, then exactly one
+    /// terminal event: [`StreamEvent::Completed`] when the provider finished
+    /// with `stop` and sent its terminal marker, or [`StreamEvent::Error`]
+    /// otherwise. Nothing follows the terminal event. Content that arrived
+    /// before an error is evidence, not a complete result.
+    ///
+    /// This sends one request with no tools. Tool iterations are forced to
+    /// zero, and there is no retry, continuation or recursion. Dropping the
+    /// stream (or breaking out of the loop that reads it) cancels the request.
+    ///
+    /// The tracer records the call when the request starts and the response,
+    /// with its evidence, when the terminal event arrives. A consumer that
+    /// stops early gets a traced call and no traced response. A gateway that
+    /// does not support this API yields a single
+    /// [`StreamEventError::StreamEventsUnsupported`] error, sends no request,
+    /// and records nothing.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// use futures::StreamExt;
+    /// use mojentic::llm::gateways::OllamaGateway;
+    /// use mojentic::llm::{LlmBroker, LlmMessage, StreamEvent};
+    /// use std::sync::Arc;
+    ///
+    /// # async fn run() {
+    /// let broker = LlmBroker::new("qwen3:32b", Arc::new(OllamaGateway::new()), None);
+    /// let messages = vec![LlmMessage::user("Write a haiku about rivers.")];
+    ///
+    /// let mut events = broker.generate_stream_events(&messages, None, None);
+    /// while let Some(event) = events.next().await {
+    ///     match event {
+    ///         StreamEvent::Content(text) => print!("{text}"),
+    ///         StreamEvent::Completed(evidence) => println!("\nusage: {:?}", evidence.usage),
+    ///         StreamEvent::Error(error) => eprintln!("\nincomplete: {error}"),
+    ///         _ => {}
+    ///     }
+    /// }
+    /// # }
+    /// ```
+    pub fn generate_stream_events<'a>(
+        &'a self,
+        messages: &'a [LlmMessage],
+        config: Option<CompletionConfig>,
+        correlation_id: Option<String>,
+    ) -> StreamEventStream<'a> {
+        const SOURCE: &str = "LlmBroker::generate_stream_events";
+        let config = CompletionConfig {
+            max_tool_iterations: 0,
+            ..config.unwrap_or_default()
+        };
+        let correlation_id = correlation_id.unwrap_or_else(|| Uuid::new_v4().to_string());
+
+        Box::pin(async_stream::stream! {
+            let mut events =
+                match self.gateway.complete_stream_events(&self.model, messages, &config) {
+                    Ok(events) => events,
+                    Err(error) => {
+                        yield StreamEvent::Error(error);
+                        return;
+                    }
+                };
+
+            if let Some(tracer) = &self.tracer {
+                tracer.record_llm_call(
+                    &self.model,
+                    messages_for_trace(messages),
+                    config.temperature as f64,
+                    None,
+                    SOURCE,
+                    &correlation_id,
+                );
+            }
+            let start = std::time::Instant::now();
+
+            let mut content = String::new();
+            let terminal = loop {
+                match events.next().await {
+                    Some(StreamEvent::Content(text)) => {
+                        content.push_str(&text);
+                        yield StreamEvent::Content(text);
+                    }
+                    Some(terminal) => break terminal,
+                    None => break StreamEvent::Error(StreamEventError::IncompleteStream(None)),
+                }
+            };
+
+            if let Some(tracer) = &self.tracer {
+                tracer.record_llm_response_with_evidence(
+                    &self.model,
+                    content,
+                    None,
+                    Some(start.elapsed().as_secs_f64() * 1000.0),
+                    terminal_evidence(&terminal),
+                    SOURCE,
+                    &correlation_id,
+                );
+            }
+            yield terminal;
+        })
+    }
+}
+
+/// The simplified message list recorded on an LLM call trace.
+fn messages_for_trace(
+    messages: &[LlmMessage],
+) -> Vec<std::collections::HashMap<String, serde_json::Value>> {
+    messages
+        .iter()
+        .map(|m| {
+            let mut map = std::collections::HashMap::new();
+            map.insert("role".to_string(), serde_json::json!(format!("{:?}", m.role)));
+            if let Some(content) = &m.content {
+                map.insert("content".to_string(), serde_json::json!(content));
+            }
+            map
+        })
+        .collect()
+}
+
+/// The provider evidence a terminal stream event carries, for the response trace.
+fn terminal_evidence(terminal: &StreamEvent) -> ResponseEvidence {
+    match terminal {
+        StreamEvent::Completed(evidence) => evidence.clone(),
+        StreamEvent::Error(StreamEventError::IncompleteCompletion(evidence))
+        | StreamEvent::Error(StreamEventError::IncompleteStream(Some(evidence))) => {
+            evidence.as_ref().clone()
+        }
+        _ => ResponseEvidence::default(),
     }
 }
 
@@ -885,6 +988,305 @@ mod tests {
         let events = responses(&captured);
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].evidence, reported_evidence());
+    }
+
+    mod stream_events {
+        use super::*;
+        use crate::llm::models::ResponseEvidence;
+        use crate::llm::stream_events::{StreamEvent, StreamEventError, StreamEventStream};
+        use crate::tracer::testing::{capturing_tracer, responses, CapturedLlmEvent};
+
+        /// Scripted event factory: a fresh copy of the script on every call.
+        type Script = fn() -> Vec<StreamEvent>;
+
+        /// A gateway that streams a fixed script of events and remembers the config it saw.
+        struct ScriptedEventsGateway {
+            script: Script,
+            seen_tool_limit: std::sync::Mutex<Option<usize>>,
+        }
+
+        impl ScriptedEventsGateway {
+            fn new(script: Script) -> Self {
+                Self {
+                    script,
+                    seen_tool_limit: std::sync::Mutex::new(None),
+                }
+            }
+        }
+
+        #[async_trait::async_trait]
+        impl LlmGateway for ScriptedEventsGateway {
+            async fn complete(
+                &self,
+                _model: &str,
+                _messages: &[LlmMessage],
+                _tools: Option<&[Box<dyn LlmTool>]>,
+                _config: &CompletionConfig,
+            ) -> Result<LlmGatewayResponse> {
+                unreachable!("the events API makes no ordinary completion")
+            }
+
+            async fn complete_json(
+                &self,
+                _model: &str,
+                _messages: &[LlmMessage],
+                _schema: Value,
+                _config: &CompletionConfig,
+            ) -> Result<Value> {
+                unreachable!("the events API makes no structured completion")
+            }
+
+            async fn get_available_models(&self) -> Result<Vec<String>> {
+                Ok(vec![])
+            }
+
+            async fn calculate_embeddings(
+                &self,
+                _text: &str,
+                _model: Option<&str>,
+            ) -> Result<Vec<f32>> {
+                Ok(vec![])
+            }
+
+            fn complete_stream<'a>(
+                &'a self,
+                _model: &'a str,
+                _messages: &'a [LlmMessage],
+                _tools: Option<&'a [Box<dyn LlmTool>]>,
+                _config: &'a CompletionConfig,
+            ) -> Pin<Box<dyn Stream<Item = Result<StreamChunk>> + Send + 'a>> {
+                unreachable!("the events API does not use the legacy stream")
+            }
+
+            fn complete_stream_events<'a>(
+                &'a self,
+                _model: &'a str,
+                _messages: &'a [LlmMessage],
+                config: &'a CompletionConfig,
+            ) -> std::result::Result<StreamEventStream<'a>, StreamEventError> {
+                *self.seen_tool_limit.lock().unwrap() = Some(config.max_tool_iterations);
+                Ok(Box::pin(futures::stream::iter((self.script)())))
+            }
+        }
+
+        fn stop_evidence() -> ResponseEvidence {
+            ResponseEvidence {
+                usage: Some(serde_json::json!({"total_tokens": 7})),
+                provider_model: Some("provider-model".to_string()),
+                finish_reason: Some("stop".to_string()),
+                metadata: HashMap::from([("total_duration".to_string(), serde_json::json!(900))]),
+            }
+        }
+
+        fn broker_with(
+            script: Script,
+        ) -> (LlmBroker, Arc<ScriptedEventsGateway>, crate::tracer::testing::CapturedLlmEvents)
+        {
+            let gateway = Arc::new(ScriptedEventsGateway::new(script));
+            let (tracer, captured) = capturing_tracer();
+            let broker = LlmBroker::new("configured-model", gateway.clone(), Some(tracer));
+            (broker, gateway, captured)
+        }
+
+        #[tokio::test]
+        async fn content_then_completed_is_forwarded_and_traced_with_evidence() {
+            let (broker, _, captured) = broker_with(|| {
+                vec![
+                    StreamEvent::Content("Hel".into()),
+                    StreamEvent::Content("lo".into()),
+                    StreamEvent::Completed(stop_evidence()),
+                ]
+            });
+            let messages = vec![LlmMessage::user("Hi")];
+
+            let events: Vec<StreamEvent> =
+                broker.generate_stream_events(&messages, None, None).collect().await;
+
+            assert!(matches!(
+                events.as_slice(),
+                [StreamEvent::Content(a), StreamEvent::Content(b), StreamEvent::Completed(evidence)]
+                    if a == "Hel" && b == "lo" && *evidence == stop_evidence()
+            ));
+            let recorded = captured.lock().unwrap().clone();
+            assert!(matches!(
+                recorded.as_slice(),
+                [CapturedLlmEvent::Call(call), CapturedLlmEvent::Response(response)]
+                    if call.model == "configured-model"
+                        && call.tools.is_none()
+                        && response.content == "Hello"
+                        && response.model == "configured-model"
+                        && response.evidence == stop_evidence()
+            ));
+        }
+
+        #[tokio::test]
+        async fn incomplete_completion_is_traced_with_its_evidence() {
+            let (broker, _, captured) = broker_with(|| {
+                vec![
+                    StreamEvent::Content("Part".into()),
+                    StreamEvent::Error(StreamEventError::IncompleteCompletion(Box::new(
+                        ResponseEvidence {
+                            finish_reason: Some("length".into()),
+                            usage: Some(serde_json::json!({"completion_tokens": 16})),
+                            ..Default::default()
+                        },
+                    ))),
+                ]
+            });
+            let messages = vec![LlmMessage::user("Hi")];
+
+            let events: Vec<StreamEvent> =
+                broker.generate_stream_events(&messages, None, None).collect().await;
+
+            assert!(matches!(
+                events.last(),
+                Some(StreamEvent::Error(StreamEventError::IncompleteCompletion(_)))
+            ));
+            let traced = responses(&captured);
+            assert_eq!(traced.len(), 1);
+            assert_eq!(traced[0].content, "Part");
+            assert_eq!(traced[0].evidence.finish_reason.as_deref(), Some("length"));
+            assert_eq!(
+                traced[0].evidence.usage,
+                Some(serde_json::json!({"completion_tokens": 16}))
+            );
+        }
+
+        #[tokio::test]
+        async fn incomplete_stream_is_traced_with_its_partial_evidence() {
+            let (broker, _, captured) = broker_with(|| {
+                vec![StreamEvent::Error(StreamEventError::IncompleteStream(
+                    Some(Box::new(ResponseEvidence {
+                        provider_model: Some("provider-model".into()),
+                        ..Default::default()
+                    })),
+                ))]
+            });
+            let messages = vec![LlmMessage::user("Hi")];
+
+            let _: Vec<StreamEvent> =
+                broker.generate_stream_events(&messages, None, None).collect().await;
+
+            let traced = responses(&captured);
+            assert_eq!(traced[0].evidence.provider_model.as_deref(), Some("provider-model"));
+        }
+
+        #[tokio::test]
+        async fn a_gateway_stream_without_terminal_event_ends_incomplete() {
+            let (broker, _, captured) = broker_with(|| vec![StreamEvent::Content("Hi".into())]);
+            let messages = vec![LlmMessage::user("Hi")];
+
+            let events: Vec<StreamEvent> =
+                broker.generate_stream_events(&messages, None, None).collect().await;
+
+            assert!(matches!(
+                events.as_slice(),
+                [
+                    StreamEvent::Content(_),
+                    StreamEvent::Error(StreamEventError::IncompleteStream(None))
+                ]
+            ));
+            assert_eq!(responses(&captured).len(), 1);
+        }
+
+        #[tokio::test]
+        async fn nothing_follows_the_terminal_event() {
+            let (broker, _, _) = broker_with(|| {
+                vec![
+                    StreamEvent::Completed(stop_evidence()),
+                    StreamEvent::Content("late".into()),
+                    StreamEvent::Completed(stop_evidence()),
+                ]
+            });
+            let messages = vec![LlmMessage::user("Hi")];
+
+            let events: Vec<StreamEvent> =
+                broker.generate_stream_events(&messages, None, None).collect().await;
+
+            assert!(matches!(events.as_slice(), [StreamEvent::Completed(_)]));
+        }
+
+        #[tokio::test]
+        async fn tool_iterations_are_forced_to_zero() {
+            let (broker, gateway, _) =
+                broker_with(|| vec![StreamEvent::Completed(stop_evidence())]);
+            let messages = vec![LlmMessage::user("Hi")];
+            let config = CompletionConfig::default().with_unlimited_tool_iterations();
+
+            let _: Vec<StreamEvent> =
+                broker.generate_stream_events(&messages, Some(config), None).collect().await;
+
+            assert_eq!(*gateway.seen_tool_limit.lock().unwrap(), Some(0));
+        }
+
+        #[tokio::test]
+        async fn stopping_early_traces_the_call_but_no_response() {
+            let (broker, _, captured) = broker_with(|| {
+                vec![
+                    StreamEvent::Content("Hi".into()),
+                    StreamEvent::Completed(stop_evidence()),
+                ]
+            });
+            let messages = vec![LlmMessage::user("Hi")];
+
+            let mut stream = broker.generate_stream_events(&messages, None, None);
+            assert!(matches!(stream.next().await, Some(StreamEvent::Content(_))));
+            drop(stream);
+
+            let recorded = captured.lock().unwrap().clone();
+            assert!(matches!(recorded.as_slice(), [CapturedLlmEvent::Call(_)]));
+        }
+
+        #[tokio::test]
+        async fn an_unsupported_gateway_yields_one_error_without_a_trace() {
+            let (tracer, captured) = capturing_tracer();
+            let broker = LlmBroker::new(
+                "configured-model",
+                Arc::new(MockGateway::new(vec![])),
+                Some(tracer),
+            );
+            let messages = vec![LlmMessage::user("Hi")];
+
+            let events: Vec<StreamEvent> =
+                broker.generate_stream_events(&messages, None, None).collect().await;
+
+            assert!(matches!(
+                events.as_slice(),
+                [StreamEvent::Error(
+                    StreamEventError::StreamEventsUnsupported
+                )]
+            ));
+            assert!(captured.lock().unwrap().is_empty());
+        }
+
+        #[tokio::test]
+        async fn dropping_the_broker_stream_cancels_the_provider_request() {
+            use crate::llm::gateways::OllamaGateway;
+            use crate::llm::stream_events::testing::endless_stream_server;
+
+            let (url, closed) =
+                endless_stream_server("{\"message\":{\"content\":\"Hi\"},\"done\":false}\n").await;
+            let broker = LlmBroker::new("qwen3:32b", Arc::new(OllamaGateway::with_host(url)), None);
+            let messages = vec![LlmMessage::user("Hi")];
+
+            let mut stream = broker.generate_stream_events(&messages, None, None);
+            assert!(matches!(stream.next().await, Some(StreamEvent::Content(_))));
+            drop(stream);
+
+            tokio::time::timeout(std::time::Duration::from_secs(5), closed)
+                .await
+                .expect("the request was not cancelled")
+                .expect("server reported the disconnect");
+        }
+
+        #[test]
+        fn the_event_stream_can_move_across_threads() {
+            fn assert_send<T: Send>(_: &T) {}
+            let broker = LlmBroker::new("m", Arc::new(MockGateway::new(vec![])), None);
+            let messages = vec![LlmMessage::user("Hi")];
+
+            assert_send(&broker.generate_stream_events(&messages, None, None));
+        }
     }
 
     // Mock gateway for testing

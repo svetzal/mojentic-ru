@@ -2,9 +2,11 @@ use crate::error::{MojenticError, Result};
 use crate::llm::gateway::{
     CompletionConfig, LlmGateway, StreamChunk, StreamMetrics, StreamProgress,
 };
+use crate::llm::gateways::ollama_stream_events::OllamaEventParser;
 use crate::llm::models::{
     LlmGatewayResponse, LlmMessage, LlmToolCall, MessageRole, ResponseEvidence,
 };
+use crate::llm::stream_events::{drive_event_stream, StreamEventError, StreamEventStream};
 use crate::llm::tools::LlmTool;
 use async_trait::async_trait;
 use futures::stream::{Stream, StreamExt};
@@ -69,6 +71,11 @@ impl OllamaGateway {
         })
     }
 
+    /// A POST to the chat endpoint carrying `body`.
+    fn chat_request(&self, body: &Value) -> reqwest::RequestBuilder {
+        self.client.post(format!("{}/api/chat", self.config.host)).json(body)
+    }
+
     /// Pull a model from Ollama library
     pub async fn pull_model(&self, model: &str) -> Result<()> {
         info!("Pulling Ollama model: {}", model);
@@ -112,15 +119,7 @@ impl LlmGateway for OllamaGateway {
         info!("Delegating to Ollama for completion");
         debug!("Model: {}, Message count: {}", model, messages.len());
 
-        let ollama_messages = adapt_messages_to_ollama(messages)?;
-        let options = extract_ollama_options(config);
-
-        let mut body = serde_json::json!({
-            "model": model,
-            "messages": ollama_messages,
-            "options": options,
-            "stream": false
-        });
+        let mut body = chat_body(model, messages, config, false)?;
 
         // Add tools if provided
         if let Some(tools) = tools {
@@ -128,24 +127,8 @@ impl LlmGateway for OllamaGateway {
             body["tools"] = serde_json::to_value(tool_defs)?;
         }
 
-        // Ollama uses a boolean `think` parameter and supports explicit disablement.
-        if let Some(reasoning_effort) = config.reasoning_effort {
-            body["think"] = serde_json::json!(!matches!(
-                reasoning_effort,
-                crate::llm::gateway::ReasoningEffort::Disabled
-            ));
-        }
-
-        // Add response format if specified
-        add_response_format(&mut body, config);
-
         // Make API request
-        let response = self
-            .client
-            .post(format!("{}/api/chat", self.config.host))
-            .json(&body)
-            .send()
-            .await?;
+        let response = self.chat_request(&body).send().await?;
 
         if !response.status().is_success() {
             return Err(MojenticError::GatewayError(format!(
@@ -226,12 +209,7 @@ impl LlmGateway for OllamaGateway {
             "stream": false
         });
 
-        let response = self
-            .client
-            .post(format!("{}/api/chat", self.config.host))
-            .json(&body)
-            .send()
-            .await?;
+        let response = self.chat_request(&body).send().await?;
 
         if !response.status().is_success() {
             return Err(MojenticError::GatewayError(format!(
@@ -326,22 +304,13 @@ impl LlmGateway for OllamaGateway {
             info!("Starting Ollama streaming completion");
             debug!("Model: {}, Message count: {}", model, messages.len());
 
-            let ollama_messages = match adapt_messages_to_ollama(messages) {
-                Ok(msgs) => msgs,
+            let mut body = match chat_body(model, messages, config, true) {
+                Ok(body) => body,
                 Err(e) => {
                     yield Err(e);
                     return;
                 }
             };
-
-            let options = extract_ollama_options(config);
-
-            let mut body = serde_json::json!({
-                "model": model,
-                "messages": ollama_messages,
-                "options": options,
-                "stream": true
-            });
 
             // Add tools if provided
             if let Some(tools) = tools {
@@ -351,25 +320,8 @@ impl LlmGateway for OllamaGateway {
                 }
             }
 
-            // Ollama uses a boolean `think` parameter and supports explicit disablement.
-            if let Some(reasoning_effort) = config.reasoning_effort {
-                body["think"] = serde_json::json!(!matches!(
-                    reasoning_effort,
-                    crate::llm::gateway::ReasoningEffort::Disabled
-                ));
-            }
-
-            // Add response format if specified
-            add_response_format(&mut body, config);
-
             // Make streaming API request
-            let response = match self
-                .client
-                .post(format!("{}/api/chat", self.config.host))
-                .json(&body)
-                .send()
-                .await
-            {
+            let response = match self.chat_request(&body).send().await {
                 Ok(r) => r,
                 Err(e) => {
                     yield Err(e.into());
@@ -492,6 +444,19 @@ impl LlmGateway for OllamaGateway {
                 }
             }
         })
+    }
+
+    fn complete_stream_events<'a>(
+        &'a self,
+        model: &'a str,
+        messages: &'a [LlmMessage],
+        config: &'a CompletionConfig,
+    ) -> std::result::Result<StreamEventStream<'a>, StreamEventError> {
+        info!("Starting Ollama stream events");
+        let body =
+            chat_body(model, messages, config, true).map_err(StreamEventError::RequestFailed)?;
+
+        Ok(drive_event_stream(self.chat_request(&body), OllamaEventParser::default()))
     }
 }
 
@@ -633,6 +598,34 @@ fn adapt_messages_to_ollama(messages: &[LlmMessage]) -> Result<Vec<Value>> {
             Ok(ollama_msg)
         })
         .collect()
+}
+
+/// Build a chat body with options, thinking control and response format.
+///
+/// Callers add tools.
+fn chat_body(
+    model: &str,
+    messages: &[LlmMessage],
+    config: &CompletionConfig,
+    stream: bool,
+) -> Result<Value> {
+    let mut body = serde_json::json!({
+        "model": model,
+        "messages": adapt_messages_to_ollama(messages)?,
+        "options": extract_ollama_options(config),
+        "stream": stream
+    });
+
+    // Ollama uses a boolean `think` parameter and supports explicit disablement.
+    if let Some(reasoning_effort) = config.reasoning_effort {
+        body["think"] = serde_json::json!(!matches!(
+            reasoning_effort,
+            crate::llm::gateway::ReasoningEffort::Disabled
+        ));
+    }
+
+    add_response_format(&mut body, config);
+    Ok(body)
 }
 
 // Extract Ollama-specific options from config
@@ -1310,6 +1303,145 @@ mod tests {
             response.evidence.usage,
             Some(serde_json::json!({"prompt_eval_count": 3, "eval_count": 4}))
         );
+    }
+
+    mod stream_events {
+        use super::*;
+        use crate::llm::stream_events::testing::endless_stream_server;
+        use crate::llm::{StreamEvent, StreamEventError};
+
+        async fn collect_events(
+            server: &mockito::Server,
+            config: &CompletionConfig,
+        ) -> Vec<StreamEvent> {
+            let gateway = OllamaGateway::with_host(server.url());
+            let messages = vec![LlmMessage::user("Hi")];
+            let stream = gateway
+                .complete_stream_events("qwen3:32b", &messages, config)
+                .expect("Ollama supports stream events");
+            stream.collect().await
+        }
+
+        #[tokio::test]
+        async fn request_streams_without_tools_and_honours_config() {
+            use crate::llm::gateway::{ReasoningEffort, ResponseFormat};
+
+            let captured = std::sync::Arc::new(Mutex::new(None::<Value>));
+            let sink = captured.clone();
+            let mut server = mockito::Server::new_async().await;
+            let mock = server
+                .mock("POST", "/api/chat")
+                .match_request(move |request| {
+                    *sink.lock().unwrap() =
+                        serde_json::from_slice(request.body().expect("request body")).ok();
+                    true
+                })
+                .with_status(200)
+                .with_body("{\"done\":true,\"done_reason\":\"stop\"}\n")
+                .create_async()
+                .await;
+            let config = CompletionConfig {
+                reasoning_effort: Some(ReasoningEffort::Disabled),
+                response_format: Some(ResponseFormat::JsonObject { schema: None }),
+                ..Default::default()
+            };
+
+            collect_events(&server, &config).await;
+
+            mock.assert_async().await;
+            let body = captured.lock().unwrap().take().expect("captured body");
+            assert_eq!(body["model"], "qwen3:32b");
+            assert_eq!(body["stream"], true);
+            assert_eq!(body["think"], false);
+            assert_eq!(body["format"], "json");
+            assert!(body.get("tools").is_none());
+        }
+
+        #[tokio::test]
+        async fn completes_over_http_with_durations() {
+            let mut server = mockito::Server::new_async().await;
+            let mock = server
+                .mock("POST", "/api/chat")
+                .with_status(200)
+                .with_body(concat!(
+                    "{\"message\":{\"content\":\"Hi\"},\"done\":false}\n",
+                    "{\"model\":\"qwen3:32b\",\"done\":true,\"done_reason\":\"stop\",",
+                    "\"total_duration\":900,\"eval_count\":2}\n",
+                ))
+                .create_async()
+                .await;
+
+            let events = collect_events(&server, &CompletionConfig::default()).await;
+
+            mock.assert_async().await;
+            assert!(matches!(
+                events.as_slice(),
+                [StreamEvent::Content(text), StreamEvent::Completed(evidence)]
+                    if text == "Hi"
+                        && evidence.metadata["total_duration"] == 900
+                        && evidence.usage == Some(serde_json::json!({"eval_count": 2}))
+            ));
+        }
+
+        #[tokio::test]
+        async fn end_of_stream_without_done_is_incomplete_stream() {
+            let mut server = mockito::Server::new_async().await;
+            let _mock = server
+                .mock("POST", "/api/chat")
+                .with_status(200)
+                .with_body("{\"message\":{\"content\":\"Hi\"},\"done\":false}\n")
+                .create_async()
+                .await;
+
+            let events = collect_events(&server, &CompletionConfig::default()).await;
+
+            assert!(matches!(
+                events.as_slice(),
+                [
+                    StreamEvent::Content(_),
+                    StreamEvent::Error(StreamEventError::IncompleteStream(_))
+                ]
+            ));
+        }
+
+        #[tokio::test]
+        async fn http_error_status_is_reported_with_body() {
+            let mut server = mockito::Server::new_async().await;
+            let _mock = server
+                .mock("POST", "/api/chat")
+                .with_status(404)
+                .with_body(r#"{"error":"model 'qwen3:32b' not found"}"#)
+                .create_async()
+                .await;
+
+            let events = collect_events(&server, &CompletionConfig::default()).await;
+
+            assert!(matches!(
+                events.as_slice(),
+                [StreamEvent::Error(StreamEventError::ProviderError { status: Some(404), error })]
+                    if error == "model 'qwen3:32b' not found"
+            ));
+        }
+
+        #[tokio::test]
+        async fn dropping_the_stream_cancels_the_request() {
+            let (url, closed) =
+                endless_stream_server("{\"message\":{\"content\":\"Hi\"},\"done\":false}\n").await;
+            let gateway = OllamaGateway::with_host(url);
+            let messages = vec![LlmMessage::user("Hi")];
+            let config = CompletionConfig::default();
+
+            let mut stream = gateway
+                .complete_stream_events("qwen3:32b", &messages, &config)
+                .expect("supported");
+            assert!(matches!(stream.next().await, Some(StreamEvent::Content(_))));
+            drop(stream);
+
+            tokio::time::timeout(std::time::Duration::from_secs(5), closed)
+                .await
+                .expect("the request was not cancelled")
+                .expect("server reported the disconnect");
+        }
     }
 
     #[tokio::test]

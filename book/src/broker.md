@@ -5,22 +5,20 @@ Mojentic’s LLM broker routes completion requests to pluggable gateways (e.g., 
 ## Quick chat example
 
 ```rust
-use mojentic::llm::{Broker, CompletionConfig, Message};
+use mojentic::llm::gateways::OllamaGateway;
+use mojentic::llm::{LlmBroker, LlmMessage};
+use std::sync::Arc;
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    let broker = Broker::new()?;
-    let cfg = CompletionConfig::default();
+async fn main() -> mojentic::Result<()> {
+    let broker = LlmBroker::new("qwen3:32b", Arc::new(OllamaGateway::new()), None);
+    let messages = vec![
+        LlmMessage::system("You are a helpful assistant"),
+        LlmMessage::user("Say hi in one sentence"),
+    ];
 
-    let resp = broker.chat(
-        cfg,
-        [
-            Message::system("You are a helpful assistant"),
-            Message::user("Say hi in one sentence"),
-        ],
-    ).await?;
-
-    println!("{}", resp.text());
+    let text = broker.generate(&messages, None, None, None).await?;
+    println!("{text}");
     Ok(())
 }
 ```
@@ -113,6 +111,16 @@ let config = CompletionConfig {
 
 For full details, see [Reasoning Effort Control](core/reasoning_effort.md).
 
+## Single-turn streaming with terminal completion evidence
+
+`broker.generate_stream_events(&messages, config, correlation_id)` streams one
+turn as `StreamEvent::Content` values and ends with exactly one terminal event:
+`StreamEvent::Completed(evidence)` or `StreamEvent::Error(error)`. A response
+cut off at the token limit ends with `StreamEventError::IncompleteCompletion`,
+never with `Completed`. It sends one request with no tools, and dropping the
+stream cancels it. See [Streaming](core/streaming.md#single-turn-streaming-with-terminal-completion-evidence)
+for the full rules.
+
 ## Caller-owned context and native responses
 
 Use `broker.generate_response(&messages, Some(&tools), Some(config), None).await` to receive one native gateway response without
@@ -133,3 +141,7 @@ The unlimited builder uses `usize::MAX` as a symbolic value and bypasses the ite
 Native responses preserve the fields supplied by the gateway. Missing provider
 usage or termination evidence must remain unknown; configured model names and
 text length are not substitutes for reported metadata.
+
+`LlmGatewayResponse.evidence` holds that evidence: `usage`, `provider_model`,
+`finish_reason` and `metadata`. The broker copies it into the response trace.
+See [Tracer System](observability/tracer.md#provider-evidence-in-response-events).

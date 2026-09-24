@@ -7,7 +7,9 @@ use crate::error::{MojenticError, Result};
 use crate::llm::gateway::{CompletionConfig, LlmGateway, ResponseFormat, StreamChunk};
 use crate::llm::gateways::openai_messages_adapter::{adapt_messages_to_openai, convert_tool_calls};
 use crate::llm::gateways::openai_model_registry::{get_model_registry, ModelType};
+use crate::llm::gateways::openai_stream_events::OpenAiEventParser;
 use crate::llm::models::{LlmGatewayResponse, LlmMessage, LlmToolCall, ResponseEvidence};
+use crate::llm::stream_events::{drive_event_stream, StreamEventError, StreamEventStream};
 use crate::llm::tools::LlmTool;
 use async_trait::async_trait;
 use futures::stream::{Stream, StreamExt};
@@ -169,6 +171,40 @@ impl OpenAIGateway {
         (params, capabilities.supports_tools)
     }
 
+    /// Build a chat completion body with adapted parameters and response format.
+    ///
+    /// Returns the body and whether the model supports tools. Callers add
+    /// tools and streaming fields.
+    fn chat_body(
+        &self,
+        model: &str,
+        messages: &[LlmMessage],
+        config: &CompletionConfig,
+    ) -> Result<(Value, bool)> {
+        let openai_messages = adapt_messages_to_openai(messages)?;
+        let (adapted_params, supports_tools) = self.adapt_parameters_for_model(model, config);
+
+        let mut body = serde_json::json!({
+            "model": model,
+            "messages": openai_messages,
+        });
+        for (key, value) in adapted_params {
+            body[key] = value;
+        }
+        add_response_format(&mut body, config);
+
+        Ok((body, supports_tools))
+    }
+
+    /// A POST to the chat completions endpoint carrying `body`.
+    fn chat_request(&self, body: &Value) -> reqwest::RequestBuilder {
+        self.client
+            .post(format!("{}/chat/completions", self.config.base_url))
+            .header("Authorization", format!("Bearer {}", self.config.api_key))
+            .header("Content-Type", "application/json")
+            .json(body)
+    }
+
     /// Chunk tokens for embedding calculation.
     fn chunk_text(&self, text: &str, chunk_size: usize) -> Vec<String> {
         // Simple character-based chunking as a fallback
@@ -244,18 +280,7 @@ impl LlmGateway for OpenAIGateway {
         info!("Delegating to OpenAI for completion");
         debug!("Model: {}, Message count: {}", model, messages.len());
 
-        let openai_messages = adapt_messages_to_openai(messages)?;
-        let (adapted_params, supports_tools) = self.adapt_parameters_for_model(model, config);
-
-        let mut body = serde_json::json!({
-            "model": model,
-            "messages": openai_messages,
-        });
-
-        // Add adapted parameters
-        for (key, value) in adapted_params {
-            body[key] = value;
-        }
+        let (mut body, supports_tools) = self.chat_body(model, messages, config)?;
 
         // Add tools if provided and supported
         if let Some(tools) = tools {
@@ -267,17 +292,8 @@ impl LlmGateway for OpenAIGateway {
             }
         }
 
-        add_response_format(&mut body, config);
-
         // Make API request
-        let response = self
-            .client
-            .post(format!("{}/chat/completions", self.config.base_url))
-            .header("Authorization", format!("Bearer {}", self.config.api_key))
-            .header("Content-Type", "application/json")
-            .json(&body)
-            .send()
-            .await?;
+        let response = self.chat_request(&body).send().await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -348,14 +364,7 @@ impl LlmGateway for OpenAIGateway {
             body[key] = value;
         }
 
-        let response = self
-            .client
-            .post(format!("{}/chat/completions", self.config.base_url))
-            .header("Authorization", format!("Bearer {}", self.config.api_key))
-            .header("Content-Type", "application/json")
-            .json(&body)
-            .send()
-            .await?;
+        let response = self.chat_request(&body).send().await?;
 
         if !response.status().is_success() {
             let status = response.status();
@@ -494,26 +503,14 @@ impl LlmGateway for OpenAIGateway {
                 return;
             }
 
-            let openai_messages = match adapt_messages_to_openai(messages) {
-                Ok(msgs) => msgs,
+            let (mut body, supports_tools) = match self.chat_body(model, messages, config) {
+                Ok(built) => built,
                 Err(e) => {
                     yield Err(e);
                     return;
                 }
             };
-
-            let (adapted_params, supports_tools) = self.adapt_parameters_for_model(model, config);
-
-            let mut body = serde_json::json!({
-                "model": model,
-                "messages": openai_messages,
-                "stream": true
-            });
-
-            // Add adapted parameters
-            for (key, value) in adapted_params {
-                body[key] = value;
-            }
+            body["stream"] = serde_json::json!(true);
 
             // Add tools if provided and supported
             if let Some(tools) = tools {
@@ -525,18 +522,8 @@ impl LlmGateway for OpenAIGateway {
                 }
             }
 
-            add_response_format(&mut body, config);
-
             // Make streaming API request
-            let response = match self
-                .client
-                .post(format!("{}/chat/completions", self.config.base_url))
-                .header("Authorization", format!("Bearer {}", self.config.api_key))
-                .header("Content-Type", "application/json")
-                .json(&body)
-                .send()
-                .await
-            {
+            let response = match self.chat_request(&body).send().await {
                 Ok(r) => r,
                 Err(e) => {
                     yield Err(e.into());
@@ -660,6 +647,22 @@ impl LlmGateway for OpenAIGateway {
                 }
             }
         })
+    }
+
+    fn complete_stream_events<'a>(
+        &'a self,
+        model: &'a str,
+        messages: &'a [LlmMessage],
+        config: &'a CompletionConfig,
+    ) -> std::result::Result<StreamEventStream<'a>, StreamEventError> {
+        info!("Starting OpenAI stream events");
+        let (mut body, _) = self
+            .chat_body(model, messages, config)
+            .map_err(StreamEventError::RequestFailed)?;
+        body["stream"] = serde_json::json!(true);
+        body["stream_options"] = serde_json::json!({"include_usage": true});
+
+        Ok(drive_event_stream(self.chat_request(&body), OpenAiEventParser::default()))
     }
 }
 
@@ -1248,6 +1251,148 @@ mod tests {
             response.evidence.usage,
             Some(serde_json::json!({"prompt_tokens":2,"completion_tokens":3}))
         );
+    }
+
+    mod stream_events {
+        use super::*;
+        use crate::llm::stream_events::testing::endless_stream_server;
+        use crate::llm::{StreamEvent, StreamEventError};
+
+        async fn collect_events(
+            server: &mockito::Server,
+            config: &CompletionConfig,
+        ) -> Vec<StreamEvent> {
+            let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url());
+            let messages = vec![LlmMessage::user("Hi")];
+            let stream = gateway
+                .complete_stream_events("gpt-4o", &messages, config)
+                .expect("OpenAI supports stream events");
+            stream.collect().await
+        }
+
+        #[tokio::test]
+        async fn request_streams_without_tools_and_asks_for_usage() {
+            let captured = std::sync::Arc::new(Mutex::new(None::<Value>));
+            let sink = captured.clone();
+            let mut server = mockito::Server::new_async().await;
+            let mock = server
+                .mock("POST", "/chat/completions")
+                .match_header("authorization", "Bearer test-key")
+                .match_request(move |request| {
+                    *sink.lock().unwrap() =
+                        serde_json::from_slice(request.body().expect("request body")).ok();
+                    true
+                })
+                .with_status(200)
+                .with_body("data: [DONE]\n\n")
+                .create_async()
+                .await;
+            let config = CompletionConfig {
+                response_format: Some(ResponseFormat::JsonObject { schema: None }),
+                ..Default::default()
+            };
+
+            collect_events(&server, &config).await;
+
+            mock.assert_async().await;
+            let body = captured.lock().unwrap().take().expect("captured body");
+            assert_eq!(body["model"], "gpt-4o");
+            assert_eq!(body["stream"], true);
+            assert_eq!(body["stream_options"], serde_json::json!({"include_usage": true}));
+            assert_eq!(body["response_format"], serde_json::json!({"type": "json_object"}));
+            assert!(body.get("tools").is_none());
+        }
+
+        #[tokio::test]
+        async fn completes_over_http_with_usage() {
+            let mut server = mockito::Server::new_async().await;
+            let mock = server
+                .mock("POST", "/chat/completions")
+                .with_status(200)
+                .with_header("content-type", "text/event-stream")
+                .with_body(concat!(
+                    "data: {\"model\":\"gpt-4o-x\",\"choices\":[{\"delta\":{\"content\":\"Hi\"}}]}\n\n",
+                    "data: {\"model\":\"gpt-4o-x\",\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n",
+                    "data: {\"model\":\"gpt-4o-x\",\"choices\":[],\"usage\":{\"total_tokens\":3}}\n\n",
+                    "data: [DONE]\n\n",
+                ))
+                .create_async()
+                .await;
+
+            let events = collect_events(&server, &CompletionConfig::default()).await;
+
+            mock.assert_async().await;
+            assert!(matches!(
+                events.as_slice(),
+                [StreamEvent::Content(text), StreamEvent::Completed(evidence)]
+                    if text == "Hi"
+                        && evidence.usage == Some(serde_json::json!({"total_tokens": 3}))
+                        && evidence.provider_model.as_deref() == Some("gpt-4o-x")
+            ));
+        }
+
+        #[tokio::test]
+        async fn end_of_stream_without_done_is_incomplete_stream() {
+            let mut server = mockito::Server::new_async().await;
+            let _mock = server
+                .mock("POST", "/chat/completions")
+                .with_status(200)
+                .with_body(concat!(
+                    "data: {\"choices\":[{\"delta\":{\"content\":\"Hi\"}}]}\n\n",
+                    "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n",
+                ))
+                .create_async()
+                .await;
+
+            let events = collect_events(&server, &CompletionConfig::default()).await;
+
+            assert!(matches!(
+                events.as_slice(),
+                [
+                    StreamEvent::Content(_),
+                    StreamEvent::Error(StreamEventError::IncompleteStream(_))
+                ]
+            ));
+        }
+
+        #[tokio::test]
+        async fn http_error_status_is_reported_with_body() {
+            let mut server = mockito::Server::new_async().await;
+            let _mock = server
+                .mock("POST", "/chat/completions")
+                .with_status(429)
+                .with_body(r#"{"error":{"message":"slow down"}}"#)
+                .create_async()
+                .await;
+
+            let events = collect_events(&server, &CompletionConfig::default()).await;
+
+            assert!(matches!(
+                events.as_slice(),
+                [StreamEvent::Error(StreamEventError::ProviderError { status: Some(429), error })]
+                    if error["message"] == "slow down"
+            ));
+        }
+
+        #[tokio::test]
+        async fn dropping_the_stream_cancels_the_request() {
+            let (url, closed) =
+                endless_stream_server("data: {\"choices\":[{\"delta\":{\"content\":\"Hi\"}}]}\n\n")
+                    .await;
+            let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", url);
+            let messages = vec![LlmMessage::user("Hi")];
+            let config = CompletionConfig::default();
+
+            let mut stream =
+                gateway.complete_stream_events("gpt-4o", &messages, &config).expect("supported");
+            assert!(matches!(stream.next().await, Some(StreamEvent::Content(_))));
+            drop(stream);
+
+            tokio::time::timeout(std::time::Duration::from_secs(5), closed)
+                .await
+                .expect("the request was not cancelled")
+                .expect("server reported the disconnect");
+        }
     }
 
     #[tokio::test]

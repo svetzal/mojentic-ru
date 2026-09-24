@@ -1,5 +1,6 @@
 use crate::error::Result;
 use crate::llm::models::{LlmGatewayResponse, LlmMessage};
+use crate::llm::stream_events::{StreamEventError, StreamEventStream};
 use crate::llm::tools::LlmTool;
 use async_trait::async_trait;
 use futures::stream::Stream;
@@ -129,6 +130,28 @@ pub trait LlmGateway: Send + Sync {
         tools: Option<&'a [Box<dyn LlmTool>]>,
         config: &'a CompletionConfig,
     ) -> Pin<Box<dyn Stream<Item = Result<StreamChunk>> + Send + 'a>>;
+
+    /// Stream one turn as [`crate::llm::StreamEvent`]s with terminal completion evidence.
+    ///
+    /// No tools are sent. The returned stream sends exactly one request when
+    /// first polled and ends with exactly one terminal event. Dropping it
+    /// cancels the request.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`StreamEventError::StreamEventsUnsupported`] when the gateway
+    /// does not implement the events API (the default), or
+    /// [`StreamEventError::RequestFailed`] when the request cannot be built.
+    /// No request is sent in either case. The broker turns either into a
+    /// single terminal error event.
+    fn complete_stream_events<'a>(
+        &'a self,
+        _model: &'a str,
+        _messages: &'a [LlmMessage],
+        _config: &'a CompletionConfig,
+    ) -> std::result::Result<StreamEventStream<'a>, StreamEventError> {
+        Err(StreamEventError::StreamEventsUnsupported)
+    }
 }
 
 /// Streaming response chunk

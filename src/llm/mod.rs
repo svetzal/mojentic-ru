@@ -3,10 +3,12 @@ pub mod chat_session;
 pub mod gateway;
 pub mod gateways;
 pub mod models;
+pub mod stream_events;
 pub mod tools;
 
 pub use broker::LlmBroker;
 pub use chat_session::{ChatSession, ChatSessionBuilder, SizedLlmMessage};
 pub use gateway::{CompletionConfig, LlmGateway};
 pub use models::{LlmGatewayResponse, LlmMessage, LlmToolCall, MessageRole, ResponseEvidence};
+pub use stream_events::{StreamEvent, StreamEventError, StreamEventStream};
 pub use tools::{FunctionDescriptor, LlmTool, ToolDescriptor, ToolWrapper};
