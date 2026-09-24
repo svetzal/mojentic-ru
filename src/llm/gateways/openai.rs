@@ -7,7 +7,7 @@ use crate::error::{MojenticError, Result};
 use crate::llm::gateway::{CompletionConfig, LlmGateway, ResponseFormat, StreamChunk};
 use crate::llm::gateways::openai_messages_adapter::{adapt_messages_to_openai, convert_tool_calls};
 use crate::llm::gateways::openai_model_registry::{get_model_registry, ModelType};
-use crate::llm::models::{LlmGatewayResponse, LlmMessage, LlmToolCall};
+use crate::llm::models::{LlmGatewayResponse, LlmMessage, LlmToolCall, ResponseEvidence};
 use crate::llm::tools::LlmTool;
 use async_trait::async_trait;
 use futures::stream::{Stream, StreamExt};
@@ -306,6 +306,7 @@ impl LlmGateway for OpenAIGateway {
             object: None,
             tool_calls,
             thinking: None,
+            evidence: openai_response_evidence(&response_body),
         })
     }
 
@@ -316,6 +317,19 @@ impl LlmGateway for OpenAIGateway {
         schema: Value,
         config: &CompletionConfig,
     ) -> Result<Value> {
+        self.complete_json_response(model, messages, schema, config)
+            .await?
+            .object
+            .ok_or_else(|| MojenticError::GatewayError("No content in response".to_string()))
+    }
+
+    async fn complete_json_response(
+        &self,
+        model: &str,
+        messages: &[LlmMessage],
+        schema: Value,
+        config: &CompletionConfig,
+    ) -> Result<LlmGatewayResponse<Value>> {
         info!("Requesting structured output from OpenAI");
 
         let openai_messages = adapt_messages_to_openai(messages)?;
@@ -358,9 +372,14 @@ impl LlmGateway for OpenAIGateway {
             .ok_or_else(|| MojenticError::GatewayError("No content in response".to_string()))?;
 
         // Parse the JSON response
-        let json_value: Value = serde_json::from_str(content)?;
+        let object: Value = serde_json::from_str(content)?;
 
-        Ok(json_value)
+        Ok(LlmGatewayResponse {
+            content: Some(content.to_string()),
+            object: Some(object),
+            evidence: openai_response_evidence(&response_body),
+            ..Default::default()
+        })
     }
 
     async fn get_available_models(&self) -> Result<Vec<String>> {
@@ -642,6 +661,32 @@ impl LlmGateway for OpenAIGateway {
             }
         })
     }
+}
+
+/// Response fields OpenAI reports that are kept as evidence metadata.
+const OPENAI_METADATA_FIELDS: [&str; 4] = ["id", "created", "system_fingerprint", "service_tier"];
+
+/// Read the evidence a chat completion body reports, leaving absent values unknown.
+fn openai_response_evidence(body: &Value) -> ResponseEvidence {
+    ResponseEvidence {
+        usage: present(&body["usage"]),
+        provider_model: body["model"].as_str().map(String::from),
+        finish_reason: body["choices"][0]["finish_reason"].as_str().map(String::from),
+        metadata: openai_metadata(body),
+    }
+}
+
+/// Collect the reported metadata fields of a completion body or stream chunk.
+pub(crate) fn openai_metadata(body: &Value) -> HashMap<String, Value> {
+    OPENAI_METADATA_FIELDS
+        .iter()
+        .filter_map(|field| present(&body[*field]).map(|value| (field.to_string(), value)))
+        .collect()
+}
+
+/// A JSON value the provider actually reported: neither missing nor null.
+pub(crate) fn present(value: &Value) -> Option<Value> {
+    (!value.is_null()).then(|| value.clone())
 }
 
 /// Map a configured response format to OpenAI's `response_format` request field.
@@ -1106,6 +1151,103 @@ mod tests {
         gateway.complete("gpt-4o", &messages, None, &config).await.unwrap();
 
         mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn complete_carries_reported_evidence_unchanged() {
+        let mut server = mockito::Server::new_async().await;
+        let mock = server
+            .mock("POST", "/chat/completions")
+            .with_status(200)
+            .with_body(
+                r#"{"id":"chatcmpl-9","object":"chat.completion","created":1727000000,
+                    "model":"gpt-4o-2024-08-06","system_fingerprint":"fp_1",
+                    "choices":[{"index":0,"message":{"role":"assistant","content":"Hi"},"finish_reason":"length"}],
+                    "usage":{"prompt_tokens":4,"completion_tokens":1,"total_tokens":5,
+                             "completion_tokens_details":{"reasoning_tokens":0}}}"#,
+            )
+            .create_async()
+            .await;
+
+        let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url());
+        let messages = vec![LlmMessage::user("Hi")];
+
+        let response = gateway
+            .complete("gpt-4o", &messages, None, &CompletionConfig::default())
+            .await
+            .unwrap();
+
+        mock.assert_async().await;
+        let evidence = response.evidence;
+        assert_eq!(evidence.provider_model.as_deref(), Some("gpt-4o-2024-08-06"));
+        assert_eq!(evidence.finish_reason.as_deref(), Some("length"));
+        assert_eq!(
+            evidence.usage,
+            Some(serde_json::json!({"prompt_tokens":4,"completion_tokens":1,"total_tokens":5,
+                                    "completion_tokens_details":{"reasoning_tokens":0}}))
+        );
+        assert_eq!(evidence.metadata["id"], "chatcmpl-9");
+        assert_eq!(evidence.metadata["system_fingerprint"], "fp_1");
+        assert_eq!(evidence.metadata["created"], 1727000000);
+    }
+
+    #[tokio::test]
+    async fn complete_leaves_unreported_usage_unknown() {
+        let mut server = mockito::Server::new_async().await;
+        let mock = server
+            .mock("POST", "/chat/completions")
+            .with_status(200)
+            .with_body(r#"{"choices":[{"message":{"role":"assistant","content":"Hello!"}}]}"#)
+            .create_async()
+            .await;
+
+        let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url());
+        let messages = vec![LlmMessage::user("Hi")];
+
+        let response = gateway
+            .complete("gpt-4o", &messages, None, &CompletionConfig::default())
+            .await
+            .unwrap();
+
+        mock.assert_async().await;
+        assert_eq!(response.evidence, crate::llm::models::ResponseEvidence::default());
+    }
+
+    #[tokio::test]
+    async fn complete_json_response_carries_object_and_evidence() {
+        let mut server = mockito::Server::new_async().await;
+        let mock = server
+            .mock("POST", "/chat/completions")
+            .with_status(200)
+            .with_body(
+                r#"{"model":"gpt-4o-mini","choices":[{"message":{"content":"{\"n\":1}"},"finish_reason":"stop"}],
+                    "usage":{"prompt_tokens":2,"completion_tokens":3}}"#,
+            )
+            .create_async()
+            .await;
+
+        let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url());
+        let messages = vec![LlmMessage::user("JSON")];
+
+        let response = gateway
+            .complete_json_response(
+                "gpt-4o",
+                &messages,
+                serde_json::json!({"type": "object"}),
+                &CompletionConfig::default(),
+            )
+            .await
+            .unwrap();
+
+        mock.assert_async().await;
+        assert_eq!(response.object, Some(serde_json::json!({"n": 1})));
+        assert_eq!(response.content.as_deref(), Some(r#"{"n":1}"#));
+        assert_eq!(response.evidence.provider_model.as_deref(), Some("gpt-4o-mini"));
+        assert_eq!(response.evidence.finish_reason.as_deref(), Some("stop"));
+        assert_eq!(
+            response.evidence.usage,
+            Some(serde_json::json!({"prompt_tokens":2,"completion_tokens":3}))
+        );
     }
 
     #[tokio::test]

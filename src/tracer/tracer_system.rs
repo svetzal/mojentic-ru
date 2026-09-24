@@ -6,6 +6,7 @@
 
 use super::event_store::EventStore;
 use super::tracer_events::*;
+use crate::llm::models::ResponseEvidence;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -98,7 +99,11 @@ impl TracerSystem {
         self.event_store.store(event);
     }
 
-    /// Record an LLM response event
+    /// Record an LLM response event with no provider evidence
+    ///
+    /// Equivalent to [`TracerSystem::record_llm_response_with_evidence`] with
+    /// [`ResponseEvidence::default()`], so usage, provider model and finish
+    /// reason are recorded as unknown.
     ///
     /// # Arguments
     ///
@@ -117,6 +122,39 @@ impl TracerSystem {
         source: impl Into<String>,
         correlation_id: impl Into<String>,
     ) {
+        self.record_llm_response_with_evidence(
+            model,
+            content,
+            tool_calls,
+            call_duration_ms,
+            ResponseEvidence::default(),
+            source,
+            correlation_id,
+        );
+    }
+
+    /// Record an LLM response event with the evidence the provider reported
+    ///
+    /// # Arguments
+    ///
+    /// * `model` - The configured model the request asked for
+    /// * `content` - The content of the LLM response
+    /// * `tool_calls` - Any tool calls made by the LLM in its response
+    /// * `call_duration_ms` - The duration of the LLM call in milliseconds
+    /// * `evidence` - Usage, provider model, finish reason and metadata, unchanged
+    /// * `source` - The source of the event
+    /// * `correlation_id` - UUID string for tracing related events
+    #[allow(clippy::too_many_arguments)]
+    pub fn record_llm_response_with_evidence(
+        &self,
+        model: impl Into<String>,
+        content: impl Into<String>,
+        tool_calls: Option<Vec<HashMap<String, serde_json::Value>>>,
+        call_duration_ms: Option<f64>,
+        evidence: ResponseEvidence,
+        source: impl Into<String>,
+        correlation_id: impl Into<String>,
+    ) {
         if !self.is_enabled() {
             return;
         }
@@ -129,6 +167,7 @@ impl TracerSystem {
             content: content.into(),
             tool_calls,
             call_duration_ms,
+            evidence,
         });
 
         self.event_store.store(event);
@@ -373,6 +412,34 @@ mod tests {
         );
 
         assert_eq!(tracer.len(), 1);
+    }
+
+    #[test]
+    fn record_llm_response_with_evidence_keeps_evidence_unchanged() {
+        use crate::tracer::testing::{capturing_tracer, responses};
+
+        let (tracer, captured) = capturing_tracer();
+        let evidence = ResponseEvidence {
+            usage: Some(serde_json::json!({"prompt_eval_count": 7})),
+            provider_model: Some("qwen3:32b".to_string()),
+            finish_reason: Some("length".to_string()),
+            metadata: HashMap::from([("total_duration".to_string(), serde_json::json!(12))]),
+        };
+
+        tracer.record_llm_response_with_evidence(
+            "qwen3",
+            "partial",
+            None,
+            None,
+            evidence.clone(),
+            "test",
+            "corr",
+        );
+
+        let events = responses(&captured);
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].model, "qwen3");
+        assert_eq!(events[0].evidence, evidence);
     }
 
     #[test]

@@ -65,6 +65,21 @@ impl NullTracer {
         // Do nothing
     }
 
+    /// Do nothing implementation of record_llm_response_with_evidence
+    #[allow(clippy::too_many_arguments)]
+    pub fn record_llm_response_with_evidence(
+        &self,
+        _model: impl Into<String>,
+        _content: impl Into<String>,
+        _tool_calls: Option<Vec<HashMap<String, serde_json::Value>>>,
+        _call_duration_ms: Option<f64>,
+        _evidence: crate::llm::models::ResponseEvidence,
+        _source: impl Into<String>,
+        _correlation_id: impl Into<String>,
+    ) {
+        // Do nothing
+    }
+
     /// Do nothing implementation of record_tool_call
     #[allow(clippy::too_many_arguments)]
     pub fn record_tool_call(

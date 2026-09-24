@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support explicit unlimited tool rounds while retaining finite defaults.
 - The unlimited builder uses `usize::MAX` as a symbolic value and bypasses the iteration check; existing numeric configuration remains compatible.
 - The OpenAI gateway now sends `CompletionConfig.response_format` in streaming and non-streaming chat requests (`{"type": "text"}`, `{"type": "json_object"}`, or `{"type": "json_schema", ...}`). Previously it ignored the setting. Ollama already forwarded `format` in both paths; tests now cover every value for streaming requests. The format records what was requested; callers still validate content.
+- `LlmGatewayResponse` has a new `evidence: ResponseEvidence` field with the provider-reported `usage`, `provider_model`, `finish_reason` and `metadata`. The OpenAI and Ollama gateways fill it for ordinary and structured responses. Unknown values stay `None`; usage is never estimated. `LlmGatewayResponse` now implements `Default`. Code that builds it with a struct literal must add `..Default::default()` (or the new field).
+- `LlmResponseTracerEvent` carries the same evidence, serialized as flat `usage`, `provider_model`, `finish_reason` and `metadata` fields. The broker records it for `generate_response`, `generate` and `generate_object`. `model` stays the configured request model. New `TracerSystem::record_llm_response_with_evidence`; `record_llm_response` is unchanged and records unknown evidence.
+- New provided method `LlmGateway::complete_json_response` returns the structured object with its evidence. `generate_object` uses it. The default implementation wraps `complete_json`, so existing gateway implementations keep working.
+- New provided method `TracerEvent::as_any` lets event-store callbacks downcast built-in events to read typed fields such as the evidence.
 
 ## [1.5.0] - 2026-05-21
 

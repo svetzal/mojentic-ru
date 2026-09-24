@@ -65,3 +65,52 @@ pub use tracer_events::{
     ToolCallTracerEvent, TracerEvent,
 };
 pub use tracer_system::TracerSystem;
+
+#[cfg(test)]
+pub(crate) mod testing {
+    //! Test helpers that read typed events back out of a tracer.
+
+    use super::*;
+    use std::sync::{Arc, Mutex};
+
+    /// A typed copy of an LLM event that a [`capturing_tracer`] recorded.
+    #[derive(Debug, Clone)]
+    pub(crate) enum CapturedLlmEvent {
+        Call(LlmCallTracerEvent),
+        Response(LlmResponseTracerEvent),
+    }
+
+    /// Captured LLM events, in recording order.
+    pub(crate) type CapturedLlmEvents = Arc<Mutex<Vec<CapturedLlmEvent>>>;
+
+    /// A tracer that also keeps a typed copy of every LLM call and response event.
+    pub(crate) fn capturing_tracer() -> (Arc<TracerSystem>, CapturedLlmEvents) {
+        let captured: CapturedLlmEvents = Arc::new(Mutex::new(Vec::new()));
+        let sink = captured.clone();
+        let store = EventStore::new(Some(Arc::new(move |event: &dyn TracerEvent| {
+            let Some(any) = event.as_any() else { return };
+            let copy = if let Some(call) = any.downcast_ref::<LlmCallTracerEvent>() {
+                CapturedLlmEvent::Call(call.clone())
+            } else if let Some(response) = any.downcast_ref::<LlmResponseTracerEvent>() {
+                CapturedLlmEvent::Response(response.clone())
+            } else {
+                return;
+            };
+            sink.lock().unwrap().push(copy);
+        })));
+        (Arc::new(TracerSystem::new(Some(Arc::new(store)), true)), captured)
+    }
+
+    /// The LLM response events captured so far.
+    pub(crate) fn responses(captured: &CapturedLlmEvents) -> Vec<LlmResponseTracerEvent> {
+        captured
+            .lock()
+            .unwrap()
+            .iter()
+            .filter_map(|event| match event {
+                CapturedLlmEvent::Response(response) => Some(response.clone()),
+                CapturedLlmEvent::Call(_) => None,
+            })
+            .collect()
+    }
+}

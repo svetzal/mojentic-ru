@@ -23,7 +23,7 @@ The tracer system consists of several key components:
 The system supports four main event types:
 
 1. **LlmCallTracerEvent**: Records LLM calls with model, messages, temperature, and available tools
-2. **LlmResponseTracerEvent**: Records LLM responses with content, tool calls, and duration
+2. **LlmResponseTracerEvent**: Records LLM responses with content, tool calls, duration, and provider evidence (usage, provider model, finish reason, metadata)
 3. **ToolCallTracerEvent**: Records tool executions with arguments, results, and duration
 4. **AgentInteractionTracerEvent**: Records agent-to-agent communications
 
@@ -70,6 +70,51 @@ tracer.record_llm_response(
     Some(150.5),                   // call_duration_ms
     "my_broker",                   // source
     "correlation-123"              // correlation_id
+);
+```
+
+#### Provider evidence in response events
+
+`LlmResponseTracerEvent` has an `evidence` field of type `ResponseEvidence`. It
+holds what the provider reported about the response:
+
+| Field | Source | When the provider does not report it |
+| ----- | ------ | ------------------------------------ |
+| `usage` | Token usage in the provider's own shape | `None` |
+| `provider_model` | Model name the provider reported | `None` |
+| `finish_reason` | OpenAI `finish_reason`, Ollama `done_reason` | `None` |
+| `metadata` | Other reported facts (OpenAI `id`, `created`, `system_fingerprint`, `service_tier`; Ollama `created_at` and durations) | empty |
+
+The event's `model` field stays the model you configured on the broker. When
+the event is serialized, the evidence becomes the flat fields `usage`,
+`provider_model`, `finish_reason` and `metadata`.
+
+The broker fills the evidence for `generate_response`, `generate`,
+`generate_object` and `generate_stream_events`. The older `generate_stream`
+does not trace provider evidence.
+
+Mojentic does not estimate usage from text length or a tokenizer. If the
+provider does not report usage, `usage` stays `None`. OpenAI usage is the
+response's `usage` object, unchanged. Ollama reports no `usage` object, so its
+usage is `{"prompt_eval_count": ..., "eval_count": ...}`, holding only the
+counts Ollama reported, under Ollama's names.
+
+To record evidence yourself, use `record_llm_response_with_evidence`:
+
+```rust
+use mojentic::llm::ResponseEvidence;
+
+tracer.record_llm_response_with_evidence(
+    "llama3.2",
+    "Response text",
+    None,
+    Some(150.5),
+    ResponseEvidence {
+        finish_reason: Some("stop".to_string()),
+        ..Default::default()
+    },
+    "my_broker",
+    "correlation-123",
 );
 ```
 
@@ -242,6 +287,22 @@ let tracer = Arc::new(TracerSystem::new(Some(event_store), true));
 tracer.record_llm_call("llama3.2", vec![], 1.0, None, "test", "corr-1");
 
 println!("Total events: {}", event_count.load(Ordering::SeqCst));
+```
+
+Built-in events implement `TracerEvent::as_any`, so a callback can read typed
+fields. This callback prints the usage of each LLM response:
+
+```rust
+use mojentic::tracer::{EventCallback, LlmResponseTracerEvent};
+
+let callback: EventCallback = Arc::new(|event| {
+    if let Some(response) = event
+        .as_any()
+        .and_then(|any| any.downcast_ref::<LlmResponseTracerEvent>())
+    {
+        println!("usage: {:?}", response.evidence.usage);
+    }
+});
 ```
 
 ## Null Tracer

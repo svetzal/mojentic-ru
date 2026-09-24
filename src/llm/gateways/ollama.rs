@@ -2,7 +2,9 @@ use crate::error::{MojenticError, Result};
 use crate::llm::gateway::{
     CompletionConfig, LlmGateway, StreamChunk, StreamMetrics, StreamProgress,
 };
-use crate::llm::models::{LlmGatewayResponse, LlmMessage, LlmToolCall, MessageRole};
+use crate::llm::models::{
+    LlmGatewayResponse, LlmMessage, LlmToolCall, MessageRole, ResponseEvidence,
+};
 use crate::llm::tools::LlmTool;
 use async_trait::async_trait;
 use futures::stream::{Stream, StreamExt};
@@ -187,6 +189,7 @@ impl LlmGateway for OllamaGateway {
             object: None,
             tool_calls,
             thinking,
+            evidence: ollama_evidence(&response_body),
         })
     }
 
@@ -197,6 +200,19 @@ impl LlmGateway for OllamaGateway {
         schema: Value,
         config: &CompletionConfig,
     ) -> Result<Value> {
+        self.complete_json_response(model, messages, schema, config)
+            .await?
+            .object
+            .ok_or_else(|| MojenticError::GatewayError("No content in response".to_string()))
+    }
+
+    async fn complete_json_response(
+        &self,
+        model: &str,
+        messages: &[LlmMessage],
+        schema: Value,
+        config: &CompletionConfig,
+    ) -> Result<LlmGatewayResponse<Value>> {
         info!("Requesting structured output from Ollama");
 
         let ollama_messages = adapt_messages_to_ollama(messages)?;
@@ -230,9 +246,14 @@ impl LlmGateway for OllamaGateway {
             .ok_or_else(|| MojenticError::GatewayError("No content in response".to_string()))?;
 
         // Parse the JSON response
-        let json_value: Value = serde_json::from_str(content)?;
+        let object: Value = serde_json::from_str(content)?;
 
-        Ok(json_value)
+        Ok(LlmGatewayResponse {
+            content: Some(content.to_string()),
+            object: Some(object),
+            evidence: ollama_evidence(&response_body),
+            ..Default::default()
+        })
     }
 
     async fn get_available_models(&self) -> Result<Vec<String>> {
@@ -472,6 +493,39 @@ impl LlmGateway for OllamaGateway {
             }
         })
     }
+}
+
+/// Token counts Ollama reports, kept under Ollama's own names as usage.
+const OLLAMA_USAGE_FIELDS: [&str; 2] = ["prompt_eval_count", "eval_count"];
+
+/// Timing and identity fields Ollama reports, kept as evidence metadata.
+const OLLAMA_METADATA_FIELDS: [&str; 5] = [
+    "created_at",
+    "total_duration",
+    "load_duration",
+    "prompt_eval_duration",
+    "eval_duration",
+];
+
+/// Read the evidence a final Ollama chat frame reports, leaving absent values unknown.
+pub(crate) fn ollama_evidence(frame: &Value) -> ResponseEvidence {
+    let usage = reported_fields(frame, &OLLAMA_USAGE_FIELDS);
+    ResponseEvidence {
+        usage: (!usage.is_empty()).then(|| Value::Object(usage.into_iter().collect())),
+        provider_model: frame["model"].as_str().map(String::from),
+        finish_reason: frame["done_reason"].as_str().map(String::from),
+        metadata: reported_fields(frame, &OLLAMA_METADATA_FIELDS),
+    }
+}
+
+fn reported_fields(frame: &Value, fields: &[&str]) -> HashMap<String, Value> {
+    fields
+        .iter()
+        .filter_map(|field| {
+            let value = &frame[*field];
+            (!value.is_null()).then(|| (field.to_string(), value.clone()))
+        })
+        .collect()
 }
 
 fn frame_progress_counts(json: &Value) -> (usize, usize, usize) {
@@ -1159,6 +1213,103 @@ mod tests {
         .await;
 
         assert_eq!(body["format"], schema);
+    }
+
+    #[tokio::test]
+    async fn complete_carries_reported_evidence_unchanged() {
+        let mut server = mockito::Server::new_async().await;
+        let mock = server
+            .mock("POST", "/api/chat")
+            .with_status(200)
+            .with_body(
+                r#"{"model":"qwen3:32b","created_at":"2026-09-24T10:00:00Z",
+                    "message":{"role":"assistant","content":"Hi"},
+                    "done":true,"done_reason":"length",
+                    "total_duration":900,"load_duration":100,
+                    "prompt_eval_count":12,"prompt_eval_duration":200,
+                    "eval_count":34,"eval_duration":600}"#,
+            )
+            .create_async()
+            .await;
+
+        let gateway = OllamaGateway::with_host(server.url());
+        let messages = vec![LlmMessage::user("Hi")];
+
+        let response = gateway
+            .complete("qwen3", &messages, None, &CompletionConfig::default())
+            .await
+            .unwrap();
+
+        mock.assert_async().await;
+        let evidence = response.evidence;
+        assert_eq!(evidence.provider_model.as_deref(), Some("qwen3:32b"));
+        assert_eq!(evidence.finish_reason.as_deref(), Some("length"));
+        assert_eq!(
+            evidence.usage,
+            Some(serde_json::json!({"prompt_eval_count": 12, "eval_count": 34}))
+        );
+        assert_eq!(evidence.metadata["total_duration"], 900);
+        assert_eq!(evidence.metadata["load_duration"], 100);
+        assert_eq!(evidence.metadata["prompt_eval_duration"], 200);
+        assert_eq!(evidence.metadata["eval_duration"], 600);
+        assert_eq!(evidence.metadata["created_at"], "2026-09-24T10:00:00Z");
+    }
+
+    #[tokio::test]
+    async fn complete_leaves_unreported_usage_unknown() {
+        let mut server = mockito::Server::new_async().await;
+        let mock = server
+            .mock("POST", "/api/chat")
+            .with_status(200)
+            .with_body(r#"{"message":{"role":"assistant","content":"Hi"},"done":true}"#)
+            .create_async()
+            .await;
+
+        let gateway = OllamaGateway::with_host(server.url());
+        let messages = vec![LlmMessage::user("Hi")];
+
+        let response = gateway
+            .complete("qwen3", &messages, None, &CompletionConfig::default())
+            .await
+            .unwrap();
+
+        mock.assert_async().await;
+        assert_eq!(response.evidence, crate::llm::models::ResponseEvidence::default());
+    }
+
+    #[tokio::test]
+    async fn complete_json_response_carries_object_and_evidence() {
+        let mut server = mockito::Server::new_async().await;
+        let mock = server
+            .mock("POST", "/api/chat")
+            .with_status(200)
+            .with_body(
+                r#"{"model":"qwen3:32b","message":{"role":"assistant","content":"{\"n\":1}"},
+                    "done":true,"done_reason":"stop","prompt_eval_count":3,"eval_count":4}"#,
+            )
+            .create_async()
+            .await;
+
+        let gateway = OllamaGateway::with_host(server.url());
+        let messages = vec![LlmMessage::user("JSON")];
+
+        let response = gateway
+            .complete_json_response(
+                "qwen3",
+                &messages,
+                serde_json::json!({"type": "object"}),
+                &CompletionConfig::default(),
+            )
+            .await
+            .unwrap();
+
+        mock.assert_async().await;
+        assert_eq!(response.object, Some(serde_json::json!({"n": 1})));
+        assert_eq!(response.evidence.finish_reason.as_deref(), Some("stop"));
+        assert_eq!(
+            response.evidence.usage,
+            Some(serde_json::json!({"prompt_eval_count": 3, "eval_count": 4}))
+        );
     }
 
     #[tokio::test]

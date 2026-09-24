@@ -37,13 +37,33 @@ fn default_role() -> MessageRole {
     MessageRole::User
 }
 
+/// Completion evidence exactly as a provider reported it for one response.
+///
+/// Every field is optional. A gateway fills what its provider reports and
+/// leaves the rest unknown: usage is never estimated from text length or a
+/// tokenizer, and `provider_model` is never copied from the configured model.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ResponseEvidence {
+    /// Token usage in the provider's own shape, unchanged.
+    pub usage: Option<serde_json::Value>,
+    /// Model name the provider reported, which can differ from the requested model.
+    pub provider_model: Option<String>,
+    /// Provider finish reason (OpenAI `finish_reason`, Ollama `done_reason`).
+    pub finish_reason: Option<String>,
+    /// Other provider-reported response facts, such as ids or timings.
+    pub metadata: HashMap<String, serde_json::Value>,
+}
+
 /// Response from LLM gateway
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct LlmGatewayResponse<T = ()> {
     pub content: Option<String>,
     pub object: Option<T>,
     pub tool_calls: Vec<LlmToolCall>,
     pub thinking: Option<String>,
+    /// What the provider reported about how this response finished.
+    pub evidence: ResponseEvidence,
 }
 
 impl LlmMessage {

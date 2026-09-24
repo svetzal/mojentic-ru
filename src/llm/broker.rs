@@ -143,11 +143,12 @@ impl LlmBroker {
                 None
             };
 
-            tracer.record_llm_response(
+            tracer.record_llm_response_with_evidence(
                 &self.model,
                 response.content.as_ref().unwrap_or(&String::new()),
                 tool_calls_json,
                 Some(call_duration_ms),
+                response.evidence.clone(),
                 "LlmBroker",
                 &correlation_id,
             );
@@ -395,26 +396,33 @@ impl LlmBroker {
         let start = std::time::Instant::now();
 
         // Call the gateway with the schema
-        let json_response =
-            self.gateway.complete_json(&self.model, messages, schema, &config).await?;
+        let response = self
+            .gateway
+            .complete_json_response(&self.model, messages, schema, &config)
+            .await?;
 
         let call_duration_ms = start.elapsed().as_secs_f64() * 1000.0;
 
-        // Deserialize the JSON into the target type
-        let object: T = serde_json::from_value(json_response.clone())?;
+        let json_response = response.object.ok_or_else(|| {
+            MojenticError::GatewayError("Structured response carried no object".to_string())
+        })?;
 
         // Record LLM response
         if let Some(tracer) = &self.tracer {
             let object_str = serde_json::to_string_pretty(&json_response).unwrap_or_default();
-            tracer.record_llm_response(
+            tracer.record_llm_response_with_evidence(
                 &self.model,
                 format!("Structured response: {}", object_str),
                 None,
                 Some(call_duration_ms),
+                response.evidence,
                 "LlmBroker::generate_object",
                 &correlation_id,
             );
         }
+
+        // Deserialize the JSON into the target type
+        let object: T = serde_json::from_value(json_response)?;
 
         Ok(object)
     }
@@ -685,6 +693,7 @@ mod tests {
                 name: "unknown".into(),
                 arguments: HashMap::new(),
             }],
+            ..Default::default()
         };
         let broker =
             LlmBroker::new("test".to_string(), Arc::new(MockGateway::new(vec![response])), None);
@@ -708,6 +717,7 @@ mod tests {
                 name: "unknown".into(),
                 arguments: HashMap::new(),
             }],
+            ..Default::default()
         };
         let mut responses = vec![response; 12];
         responses.push(LlmGatewayResponse {
@@ -715,6 +725,7 @@ mod tests {
             object: None,
             thinking: None,
             tool_calls: vec![],
+            ..Default::default()
         });
         let broker =
             LlmBroker::new("test".to_string(), Arc::new(MockGateway::new(responses)), None);
@@ -728,6 +739,152 @@ mod tests {
             .await
             .expect("unlimited completion");
         assert_eq!(actual, "done");
+    }
+
+    fn reported_evidence() -> crate::llm::models::ResponseEvidence {
+        crate::llm::models::ResponseEvidence {
+            usage: Some(serde_json::json!({"prompt_tokens": 9, "completion_tokens": 4})),
+            provider_model: Some("provider-model-2026".to_string()),
+            finish_reason: Some("stop".to_string()),
+            metadata: HashMap::from([("id".to_string(), serde_json::json!("resp-1"))]),
+        }
+    }
+
+    /// A gateway whose ordinary and structured responses carry fixed evidence.
+    struct EvidenceGateway {
+        evidence: crate::llm::models::ResponseEvidence,
+    }
+
+    #[async_trait::async_trait]
+    impl LlmGateway for EvidenceGateway {
+        async fn complete(
+            &self,
+            _model: &str,
+            _messages: &[LlmMessage],
+            _tools: Option<&[Box<dyn LlmTool>]>,
+            _config: &CompletionConfig,
+        ) -> Result<LlmGatewayResponse> {
+            Ok(LlmGatewayResponse {
+                content: Some("answer".to_string()),
+                evidence: self.evidence.clone(),
+                ..Default::default()
+            })
+        }
+
+        async fn complete_json(
+            &self,
+            _model: &str,
+            _messages: &[LlmMessage],
+            _schema: Value,
+            _config: &CompletionConfig,
+        ) -> Result<Value> {
+            unreachable!("the broker asks for the structured response with evidence")
+        }
+
+        async fn complete_json_response(
+            &self,
+            _model: &str,
+            _messages: &[LlmMessage],
+            _schema: Value,
+            _config: &CompletionConfig,
+        ) -> Result<LlmGatewayResponse<Value>> {
+            Ok(LlmGatewayResponse {
+                object: Some(serde_json::json!({"test": "value"})),
+                evidence: self.evidence.clone(),
+                ..Default::default()
+            })
+        }
+
+        async fn get_available_models(&self) -> Result<Vec<String>> {
+            Ok(vec![])
+        }
+
+        async fn calculate_embeddings(
+            &self,
+            _text: &str,
+            _model: Option<&str>,
+        ) -> Result<Vec<f32>> {
+            Ok(vec![])
+        }
+
+        fn complete_stream<'a>(
+            &'a self,
+            _model: &'a str,
+            _messages: &'a [LlmMessage],
+            _tools: Option<&'a [Box<dyn LlmTool>]>,
+            _config: &'a CompletionConfig,
+        ) -> Pin<Box<dyn Stream<Item = Result<StreamChunk>> + Send + 'a>> {
+            Box::pin(futures::stream::empty())
+        }
+    }
+
+    #[tokio::test]
+    async fn generate_response_traces_reported_evidence_unchanged() {
+        use crate::tracer::testing::{capturing_tracer, responses};
+
+        let (tracer, captured) = capturing_tracer();
+        let gateway = Arc::new(EvidenceGateway {
+            evidence: reported_evidence(),
+        });
+        let broker = LlmBroker::new("configured-model", gateway, Some(tracer));
+
+        let response = broker
+            .generate_response(&[LlmMessage::user("q")], None, None, None)
+            .await
+            .unwrap();
+
+        assert_eq!(response.evidence, reported_evidence());
+        assert!(matches!(
+            captured.lock().unwrap().first(),
+            Some(crate::tracer::testing::CapturedLlmEvent::Call(call))
+                if call.model == "configured-model"
+        ));
+        let events = responses(&captured);
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].model, "configured-model");
+        assert_eq!(events[0].evidence, reported_evidence());
+    }
+
+    #[tokio::test]
+    async fn generate_response_traces_unknown_usage_as_none() {
+        use crate::tracer::testing::{capturing_tracer, responses};
+
+        let (tracer, captured) = capturing_tracer();
+        let gateway = Arc::new(EvidenceGateway {
+            evidence: Default::default(),
+        });
+        let broker = LlmBroker::new("configured-model", gateway, Some(tracer));
+
+        broker.generate(&[LlmMessage::user("q")], None, None, None).await.unwrap();
+
+        let events = responses(&captured);
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].evidence.usage, None);
+        assert_eq!(events[0].evidence.provider_model, None);
+    }
+
+    #[tokio::test]
+    async fn generate_object_traces_reported_evidence_unchanged() {
+        use crate::tracer::testing::{capturing_tracer, responses};
+
+        #[derive(Debug, Serialize, Deserialize, schemars::JsonSchema)]
+        struct TestObject {
+            test: String,
+        }
+
+        let (tracer, captured) = capturing_tracer();
+        let gateway = Arc::new(EvidenceGateway {
+            evidence: reported_evidence(),
+        });
+        let broker = LlmBroker::new("configured-model", gateway, Some(tracer));
+
+        let object: TestObject =
+            broker.generate_object(&[LlmMessage::user("q")], None, None).await.unwrap();
+
+        assert_eq!(object.test, "value");
+        let events = responses(&captured);
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0].evidence, reported_evidence());
     }
 
     // Mock gateway for testing
@@ -766,6 +923,7 @@ mod tests {
                     object: None,
                     tool_calls: vec![],
                     thinking: None,
+                    ..Default::default()
                 })
             }
         }
@@ -876,6 +1034,7 @@ mod tests {
                 object: None,
                 tool_calls: vec![tool_call.clone()],
                 thinking: None,
+                ..Default::default()
             })
             .collect();
 
@@ -930,6 +1089,7 @@ mod tests {
                     object: None,
                     tool_calls: vec![],
                     thinking: None,
+                    ..Default::default()
                 })
             }
 
@@ -1016,6 +1176,7 @@ mod tests {
             object: None,
             tool_calls: vec![],
             thinking: None,
+            ..Default::default()
         };
 
         let gateway = Arc::new(MockGateway::new(vec![response]));
@@ -1034,6 +1195,7 @@ mod tests {
             object: None,
             tool_calls: vec![],
             thinking: None,
+            ..Default::default()
         };
 
         let gateway = Arc::new(MockGateway::new(vec![response]));
@@ -1064,6 +1226,7 @@ mod tests {
             object: None,
             tool_calls: vec![],
             thinking: None,
+            ..Default::default()
         };
 
         let gateway = Arc::new(MockGateway::new(vec![response]));
@@ -1088,6 +1251,7 @@ mod tests {
             object: None,
             tool_calls: vec![tool_call],
             thinking: None,
+            ..Default::default()
         };
 
         let second_response = LlmGatewayResponse {
@@ -1095,6 +1259,7 @@ mod tests {
             object: None,
             tool_calls: vec![],
             thinking: None,
+            ..Default::default()
         };
 
         let gateway = Arc::new(MockGateway::new(vec![first_response, second_response]));
@@ -1126,6 +1291,7 @@ mod tests {
             object: None,
             tool_calls: vec![tool_call],
             thinking: None,
+            ..Default::default()
         };
 
         let gateway = Arc::new(MockGateway::new(vec![response]));
@@ -1188,6 +1354,7 @@ mod tests {
             object: None,
             tool_calls: vec![],
             thinking: None,
+            ..Default::default()
         };
 
         let gateway = Arc::new(MockGateway::new(vec![response]));
@@ -1225,6 +1392,7 @@ mod tests {
                     object: None,
                     tool_calls: vec![],
                     thinking: None,
+                    ..Default::default()
                 })
             }
 
@@ -1310,6 +1478,7 @@ mod tests {
                     object: None,
                     tool_calls: vec![],
                     thinking: None,
+                    ..Default::default()
                 })
             }
 
@@ -1409,6 +1578,7 @@ mod tests {
                     object: None,
                     tool_calls: vec![],
                     thinking: None,
+                    ..Default::default()
                 })
             }
 
@@ -1472,6 +1642,7 @@ mod tests {
             object: None,
             tool_calls: vec![],
             thinking: None,
+            ..Default::default()
         };
 
         let gateway = Arc::new(MockGateway::new(vec![response]));
@@ -1512,6 +1683,7 @@ mod tests {
             object: None,
             tool_calls: vec![tool_call],
             thinking: None,
+            ..Default::default()
         };
 
         let second_response = LlmGatewayResponse {
@@ -1519,6 +1691,7 @@ mod tests {
             object: None,
             tool_calls: vec![],
             thinking: None,
+            ..Default::default()
         };
 
         let gateway = Arc::new(MockGateway::new(vec![first_response, second_response]));

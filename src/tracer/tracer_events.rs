@@ -4,8 +4,10 @@
 //! LLM calls, tool executions, and agent interactions. All events implement the
 //! `TracerEvent` trait which provides timestamps, correlation IDs, and printable summaries.
 
+use crate::llm::models::ResponseEvidence;
 use chrono::{DateTime, Local};
 use serde::{Deserialize, Serialize};
+use std::any::Any;
 use std::collections::HashMap;
 
 /// Trait for filtering tracer events
@@ -43,6 +45,28 @@ pub trait TracerEvent: Send + Sync {
 
     /// Get a formatted string summary of the event
     fn printable_summary(&self) -> String;
+
+    /// Expose the concrete event for downcasting, when the event type allows it.
+    ///
+    /// The built-in events return `Some(self)`, so an [`crate::tracer::EventCallback`]
+    /// can read typed fields, for example the evidence on an
+    /// [`LlmResponseTracerEvent`]:
+    ///
+    /// ```
+    /// use mojentic::tracer::{LlmResponseTracerEvent, TracerEvent};
+    ///
+    /// fn finish_reason(event: &dyn TracerEvent) -> Option<String> {
+    ///     event
+    ///         .as_any()?
+    ///         .downcast_ref::<LlmResponseTracerEvent>()?
+    ///         .evidence
+    ///         .finish_reason
+    ///         .clone()
+    /// }
+    /// ```
+    fn as_any(&self) -> Option<&dyn Any> {
+        None
+    }
 }
 
 /// Records when an LLM is called with specific messages
@@ -110,6 +134,10 @@ impl TracerEvent for LlmCallTracerEvent {
 
         summary
     }
+
+    fn as_any(&self) -> Option<&dyn Any> {
+        Some(self)
+    }
 }
 
 /// Records when an LLM responds to a call
@@ -129,6 +157,12 @@ pub struct LlmResponseTracerEvent {
     pub tool_calls: Option<Vec<HashMap<String, serde_json::Value>>>,
     /// Duration of the LLM call in milliseconds
     pub call_duration_ms: Option<f64>,
+    /// Provider-reported usage, provider model, finish reason and metadata.
+    ///
+    /// Serialized as the flat fields `usage`, `provider_model`,
+    /// `finish_reason` and `metadata`. Unknown values stay null.
+    #[serde(flatten)]
+    pub evidence: ResponseEvidence,
 }
 
 impl TracerEvent for LlmResponseTracerEvent {
@@ -174,7 +208,23 @@ impl TracerEvent for LlmResponseTracerEvent {
             summary.push_str(&format!("\n   Duration: {:.2}ms", duration));
         }
 
+        if let Some(provider_model) = &self.evidence.provider_model {
+            summary.push_str(&format!("\n   Provider Model: {}", provider_model));
+        }
+
+        if let Some(finish_reason) = &self.evidence.finish_reason {
+            summary.push_str(&format!("\n   Finish Reason: {}", finish_reason));
+        }
+
+        if let Some(usage) = &self.evidence.usage {
+            summary.push_str(&format!("\n   Usage: {}", usage));
+        }
+
         summary
+    }
+
+    fn as_any(&self) -> Option<&dyn Any> {
+        Some(self)
     }
 }
 
@@ -245,6 +295,10 @@ impl TracerEvent for ToolCallTracerEvent {
 
         summary
     }
+
+    fn as_any(&self) -> Option<&dyn Any> {
+        Some(self)
+    }
 }
 
 /// Records the end-to-end execution of a parallel tool batch.
@@ -293,6 +347,10 @@ impl TracerEvent for ToolBatchTracerEvent {
             self.failure_count,
             self.call_duration_ms
         )
+    }
+
+    fn as_any(&self) -> Option<&dyn Any> {
+        Some(self)
     }
 }
 
@@ -345,6 +403,10 @@ impl TracerEvent for AgentInteractionTracerEvent {
 
         summary
     }
+
+    fn as_any(&self) -> Option<&dyn Any> {
+        Some(self)
+    }
 }
 
 #[cfg(test)]
@@ -388,6 +450,7 @@ mod tests {
             content: "Hello, world!".to_string(),
             tool_calls: None,
             call_duration_ms: Some(150.5),
+            evidence: ResponseEvidence::default(),
         };
 
         assert_eq!(event.content, "Hello, world!");
@@ -397,6 +460,86 @@ mod tests {
         assert!(summary.contains("LlmResponseTracerEvent"));
         assert!(summary.contains("Hello, world!"));
         assert!(summary.contains("150.5"));
+    }
+
+    fn evidence() -> ResponseEvidence {
+        ResponseEvidence {
+            usage: Some(serde_json::json!({"prompt_tokens": 3, "completion_tokens": 5})),
+            provider_model: Some("gpt-4o-2024-08-06".to_string()),
+            finish_reason: Some("stop".to_string()),
+            metadata: HashMap::from([("id".to_string(), serde_json::json!("chatcmpl-1"))]),
+        }
+    }
+
+    fn response_event(evidence: ResponseEvidence) -> LlmResponseTracerEvent {
+        LlmResponseTracerEvent {
+            timestamp: current_timestamp(),
+            correlation_id: "corr".to_string(),
+            source: "test".to_string(),
+            model: "gpt-4o".to_string(),
+            content: "Hi".to_string(),
+            tool_calls: None,
+            call_duration_ms: None,
+            evidence,
+        }
+    }
+
+    #[test]
+    fn llm_response_event_serializes_evidence_as_flat_fields() {
+        let json = serde_json::to_value(response_event(evidence())).unwrap();
+
+        assert_eq!(json["model"], "gpt-4o");
+        assert_eq!(json["provider_model"], "gpt-4o-2024-08-06");
+        assert_eq!(json["finish_reason"], "stop");
+        assert_eq!(json["usage"], serde_json::json!({"prompt_tokens": 3, "completion_tokens": 5}));
+        assert_eq!(json["metadata"], serde_json::json!({"id": "chatcmpl-1"}));
+    }
+
+    #[test]
+    fn llm_response_event_serializes_unknown_evidence_as_null() {
+        let json = serde_json::to_value(response_event(ResponseEvidence::default())).unwrap();
+
+        assert!(json["usage"].is_null());
+        assert!(json["provider_model"].is_null());
+        assert!(json["finish_reason"].is_null());
+    }
+
+    #[test]
+    fn llm_response_event_deserializes_records_without_evidence() {
+        let json = serde_json::json!({
+            "timestamp": 1.0,
+            "correlation_id": "corr",
+            "source": "test",
+            "model": "gpt-4o",
+            "content": "Hi",
+            "tool_calls": null,
+            "call_duration_ms": null
+        });
+
+        let event: LlmResponseTracerEvent = serde_json::from_value(json).unwrap();
+
+        assert_eq!(event.evidence, ResponseEvidence::default());
+    }
+
+    #[test]
+    fn llm_response_summary_shows_reported_evidence() {
+        let summary = response_event(evidence()).printable_summary();
+
+        assert!(summary.contains("Provider Model: gpt-4o-2024-08-06"));
+        assert!(summary.contains("Finish Reason: stop"));
+        assert!(summary.contains("\"prompt_tokens\":3"));
+    }
+
+    #[test]
+    fn built_in_events_downcast_through_as_any() {
+        let event: Box<dyn TracerEvent> = Box::new(response_event(evidence()));
+
+        let typed = event
+            .as_any()
+            .and_then(|any| any.downcast_ref::<LlmResponseTracerEvent>())
+            .expect("response event downcasts");
+
+        assert_eq!(typed.evidence, evidence());
     }
 
     #[test]

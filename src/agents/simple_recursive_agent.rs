@@ -683,6 +683,7 @@ mod tests {
                 object: None,
                 tool_calls: vec![],
                 thinking: None,
+                ..Default::default()
             })
         }
 

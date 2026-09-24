@@ -92,6 +92,26 @@ pub trait LlmGateway: Send + Sync {
         config: &CompletionConfig,
     ) -> Result<Value>;
 
+    /// Complete a structured JSON request and keep the provider's evidence.
+    ///
+    /// The response carries the parsed object, the raw content when the
+    /// gateway has it, and [`crate::llm::models::ResponseEvidence`]. The
+    /// default implementation wraps [`LlmGateway::complete_json`] and reports
+    /// no evidence; gateways that see provider metadata override it.
+    async fn complete_json_response(
+        &self,
+        model: &str,
+        messages: &[LlmMessage],
+        schema: Value,
+        config: &CompletionConfig,
+    ) -> Result<LlmGatewayResponse<Value>> {
+        let object = self.complete_json(model, messages, schema, config).await?;
+        Ok(LlmGatewayResponse {
+            object: Some(object),
+            ..Default::default()
+        })
+    }
+
     /// Get list of available models
     async fn get_available_models(&self) -> Result<Vec<String>>;
 
