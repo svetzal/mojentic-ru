@@ -1083,6 +1083,84 @@ mod tests {
         assert!(body.get("format").is_none());
     }
 
+    /// Send one streaming request and return the JSON body the server received.
+    async fn streamed_request_body(config: CompletionConfig) -> Value {
+        let captured = std::sync::Arc::new(Mutex::new(None::<Value>));
+        let sink = captured.clone();
+        let mut server = mockito::Server::new_async().await;
+        let mock = server
+            .mock("POST", "/api/chat")
+            .match_request(move |request| {
+                let body = serde_json::from_slice(request.body().expect("request body"))
+                    .expect("JSON request body");
+                *sink.lock().unwrap() = Some(body);
+                true
+            })
+            .with_status(200)
+            .with_body("{\"done\":true,\"done_reason\":\"stop\"}\n")
+            .create_async()
+            .await;
+
+        let gateway = OllamaGateway::with_host(server.url());
+        let messages = vec![LlmMessage::user("Hi")];
+        let mut stream = gateway.complete_stream("qwen3:32b", &messages, None, &config);
+        while stream.next().await.is_some() {}
+
+        mock.assert_async().await;
+        let body = captured.lock().unwrap().take();
+        body.expect("streaming request body was captured")
+    }
+
+    fn config_with_format(format: Option<crate::llm::gateway::ResponseFormat>) -> CompletionConfig {
+        CompletionConfig {
+            response_format: format,
+            ..Default::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn streaming_request_without_format_leaves_body_unchanged() {
+        let body = streamed_request_body(config_with_format(None)).await;
+
+        assert_eq!(body["stream"], true);
+        assert!(body.get("format").is_none());
+    }
+
+    #[tokio::test]
+    async fn streaming_request_omits_format_for_text() {
+        use crate::llm::gateway::ResponseFormat;
+
+        let body = streamed_request_body(config_with_format(Some(ResponseFormat::Text))).await;
+
+        assert!(body.get("format").is_none());
+    }
+
+    #[tokio::test]
+    async fn streaming_request_forwards_json_object_format() {
+        use crate::llm::gateway::ResponseFormat;
+
+        let body = streamed_request_body(config_with_format(Some(ResponseFormat::JsonObject {
+            schema: None,
+        })))
+        .await;
+
+        assert_eq!(body["format"], "json");
+    }
+
+    #[tokio::test]
+    async fn streaming_request_forwards_json_schema_format() {
+        use crate::llm::gateway::ResponseFormat;
+
+        let schema =
+            serde_json::json!({"type": "object", "properties": {"n": {"type": "integer"}}});
+        let body = streamed_request_body(config_with_format(Some(ResponseFormat::JsonObject {
+            schema: Some(schema.clone()),
+        })))
+        .await;
+
+        assert_eq!(body["format"], schema);
+    }
+
     #[tokio::test]
     async fn test_pull_model_success() {
         let mut server = mockito::Server::new_async().await;

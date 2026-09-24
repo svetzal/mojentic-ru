@@ -34,6 +34,37 @@ async fn main() -> anyhow::Result<()> {
 
 Use typed schemas to parse the model output into structs. See [Structured Output](core/structured_output.md).
 
+### Structured output in streaming requests
+
+`CompletionConfig.response_format` asks the provider for a response format. The
+OpenAI and Ollama gateways send it in streaming and non-streaming requests alike.
+
+| `response_format` | OpenAI request | Ollama request |
+| ----------------- | -------------- | -------------- |
+| `None` | unchanged | unchanged |
+| `Some(ResponseFormat::Text)` | `response_format: {"type": "text"}` | no `format` field |
+| `Some(ResponseFormat::JsonObject { schema: None })` | `response_format: {"type": "json_object"}` | `format: "json"` |
+| `Some(ResponseFormat::JsonObject { schema: Some(s) })` | `response_format: {"type": "json_schema", "json_schema": {"name": "response", "schema": s}}` | `format: s` |
+
+```rust
+use mojentic::llm::gateway::{CompletionConfig, ResponseFormat};
+
+let config = CompletionConfig {
+    response_format: Some(ResponseFormat::JsonObject {
+        schema: Some(serde_json::json!({
+            "type": "object",
+            "properties": {"answer": {"type": "string"}},
+            "required": ["answer"]
+        })),
+    }),
+    ..Default::default()
+};
+let mut stream = broker.generate_stream(&messages, None, Some(config), None);
+```
+
+The format records what you asked for. It does not prove that the provider
+enforced it. Parse and validate the streamed content before you use it.
+
 ## Configuration
 
 Use `CompletionConfig` to control generation parameters:

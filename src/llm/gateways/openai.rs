@@ -4,7 +4,7 @@
 //! including chat completions, streaming, and embeddings.
 
 use crate::error::{MojenticError, Result};
-use crate::llm::gateway::{CompletionConfig, LlmGateway, StreamChunk};
+use crate::llm::gateway::{CompletionConfig, LlmGateway, ResponseFormat, StreamChunk};
 use crate::llm::gateways::openai_messages_adapter::{adapt_messages_to_openai, convert_tool_calls};
 use crate::llm::gateways::openai_model_registry::{get_model_registry, ModelType};
 use crate::llm::models::{LlmGatewayResponse, LlmMessage, LlmToolCall};
@@ -267,6 +267,8 @@ impl LlmGateway for OpenAIGateway {
             }
         }
 
+        add_response_format(&mut body, config);
+
         // Make API request
         let response = self
             .client
@@ -322,13 +324,9 @@ impl LlmGateway for OpenAIGateway {
         let mut body = serde_json::json!({
             "model": model,
             "messages": openai_messages,
-            "response_format": {
-                "type": "json_schema",
-                "json_schema": {
-                    "name": "response",
-                    "schema": schema
-                }
-            }
+            "response_format": openai_response_format(&ResponseFormat::JsonObject {
+                schema: Some(schema)
+            }),
         });
 
         // Add adapted parameters
@@ -508,6 +506,8 @@ impl LlmGateway for OpenAIGateway {
                 }
             }
 
+            add_response_format(&mut body, config);
+
             // Make streaming API request
             let response = match self
                 .client
@@ -641,6 +641,27 @@ impl LlmGateway for OpenAIGateway {
                 }
             }
         })
+    }
+}
+
+/// Map a configured response format to OpenAI's `response_format` request field.
+fn openai_response_format(format: &ResponseFormat) -> Value {
+    match format {
+        ResponseFormat::Text => serde_json::json!({"type": "text"}),
+        ResponseFormat::JsonObject { schema: None } => serde_json::json!({"type": "json_object"}),
+        ResponseFormat::JsonObject {
+            schema: Some(schema),
+        } => serde_json::json!({
+            "type": "json_schema",
+            "json_schema": {"name": "response", "schema": schema}
+        }),
+    }
+}
+
+/// Forward the configured response format, leaving the body unchanged when none is set.
+fn add_response_format(body: &mut Value, config: &CompletionConfig) {
+    if let Some(format) = &config.response_format {
+        body["response_format"] = openai_response_format(format);
     }
 }
 
@@ -985,6 +1006,106 @@ mod tests {
         assert!(result.is_ok());
         let embeddings = result.unwrap();
         assert_eq!(embeddings.len(), 4);
+    }
+
+    /// Send one streaming request and return the JSON body the server received.
+    async fn streamed_request_body(config: CompletionConfig) -> Value {
+        let captured = std::sync::Arc::new(Mutex::new(None::<Value>));
+        let sink = captured.clone();
+        let mut server = mockito::Server::new_async().await;
+        let mock = server
+            .mock("POST", "/chat/completions")
+            .match_request(move |request| {
+                let body = serde_json::from_slice(request.body().expect("request body"))
+                    .expect("JSON request body");
+                *sink.lock().unwrap() = Some(body);
+                true
+            })
+            .with_status(200)
+            .with_body("data: [DONE]\n\n")
+            .create_async()
+            .await;
+
+        let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url());
+        let messages = vec![LlmMessage::user("Hi")];
+        let mut stream = gateway.complete_stream("gpt-4o", &messages, None, &config);
+        while stream.next().await.is_some() {}
+
+        mock.assert_async().await;
+        let body = captured.lock().unwrap().take();
+        body.expect("streaming request body was captured")
+    }
+
+    fn config_with_format(format: Option<ResponseFormat>) -> CompletionConfig {
+        CompletionConfig {
+            response_format: format,
+            ..Default::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn streaming_request_without_format_leaves_body_unchanged() {
+        let body = streamed_request_body(config_with_format(None)).await;
+
+        assert_eq!(body["stream"], true);
+        assert!(body.get("response_format").is_none());
+    }
+
+    #[tokio::test]
+    async fn streaming_request_forwards_text_format() {
+        let body = streamed_request_body(config_with_format(Some(ResponseFormat::Text))).await;
+
+        assert_eq!(body["response_format"], serde_json::json!({"type": "text"}));
+    }
+
+    #[tokio::test]
+    async fn streaming_request_forwards_json_object_format() {
+        let body = streamed_request_body(config_with_format(Some(ResponseFormat::JsonObject {
+            schema: None,
+        })))
+        .await;
+
+        assert_eq!(body["response_format"], serde_json::json!({"type": "json_object"}));
+    }
+
+    #[tokio::test]
+    async fn streaming_request_forwards_json_schema_format() {
+        let schema =
+            serde_json::json!({"type": "object", "properties": {"n": {"type": "integer"}}});
+        let body = streamed_request_body(config_with_format(Some(ResponseFormat::JsonObject {
+            schema: Some(schema.clone()),
+        })))
+        .await;
+
+        assert_eq!(
+            body["response_format"],
+            serde_json::json!({
+                "type": "json_schema",
+                "json_schema": {"name": "response", "schema": schema}
+            })
+        );
+    }
+
+    #[tokio::test]
+    async fn non_streaming_request_forwards_configured_format() {
+        let mut server = mockito::Server::new_async().await;
+        let mock = server
+            .mock("POST", "/chat/completions")
+            .match_body(mockito::Matcher::PartialJson(serde_json::json!({
+                "response_format": {"type": "json_object"}
+            })))
+            .with_status(200)
+            .with_body(r#"{"choices":[{"message":{"role":"assistant","content":"{}"}}]}"#)
+            .create_async()
+            .await;
+
+        let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url());
+        let messages = vec![LlmMessage::user("Hi")];
+        let config = config_with_format(Some(ResponseFormat::JsonObject { schema: None }));
+
+        gateway.complete("gpt-4o", &messages, None, &config).await.unwrap();
+
+        mock.assert_async().await;
     }
 
     #[tokio::test]

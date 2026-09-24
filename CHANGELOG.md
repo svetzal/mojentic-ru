@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add a single-response broker API for caller-owned context and native tool requests.
 - Support explicit unlimited tool rounds while retaining finite defaults.
 - The unlimited builder uses `usize::MAX` as a symbolic value and bypasses the iteration check; existing numeric configuration remains compatible.
+- The OpenAI gateway now sends `CompletionConfig.response_format` in streaming and non-streaming chat requests (`{"type": "text"}`, `{"type": "json_object"}`, or `{"type": "json_schema", ...}`). Previously it ignored the setting. Ollama already forwarded `format` in both paths; tests now cover every value for streaming requests. The format records what was requested; callers still validate content.
 
 ## [1.5.0] - 2026-05-21
 
