@@ -1,6 +1,7 @@
 pub mod ollama;
 mod ollama_stream_events;
 pub mod openai;
+mod openai_legacy_stream;
 pub mod openai_messages_adapter;
 pub mod openai_model_registry;
 mod openai_stream_events;

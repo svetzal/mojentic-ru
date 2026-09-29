@@ -5,14 +5,15 @@
 
 use crate::error::{MojenticError, Result};
 use crate::llm::gateway::{CompletionConfig, LlmGateway, ResponseFormat, StreamChunk};
+use crate::llm::gateways::openai_legacy_stream::{legacy_body_stream, OpenAiLegacyParser};
 use crate::llm::gateways::openai_messages_adapter::{adapt_messages_to_openai, convert_tool_calls};
 use crate::llm::gateways::openai_model_registry::{get_model_registry, ModelType};
 use crate::llm::gateways::openai_stream_events::OpenAiEventParser;
-use crate::llm::models::{LlmGatewayResponse, LlmMessage, LlmToolCall, ResponseEvidence};
+use crate::llm::models::{LlmGatewayResponse, LlmMessage, ResponseEvidence};
 use crate::llm::stream_events::{drive_event_stream, StreamEventError, StreamEventStream};
 use crate::llm::tools::LlmTool;
 use async_trait::async_trait;
-use futures::stream::{Stream, StreamExt};
+use futures::stream::Stream;
 use reqwest::Client;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -539,112 +540,12 @@ impl LlmGateway for OpenAIGateway {
                 return;
             }
 
-            // Process SSE stream
-            let mut stream = response.bytes_stream();
-            let mut buffer = String::new();
-
-            // Accumulate tool calls as they stream in
-            let mut tool_calls_accumulator: HashMap<usize, ToolCallAccumulator> = HashMap::new();
-
-            while let Some(chunk_result) = stream.next().await {
-                match chunk_result {
-                    Ok(bytes) => {
-                        if let Ok(text) = std::str::from_utf8(&bytes) {
-                            buffer.push_str(text);
-
-                            // Process complete SSE lines
-                            while let Some(line_end) = buffer.find('\n') {
-                                let line = buffer[..line_end].trim().to_string();
-                                buffer = buffer[line_end + 1..].to_string();
-
-                                if line.is_empty() || !line.starts_with("data: ") {
-                                    continue;
-                                }
-
-                                let data = line.strip_prefix("data: ").unwrap();
-
-                                if data == "[DONE]" {
-                                    // Final chunk - yield accumulated tool calls if any
-                                    if !tool_calls_accumulator.is_empty() {
-                                        let complete_tool_calls = build_complete_tool_calls(&tool_calls_accumulator);
-                                        if !complete_tool_calls.is_empty() {
-                                            yield Ok(StreamChunk::ToolCalls(complete_tool_calls));
-                                        }
-                                    }
-                                    continue;
-                                }
-
-                                // Parse JSON data
-                                match serde_json::from_str::<Value>(data) {
-                                    Ok(json) => {
-                                        if let Some(choices) = json["choices"].as_array() {
-                                            if choices.is_empty() {
-                                                continue;
-                                            }
-
-                                            let delta = &choices[0]["delta"];
-                                            let finish_reason = choices[0]["finish_reason"].as_str();
-
-                                            // Yield content chunks
-                                            if let Some(content) = delta["content"].as_str() {
-                                                if !content.is_empty() {
-                                                    yield Ok(StreamChunk::Content(content.to_string()));
-                                                }
-                                            }
-
-                                            // Accumulate tool call chunks
-                                            if let Some(tool_calls) = delta["tool_calls"].as_array() {
-                                                for tc in tool_calls {
-                                                    if let Some(index) = tc["index"].as_u64() {
-                                                        let index = index as usize;
-
-                                                        // Initialize accumulator if needed
-                                                        let acc = tool_calls_accumulator.entry(index).or_insert_with(|| ToolCallAccumulator {
-                                                            id: None,
-                                                            name: None,
-                                                            arguments: String::new(),
-                                                        });
-
-                                                        // First chunk has id
-                                                        if let Some(id) = tc["id"].as_str() {
-                                                            acc.id = Some(id.to_string());
-                                                        }
-
-                                                        // First chunk has function name
-                                                        if let Some(name) = tc["function"]["name"].as_str() {
-                                                            acc.name = Some(name.to_string());
-                                                        }
-
-                                                        // All chunks may have argument fragments
-                                                        if let Some(args) = tc["function"]["arguments"].as_str() {
-                                                            acc.arguments.push_str(args);
-                                                        }
-                                                    }
-                                                }
-                                            }
-
-                                            // When stream completes with tool_calls, yield accumulated tool calls
-                                            if finish_reason == Some("tool_calls") && !tool_calls_accumulator.is_empty() {
-                                                let complete_tool_calls = build_complete_tool_calls(&tool_calls_accumulator);
-                                                if !complete_tool_calls.is_empty() {
-                                                    yield Ok(StreamChunk::ToolCalls(complete_tool_calls));
-                                                }
-                                                tool_calls_accumulator.clear();
-                                            }
-                                        }
-                                    }
-                                    Err(e) => {
-                                        warn!("Failed to parse streaming chunk: {}", e);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        yield Err(e.into());
-                        return;
-                    }
-                }
+            let mut parser = OpenAiLegacyParser::default();
+            let chunks = legacy_body_stream(response.bytes_stream(), move |line: &str| {
+                parser.parse_line(line)
+            });
+            for await chunk in chunks {
+                yield chunk;
             }
         })
     }
@@ -670,7 +571,7 @@ impl LlmGateway for OpenAIGateway {
 const OPENAI_METADATA_FIELDS: [&str; 4] = ["id", "created", "system_fingerprint", "service_tier"];
 
 /// Read the evidence a chat completion body reports, leaving absent values unknown.
-fn openai_response_evidence(body: &Value) -> ResponseEvidence {
+pub(crate) fn openai_response_evidence(body: &Value) -> ResponseEvidence {
     ResponseEvidence {
         usage: present(&body["usage"]),
         provider_model: body["model"].as_str().map(String::from),
@@ -693,7 +594,7 @@ pub(crate) fn present(value: &Value) -> Option<Value> {
 }
 
 /// Map a configured response format to OpenAI's `response_format` request field.
-fn openai_response_format(format: &ResponseFormat) -> Value {
+pub(crate) fn openai_response_format(format: &ResponseFormat) -> Value {
     match format {
         ResponseFormat::Text => serde_json::json!({"type": "text"}),
         ResponseFormat::JsonObject { schema: None } => serde_json::json!({"type": "json_object"}),
@@ -707,48 +608,16 @@ fn openai_response_format(format: &ResponseFormat) -> Value {
 }
 
 /// Forward the configured response format, leaving the body unchanged when none is set.
-fn add_response_format(body: &mut Value, config: &CompletionConfig) {
+pub(crate) fn add_response_format(body: &mut Value, config: &CompletionConfig) {
     if let Some(format) = &config.response_format {
         body["response_format"] = openai_response_format(format);
     }
 }
 
-/// Accumulator for streaming tool calls.
-struct ToolCallAccumulator {
-    id: Option<String>,
-    name: Option<String>,
-    arguments: String,
-}
-
-/// Build complete tool calls from accumulators.
-fn build_complete_tool_calls(
-    accumulators: &HashMap<usize, ToolCallAccumulator>,
-) -> Vec<LlmToolCall> {
-    let mut indices: Vec<_> = accumulators.keys().collect();
-    indices.sort();
-
-    indices
-        .iter()
-        .filter_map(|&&index| {
-            let acc = accumulators.get(&index)?;
-            let name = acc.name.clone()?;
-
-            // Parse arguments
-            let arguments: HashMap<String, Value> =
-                serde_json::from_str(&acc.arguments).unwrap_or_default();
-
-            Some(LlmToolCall {
-                id: acc.id.clone(),
-                name,
-                arguments,
-            })
-        })
-        .collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures::stream::StreamExt;
     use std::sync::Mutex;
 
     static ENV_MUTEX: Mutex<()> = Mutex::new(());
@@ -851,51 +720,6 @@ mod tests {
         let weights: Vec<f32> = vec![];
         let result = gateway.weighted_average_embeddings(&embeddings, &weights);
         assert!(result.is_empty());
-    }
-
-    #[test]
-    fn test_build_complete_tool_calls() {
-        let mut accumulators = HashMap::new();
-        accumulators.insert(
-            0,
-            ToolCallAccumulator {
-                id: Some("call_123".to_string()),
-                name: Some("get_weather".to_string()),
-                arguments: r#"{"location": "NYC"}"#.to_string(),
-            },
-        );
-        accumulators.insert(
-            1,
-            ToolCallAccumulator {
-                id: Some("call_456".to_string()),
-                name: Some("search".to_string()),
-                arguments: r#"{"query": "test"}"#.to_string(),
-            },
-        );
-
-        let result = build_complete_tool_calls(&accumulators);
-
-        assert_eq!(result.len(), 2);
-        assert_eq!(result[0].id, Some("call_123".to_string()));
-        assert_eq!(result[0].name, "get_weather");
-        assert_eq!(result[1].id, Some("call_456".to_string()));
-        assert_eq!(result[1].name, "search");
-    }
-
-    #[test]
-    fn test_build_complete_tool_calls_missing_name() {
-        let mut accumulators = HashMap::new();
-        accumulators.insert(
-            0,
-            ToolCallAccumulator {
-                id: Some("call_123".to_string()),
-                name: None, // Missing name
-                arguments: r#"{}"#.to_string(),
-            },
-        );
-
-        let result = build_complete_tool_calls(&accumulators);
-        assert!(result.is_empty()); // Should be filtered out
     }
 
     #[test]
@@ -1082,6 +906,105 @@ mod tests {
         mock.assert_async().await;
         let body = captured.lock().unwrap().take();
         body.expect("streaming request body was captured")
+    }
+
+    /// Stream `body` through the legacy streaming API and collect every item.
+    async fn legacy_stream_items(body: &str) -> Vec<Result<StreamChunk>> {
+        let mut server = mockito::Server::new_async().await;
+        let _mock = server
+            .mock("POST", "/chat/completions")
+            .with_status(200)
+            .with_header("content-type", "text/event-stream")
+            .with_body(body)
+            .create_async()
+            .await;
+
+        let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url());
+        let messages = vec![LlmMessage::user("Hi")];
+        let config = CompletionConfig::default();
+        gateway.complete_stream("gpt-4o", &messages, None, &config).collect().await
+    }
+
+    #[tokio::test]
+    async fn legacy_stream_yields_non_empty_content_and_skips_unreadable_frames() {
+        let items = legacy_stream_items(concat!(
+            ": keep-alive\n\n",
+            "data: {\"choices\":[{\"delta\":{\"role\":\"assistant\",\"content\":\"\"}}]}\n\n",
+            "data: {\"choices\":[{\"delta\":{\"content\":\"Hel\"}}]}\n\n",
+            "data: {not json\n\n",
+            "data: {\"choices\":[]}\n\n",
+            "data: {\"choices\":[{\"delta\":{\"content\":\"lo\"}}]}\n\n",
+            "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"stop\"}]}\n\n",
+            "data: [DONE]\n\n",
+        ))
+        .await;
+
+        let texts: Vec<_> = items
+            .iter()
+            .map(|item| match item {
+                Ok(StreamChunk::Content(text)) => text.clone(),
+                other => panic!("expected only content, got {other:?}"),
+            })
+            .collect();
+        assert_eq!(texts, ["Hel", "lo"]);
+    }
+
+    #[tokio::test]
+    async fn legacy_stream_accumulates_tool_call_fragments_until_the_finish_reason() {
+        let items = legacy_stream_items(concat!(
+            "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call_1\",\"function\":{\"name\":\"get_weather\",\"arguments\":\"\"}}]}}]}\n\n",
+            "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{\\\"location\\\":\"}}]}}]}\n\n",
+            "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\" \\\"NYC\\\"}\"}}]}}]}\n\n",
+            "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"tool_calls\"}]}\n\n",
+            "data: [DONE]\n\n",
+        ))
+        .await;
+
+        let [Ok(StreamChunk::ToolCalls(calls))] = items.as_slice() else {
+            panic!("expected one tool-calls chunk, got {items:?}");
+        };
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].id.as_deref(), Some("call_1"));
+        assert_eq!(calls[0].name, "get_weather");
+        assert_eq!(calls[0].arguments["location"], "NYC");
+    }
+
+    #[tokio::test]
+    async fn legacy_stream_yields_pending_tool_calls_at_done() {
+        let items = legacy_stream_items(concat!(
+            "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":1,\"id\":\"call_b\",\"function\":{\"name\":\"b\",\"arguments\":\"{}\"}}]}}]}\n\n",
+            "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call_a\",\"function\":{\"name\":\"a\",\"arguments\":\"{}\"}}]}}]}\n\n",
+            "data: [DONE]\n\n",
+        ))
+        .await;
+
+        let [Ok(StreamChunk::ToolCalls(calls))] = items.as_slice() else {
+            panic!("expected one tool-calls chunk, got {items:?}");
+        };
+        let names: Vec<_> = calls.iter().map(|call| call.name.as_str()).collect();
+        assert_eq!(names, ["a", "b"]);
+    }
+
+    #[tokio::test]
+    async fn legacy_stream_reports_http_error_status() {
+        let mut server = mockito::Server::new_async().await;
+        let _mock = server
+            .mock("POST", "/chat/completions")
+            .with_status(500)
+            .with_body("boom")
+            .create_async()
+            .await;
+
+        let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url());
+        let messages = vec![LlmMessage::user("Hi")];
+        let config = CompletionConfig::default();
+        let items: Vec<_> =
+            gateway.complete_stream("gpt-4o", &messages, None, &config).collect().await;
+
+        assert!(matches!(
+            items.as_slice(),
+            [Err(MojenticError::GatewayError(message))] if message == "OpenAI API error: 500 Internal Server Error"
+        ));
     }
 
     fn config_with_format(format: Option<ResponseFormat>) -> CompletionConfig {
