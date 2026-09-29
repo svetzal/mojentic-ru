@@ -26,6 +26,7 @@ async fn main() -> mojentic::Result<()> {
 ## Gateways
 
 - Ollama: local models for fast iteration.
+- oMLX: local models on Apple Silicon. See [oMLX Gateway](core/omlx.md).
 - HTTP-based gateways: add your own by implementing the `Gateway` trait.
 
 ## Structured output

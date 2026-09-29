@@ -131,3 +131,7 @@ gateway records nothing.
 The gateways' lower-level `complete_stream` also yields `StreamChunk::Thinking`,
 `StreamChunk::Progress` and `StreamChunk::Metrics` for Ollama. The events API
 does not expose these. Thinking text is not assistant content.
+
+The oMLX gateway's `complete_stream` yields `StreamChunk::Thinking` for
+reasoning deltas, but no progress or metrics chunks. See
+[oMLX Gateway](omlx.md#streaming).

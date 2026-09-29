@@ -191,6 +191,13 @@ Stream one turn as events and read the terminal completion evidence (finish reas
 cargo run --example stream_events
 ```
 
+#### `omlx.rs`
+One chat turn against a local [oMLX](https://github.com/jundot/omlx) server. Reads `OMLX_HOST` and `OMLX_API_KEY`, and prints the thinking, the content and the finish reason.
+
+```bash
+cargo run --example omlx -- Qwen3.8-27B-MLX-8bit
+```
+
 #### `chat_session.rs`
 Interactive chat session maintaining conversation history.
 

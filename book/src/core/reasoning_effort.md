@@ -65,6 +65,13 @@ For OpenAI reasoning models (like o1), the `reasoning_effort` parameter maps dir
 
 For non-reasoning OpenAI models, the parameter is ignored and a warning is logged.
 
+### oMLX
+
+The oMLX gateway sends `reasoning_effort` without change (`"disabled"`,
+`"low"`, `"medium"` or `"high"`) to the model's chat template. The effect
+depends on the model. The reasoning trace is in the response's `thinking`
+field. See [oMLX Gateway](omlx.md#reasoning-effort).
+
 ## When to Use Reasoning Effort
 
 Use higher reasoning effort for:

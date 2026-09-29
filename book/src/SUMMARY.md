@@ -27,6 +27,7 @@
   - [Agent Delegation](core/agent_delegation.md)
   - [Chat Sessions with Tools](core/chat_sessions_with_tools.md)
   - [OpenAI Model Registry](core/openai_model_registry.md)
+  - [oMLX Gateway](core/omlx.md)
 - [Layer 2 - Agents](agents/README.md)
   - [Asynchronous Capabilities](agents/async_capabilities.md)
   - [Iterative Problem Solver](agents/ipa.md)
