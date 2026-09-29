@@ -8,6 +8,7 @@
 use crate::error::Result;
 use crate::llm::gateway::StreamChunk;
 use crate::llm::models::LlmToolCall;
+use crate::llm::stream_events::LineBuffer;
 use futures::stream::{Stream, StreamExt};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -114,7 +115,10 @@ impl OpenAiLegacyParser {
 
 /// Read a legacy SSE response body, handing each complete line to `parse_line`.
 ///
-/// A transport error ends the stream with that error.
+/// Bytes are buffered until a newline arrives, so a line (and any UTF-8
+/// character in it) split across network reads is decoded whole. A line that
+/// is not UTF-8 is logged and skipped. A transport error ends the stream with
+/// that error.
 pub(crate) fn legacy_body_stream<'a, S, B, F>(
     bytes: S,
     mut parse_line: F,
@@ -126,21 +130,19 @@ where
 {
     async_stream::stream! {
         let mut bytes = Box::pin(bytes);
-        let mut buffer = String::new();
+        let mut lines = LineBuffer::default();
 
         while let Some(chunk_result) = bytes.next().await {
             match chunk_result {
                 Ok(chunk) => {
-                    if let Ok(text) = std::str::from_utf8(chunk.as_ref()) {
-                        buffer.push_str(text);
-
-                        while let Some(line_end) = buffer.find('\n') {
-                            let line = buffer[..line_end].to_string();
-                            buffer = buffer[line_end + 1..].to_string();
-
-                            for chunk in parse_line(&line) {
-                                yield Ok(chunk);
+                    for line in lines.push(chunk.as_ref()) {
+                        match std::str::from_utf8(&line) {
+                            Ok(text) => {
+                                for chunk in parse_line(text) {
+                                    yield Ok(chunk);
+                                }
                             }
+                            Err(e) => warn!("Skipping a streaming line that is not UTF-8: {}", e),
                         }
                     }
                 }
@@ -240,6 +242,26 @@ mod tests {
 
         let result = build_complete_tool_calls(&accumulators);
         assert!(result.is_empty());
+    }
+
+    #[tokio::test]
+    async fn the_body_stream_decodes_a_character_split_across_chunks() {
+        use futures::stream::StreamExt;
+        let line = "data: {\"choices\":[{\"delta\":{\"content\":\"\u{e9}\"}}]}\n".as_bytes();
+        let split = line.iter().position(|byte| *byte >= 0x80).expect("multi-byte") + 1;
+        let chunks: Vec<std::result::Result<Vec<u8>, reqwest::Error>> =
+            vec![Ok(line[..split].to_vec()), Ok(line[split..].to_vec())];
+        let mut parser = OpenAiLegacyParser::default();
+
+        let items: Vec<_> =
+            legacy_body_stream(futures::stream::iter(chunks), move |l: &str| parser.parse_line(l))
+                .collect()
+                .await;
+
+        assert!(
+            matches!(items.as_slice(), [Ok(StreamChunk::Content(text))] if text == "\u{e9}"),
+            "{items:?}"
+        );
     }
 
     #[test]

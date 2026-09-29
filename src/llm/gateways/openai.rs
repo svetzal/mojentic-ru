@@ -986,6 +986,29 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn legacy_stream_keeps_a_character_split_across_network_chunks() {
+        use crate::llm::stream_events::testing::{
+            split_body_server, split_inside_first_multibyte_char,
+        };
+        let body = concat!(
+            "data: {\"choices\":[{\"delta\":{\"content\":\"Caf\u{e9} \u{1f30a}\"}}]}\n\n",
+            "data: [DONE]\n\n",
+        );
+        let url = split_body_server(split_inside_first_multibyte_char(body)).await;
+
+        let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", url);
+        let messages = vec![LlmMessage::user("Hi")];
+        let config = CompletionConfig::default();
+        let items: Vec<_> =
+            gateway.complete_stream("gpt-4o", &messages, None, &config).collect().await;
+
+        assert!(
+            matches!(items.as_slice(), [Ok(StreamChunk::Content(text))] if text == "Caf\u{e9} \u{1f30a}"),
+            "{items:?}"
+        );
+    }
+
+    #[tokio::test]
     async fn legacy_stream_reports_http_error_status() {
         let mut server = mockito::Server::new_async().await;
         let _mock = server

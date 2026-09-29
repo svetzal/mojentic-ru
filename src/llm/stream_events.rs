@@ -197,12 +197,12 @@ pub(crate) fn invalid_event(reason: impl Into<String>) -> StreamEvent {
 /// A trailing partial line at end of stream is never returned: a stream cut
 /// mid-frame is incomplete, not malformed.
 #[derive(Default)]
-struct LineBuffer {
+pub(crate) struct LineBuffer {
     pending: Vec<u8>,
 }
 
 impl LineBuffer {
-    fn push(&mut self, chunk: &[u8]) -> Vec<Vec<u8>> {
+    pub(crate) fn push(&mut self, chunk: &[u8]) -> Vec<Vec<u8>> {
         self.pending.extend_from_slice(chunk);
         let Some(last_newline) = self.pending.iter().rposition(|byte| *byte == b'\n') else {
             return Vec::new();
@@ -254,6 +254,44 @@ pub(crate) mod testing {
         });
 
         (format!("http://{address}"), closed_rx)
+    }
+
+    /// Serve one chunked response that sends each of `parts` as its own
+    /// network write, pausing between them so the client reads them apart.
+    ///
+    /// Returns the base URL.
+    pub(crate) async fn split_body_server(parts: Vec<Vec<u8>>) -> String {
+        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind test server");
+        let address = listener.local_addr().expect("test server address");
+
+        tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.expect("accept client");
+            read_request(&mut socket).await;
+            let head = "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\ntransfer-encoding: chunked\r\n\r\n";
+            socket.write_all(head.as_bytes()).await.expect("write head");
+            for part in parts {
+                let mut chunk = format!("{:x}\r\n", part.len()).into_bytes();
+                chunk.extend_from_slice(&part);
+                chunk.extend_from_slice(b"\r\n");
+                socket.write_all(&chunk).await.expect("write part");
+                socket.flush().await.expect("flush part");
+                tokio::time::sleep(std::time::Duration::from_millis(30)).await;
+            }
+            socket.write_all(b"0\r\n\r\n").await.expect("write end");
+            socket.flush().await.expect("flush end");
+        });
+
+        format!("http://{address}")
+    }
+
+    /// `body` split into two parts inside the first multi-byte UTF-8 character.
+    pub(crate) fn split_inside_first_multibyte_char(body: &str) -> Vec<Vec<u8>> {
+        let (index, _) = body
+            .char_indices()
+            .find(|(_, c)| c.len_utf8() > 1)
+            .expect("body has a multi-byte character");
+        let bytes = body.as_bytes();
+        vec![bytes[..index + 1].to_vec(), bytes[index + 1..].to_vec()]
     }
 
     async fn read_request(socket: &mut tokio::net::TcpStream) {

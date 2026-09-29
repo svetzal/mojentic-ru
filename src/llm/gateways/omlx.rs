@@ -578,6 +578,38 @@ impl LlmGateway for OmlxGateway {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures::stream::StreamExt;
+
+    #[tokio::test]
+    async fn legacy_stream_keeps_a_character_split_across_network_chunks() {
+        use crate::llm::stream_events::testing::{
+            split_body_server, split_inside_first_multibyte_char,
+        };
+        let body = concat!(
+            "data: {\"model\":\"m\",\"choices\":[{\"index\":0,\"delta\":{\"reasoning_content\":\"\u{1f914} hmm\"}}]}\n\n",
+            "data: {\"model\":\"m\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"caf\u{e9}\"}}]}\n\n",
+            "data: [DONE]\n\n",
+        );
+        let url = split_body_server(split_inside_first_multibyte_char(body)).await;
+        let gateway = OmlxGateway::with_config(OmlxConfig {
+            host: url,
+            api_key: None,
+            timeout: None,
+        });
+        let messages = vec![LlmMessage::user("Hi")];
+        let config = CompletionConfig::default();
+
+        let items: Vec<_> = gateway.complete_stream("m", &messages, None, &config).collect().await;
+
+        assert!(
+            matches!(
+                items.as_slice(),
+                [Ok(StreamChunk::Thinking(thinking)), Ok(StreamChunk::Content(content))]
+                    if thinking == "\u{1f914} hmm" && content == "caf\u{e9}"
+            ),
+            "{items:?}"
+        );
+    }
 
     #[test]
     fn debug_output_hides_the_api_key() {
