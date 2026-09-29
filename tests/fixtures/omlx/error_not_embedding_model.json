@@ -1,0 +1,1 @@
+{"error":{"message":"Model 'Qwen3.8-27B-MLX-8bit' is not an embedding model. Use /v1/chat/completions for LLM models.","type":"invalid_request_error","param":null,"code":null}}

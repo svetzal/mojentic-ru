@@ -1,0 +1,1 @@
+{"id":"chatcmpl-42f61c60","object":"chat.completion","created":1790679568,"model":"Qwen3.8-27B-MLX-8bit","choices":[{"index":0,"message":{"role":"assistant","content":"hello"},"finish_reason":"stop"}],"usage":{"prompt_tokens":17,"completion_tokens":1,"total_tokens":18,"input_tokens":17,"output_tokens":1,"prompt_tokens_details":{"cached_tokens":0},"total_time":1.05}}

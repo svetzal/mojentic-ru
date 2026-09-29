@@ -1,0 +1,32 @@
+data: {"id":"chatcmpl-05014002","object":"chat.completion.chunk","created":0,"model":"keepalive","choices":[{"index":0,"delta":{"role":"assistant","content":""},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-05014002","object":"chat.completion.chunk","created":1790679814,"model":"Qwen3.8-27B-MLX-8bit","choices":[{"index":0,"delta":{"role":"assistant"}}]}
+
+data: {"id":"chatcmpl-05014002","object":"chat.completion.chunk","created":1790679815,"model":"Qwen3.8-27B-MLX-8bit","choices":[{"index":0,"delta":{"reasoning_content":"\nWe"}}]}
+
+data: {"id":"chatcmpl-05014002","object":"chat.completion.chunk","created":1790679815,"model":"Qwen3.8-27B-MLX-8bit","choices":[{"index":0,"delta":{"reasoning_content":" need to reply"}}]}
+
+data: {"id":"chatcmpl-05014002","object":"chat.completion.chunk","created":1790679815,"model":"Qwen3.8-27B-MLX-8bit","choices":[{"index":0,"delta":{"reasoning_content":" exactly: hello"}}]}
+
+data: {"id":"chatcmpl-05014002","object":"chat.completion.chunk","created":1790679815,"model":"Qwen3.8-27B-MLX-8bit","choices":[{"index":0,"delta":{"reasoning_content":". User said"}}]}
+
+data: {"id":"chatcmpl-05014002","object":"chat.completion.chunk","created":1790679815,"model":"Qwen3.8-27B-MLX-8bit","choices":[{"index":0,"delta":{"reasoning_content":" \"Reply with"}}]}
+
+data: {"id":"chatcmpl-05014002","object":"chat.completion.chunk","created":1790679816,"model":"Qwen3.8-27B-MLX-8bit","choices":[{"index":0,"delta":{"reasoning_content":" exactly: hello"}}]}
+
+data: {"id":"chatcmpl-05014002","object":"chat.completion.chunk","created":1790679816,"model":"Qwen3.8-27B-MLX-8bit","choices":[{"index":0,"delta":{"reasoning_content":"\". Need final"}}]}
+
+data: {"id":"chatcmpl-05014002","object":"chat.completion.chunk","created":1790679816,"model":"Qwen3.8-27B-MLX-8bit","choices":[{"index":0,"delta":{"reasoning_content":" \"hello\"."}}]}
+
+data: {"id":"chatcmpl-05014002","object":"chat.completion.chunk","created":1790679816,"model":"Qwen3.8-27B-MLX-8bit","choices":[{"index":0,"delta":{"reasoning_content":" Ensure no extra"}}]}
+
+data: {"id":"chatcmpl-05014002","object":"chat.completion.chunk","created":1790679816,"model":"Qwen3.8-27B-MLX-8bit","choices":[{"index":0,"delta":{"reasoning_content":".\n"}}]}
+
+data: {"id":"chatcmpl-05014002","object":"chat.completion.chunk","created":1790679817,"model":"Qwen3.8-27B-MLX-8bit","choices":[{"index":0,"delta":{"content":"\n\nhello"}}]}
+
+data: {"id":"chatcmpl-05014002","object":"chat.completion.chunk","created":1790679817,"model":"Qwen3.8-27B-MLX-8bit","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+
+data: {"id":"chatcmpl-05014002","object":"chat.completion.chunk","created":1790679817,"model":"Qwen3.8-27B-MLX-8bit","choices":[],"usage":{"prompt_tokens":57,"completion_tokens":30,"total_tokens":87,"input_tokens":57,"output_tokens":30,"prompt_tokens_details":{"cached_tokens":52},"time_to_first_token":0.73,"time_to_first_visible_token":0.79,"total_time":2.7,"prompt_eval_duration":0.73,"generation_duration":1.97,"prompt_tokens_per_second":78.03,"generation_tokens_per_second":15.22}}
+
+data: [DONE]
+
