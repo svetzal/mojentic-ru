@@ -67,9 +67,10 @@ For non-reasoning OpenAI models, the parameter is ignored and a warning is logge
 
 ### oMLX
 
-The oMLX gateway sends `reasoning_effort` without change (`"disabled"`,
-`"low"`, `"medium"` or `"high"`) to the model's chat template. The effect
-depends on the model. The reasoning trace is in the response's `thinking`
+The oMLX gateway sends `Low`, `Medium` and `High` as `reasoning_effort`
+(`"low"`, `"medium"` or `"high"`) to the model's chat template. The effect
+depends on the model. `Disabled` sends `enable_thinking: false` instead, which
+turns thinking off. The reasoning trace is in the response's `thinking`
 field. See [oMLX Gateway](omlx.md#reasoning-effort).
 
 ## When to Use Reasoning Effort

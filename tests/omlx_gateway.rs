@@ -284,7 +284,7 @@ mod request_body {
 
         let body = sent(&captured);
         assert_eq!(body["max_tokens"], 16384);
-        for absent in ["top_p", "top_k", "reasoning_effort"] {
+        for absent in ["top_p", "top_k", "reasoning_effort", "enable_thinking"] {
             assert!(body.get(absent).is_none(), "{absent} should not be sent: {body}");
         }
     }
@@ -304,9 +304,8 @@ mod request_body {
     }
 
     #[tokio::test]
-    async fn forwards_each_reasoning_effort_unchanged() {
+    async fn forwards_low_medium_and_high_reasoning_effort_as_strings() {
         for (effort, sent_value) in [
-            (ReasoningEffort::Disabled, "disabled"),
             (ReasoningEffort::Low, "low"),
             (ReasoningEffort::Medium, "medium"),
             (ReasoningEffort::High, "high"),
@@ -319,8 +318,48 @@ mod request_body {
 
             gateway(server.url()).complete(MODEL, &user("Hi"), None, &config).await.unwrap();
 
-            assert_eq!(sent(&captured)["reasoning_effort"], sent_value);
+            let body = sent(&captured);
+            assert_eq!(body["reasoning_effort"], sent_value);
+            assert!(body.get("enable_thinking").is_none(), "{body}");
         }
+    }
+
+    #[tokio::test]
+    async fn disabled_reasoning_effort_turns_thinking_off() {
+        let (server, captured) = chat_server(CHAT_THINKING_DISABLED).await;
+        let config = CompletionConfig {
+            reasoning_effort: Some(ReasoningEffort::Disabled),
+            ..Default::default()
+        };
+
+        let response =
+            gateway(server.url()).complete(MODEL, &user("Hi"), None, &config).await.unwrap();
+
+        let body = sent(&captured);
+        assert_eq!(body["enable_thinking"], false);
+        assert!(body.get("reasoning_effort").is_none(), "{body}");
+        assert_eq!(response.thinking, None);
+    }
+
+    #[tokio::test]
+    async fn disabled_reasoning_effort_turns_thinking_off_when_streaming() {
+        let (server, captured) = chat_server(STREAM_THINKING).await;
+        let config = CompletionConfig {
+            reasoning_effort: Some(ReasoningEffort::Disabled),
+            ..Default::default()
+        };
+        let gateway = gateway(server.url());
+        let messages = user("Hi");
+
+        let _: Vec<_> = gateway
+            .complete_stream_events(MODEL, &messages, &config)
+            .expect("supported")
+            .collect()
+            .await;
+
+        let body = sent(&captured);
+        assert_eq!(body["enable_thinking"], false);
+        assert!(body.get("reasoning_effort").is_none(), "{body}");
     }
 
     #[tokio::test]

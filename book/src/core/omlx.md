@@ -74,7 +74,7 @@ The gateway sends these `CompletionConfig` fields to oMLX:
 | `temperature` | `temperature` |
 | `max_tokens` | `max_tokens`, always. Never `max_completion_tokens` |
 | `top_p`, `top_k` | `top_p`, `top_k`, when set |
-| `reasoning_effort` | `reasoning_effort`, when set |
+| `reasoning_effort` | `reasoning_effort` or `enable_thinking`, when set. See below |
 | `response_format` | `response_format`, the same as the OpenAI gateway |
 
 The gateway does not send `num_ctx` or `num_predict`. oMLX sets the context
@@ -82,10 +82,15 @@ length for each model.
 
 ### Reasoning effort
 
-The gateway sends `reasoning_effort` without change, as `"disabled"`, `"low"`,
-`"medium"` or `"high"`. oMLX gives the value to the model's chat template, so
-the effect depends on the model. When you do not set it, the model uses its
-default. Qwen 3 models think by default.
+| `reasoning_effort` | Sent as |
+| ------------------ | ------- |
+| not set | nothing. The model uses its default. Qwen 3 models think by default |
+| `Low`, `Medium`, `High` | `reasoning_effort: "low"`, `"medium"` or `"high"` |
+| `Disabled` | `enable_thinking: false`, and no `reasoning_effort` |
+
+oMLX gives `reasoning_effort` to the model's chat template, so the effect of
+`low`, `medium` and `high` depends on the model. `enable_thinking: false`
+turns thinking off.
 
 ## Thinking
 

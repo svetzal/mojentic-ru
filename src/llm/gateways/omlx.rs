@@ -9,7 +9,9 @@
 //! It reuses the OpenAI message adapter and the OpenAI stream parsers.
 
 use crate::error::{MojenticError, Result};
-use crate::llm::gateway::{CompletionConfig, LlmGateway, ResponseFormat, StreamChunk};
+use crate::llm::gateway::{
+    CompletionConfig, LlmGateway, ReasoningEffort, ResponseFormat, StreamChunk,
+};
 use crate::llm::gateways::openai::{add_response_format, openai_response_evidence};
 use crate::llm::gateways::openai_legacy_stream::{
     legacy_body_stream, read_legacy_line, LegacyLine, OpenAiLegacyParser,
@@ -129,10 +131,11 @@ fn timeout_from_env(value: Option<String>) -> Duration {
 /// API, to [`StreamChunk::Thinking`]. The events API has no thinking event
 /// and yields none.
 ///
-/// `reasoning_effort` is sent unchanged to the model's chat template, as
-/// `"disabled"`, `"low"`, `"medium"` or `"high"`. Its effect depends on the
-/// model. Leaving it unset keeps the model's default; Qwen 3 models think by
-/// default.
+/// `reasoning_effort` of low, medium or high is sent unchanged to the model's
+/// chat template as `"low"`, `"medium"` or `"high"`. Its effect depends on the
+/// model. [`ReasoningEffort::Disabled`] sends `enable_thinking: false` and no
+/// `reasoning_effort`, which turns thinking off. Leaving it unset keeps the
+/// model's default; Qwen 3 models think by default.
 ///
 /// # Truncation
 ///
@@ -317,8 +320,11 @@ fn chat_body(model: &str, messages: &[LlmMessage], config: &CompletionConfig) ->
     if let Some(top_k) = config.top_k {
         body["top_k"] = serde_json::json!(top_k);
     }
-    if let Some(effort) = config.reasoning_effort {
-        body["reasoning_effort"] = serde_json::to_value(effort)?;
+    match config.reasoning_effort {
+        // oMLX turns thinking off with its own flag, not an effort level.
+        Some(ReasoningEffort::Disabled) => body["enable_thinking"] = Value::Bool(false),
+        Some(effort) => body["reasoning_effort"] = serde_json::to_value(effort)?,
+        None => {}
     }
     add_response_format(&mut body, config);
     Ok(body)
