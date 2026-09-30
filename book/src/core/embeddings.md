@@ -47,3 +47,11 @@ use mojentic::utils::math::cosine_similarity;
 
 let similarity = cosine_similarity(&vector1, &vector2);
 ```
+
+## OpenAI long text
+
+The OpenAI gateway splits long text into parts of at most 8191 tokens with the
+cl100k_base tokenizer. It weights each part vector by the number of tokens in
+that part, then normalizes the result to length 1. A short trailing part has
+less weight than a full part. For a single part, the gateway returns the
+provider vector unchanged.

@@ -206,29 +206,15 @@ impl OpenAIGateway {
             .json(body)
     }
 
-    /// Chunk tokens for embedding calculation.
-    fn chunk_text(&self, text: &str, chunk_size: usize) -> Vec<String> {
-        // Simple character-based chunking as a fallback
-        // In production, you'd use a proper tokenizer
-        let chars: Vec<char> = text.chars().collect();
-        let avg_chars_per_token = 4; // Rough estimate
-        let max_chars = chunk_size * avg_chars_per_token;
-
-        if chars.len() <= max_chars {
-            return vec![text.to_string()];
+    /// Split cl100k_base tokens into bounded embedding inputs.
+    fn chunk_text(&self, text: &str, chunk_size: usize) -> Result<Vec<Vec<u32>>> {
+        let tokenizer = tiktoken_rs::cl100k_base()
+            .map_err(|error| MojenticError::GatewayError(format!("Tokenizer error: {error}")))?;
+        let tokens = tokenizer.encode_ordinary(text);
+        if tokens.is_empty() {
+            return Ok(vec![vec![]]);
         }
-
-        let mut chunks = Vec::new();
-        let mut start = 0;
-
-        while start < chars.len() {
-            let end = std::cmp::min(start + max_chars, chars.len());
-            let chunk: String = chars[start..end].iter().collect();
-            chunks.push(chunk);
-            start = end;
-        }
-
-        chunks
+        Ok(tokens.chunks(chunk_size).map(<[u32]>::to_vec).collect())
     }
 
     /// Calculate weighted average of embeddings.
@@ -427,7 +413,7 @@ impl LlmGateway for OpenAIGateway {
         debug!("Calculating embeddings with model: {}", model);
 
         // Chunk the text to handle token limits
-        let chunks = self.chunk_text(text, 8191);
+        let chunks = self.chunk_text(text, 8191)?;
 
         if chunks.is_empty() {
             return Ok(vec![]);
@@ -439,7 +425,7 @@ impl LlmGateway for OpenAIGateway {
         for chunk in &chunks {
             let body = serde_json::json!({
                 "model": model,
-                "input": chunk
+                "input": if chunks.len() == 1 { serde_json::json!(text) } else { serde_json::json!(chunk) }
             });
 
             let response = self
@@ -469,7 +455,7 @@ impl LlmGateway for OpenAIGateway {
                 .filter_map(|v| v.as_f64().map(|f| f as f32))
                 .collect();
 
-            weights.push(embedding.len() as f32);
+            weights.push(chunk.len() as f32);
             all_embeddings.push(embedding);
         }
 
@@ -673,17 +659,18 @@ mod tests {
     #[test]
     fn test_chunk_text_short() {
         let gateway = OpenAIGateway::new();
-        let chunks = gateway.chunk_text("Hello world", 100);
+        let chunks = gateway.chunk_text("Hello world", 100).expect("tokens");
         assert_eq!(chunks.len(), 1);
-        assert_eq!(chunks[0], "Hello world");
+        assert_eq!(chunks[0].len(), 2);
     }
 
     #[test]
     fn test_chunk_text_long() {
         let gateway = OpenAIGateway::new();
         let long_text = "a".repeat(50000);
-        let chunks = gateway.chunk_text(&long_text, 100);
+        let chunks = gateway.chunk_text(&long_text, 100).expect("tokens");
         assert!(chunks.len() > 1);
+        assert!(chunks.iter().all(|chunk| chunk.len() <= 100));
     }
 
     #[test]
@@ -877,7 +864,45 @@ mod tests {
         mock.assert();
         assert!(result.is_ok());
         let embeddings = result.unwrap();
-        assert_eq!(embeddings.len(), 4);
+        assert_eq!(embeddings, vec![0.1, 0.2, 0.3, 0.4]);
+    }
+
+    #[tokio::test]
+    async fn test_calculate_embeddings_weights_by_token_count() {
+        let text = " hello".repeat(8291);
+        let tokenizer = tiktoken_rs::cl100k_base().expect("tokenizer");
+        assert_eq!(tokenizer.encode_ordinary(&text).len(), 8291);
+        let mut server = mockito::Server::new_async().await;
+        let calls = std::sync::atomic::AtomicUsize::new(0);
+        let chunk_lengths = std::sync::Arc::new(Mutex::new(Vec::new()));
+        let captured_lengths = chunk_lengths.clone();
+        let mock = server
+            .mock("POST", "/embeddings")
+            .with_status(200)
+            .with_body_from_request(move |request| {
+                let body: Value = serde_json::from_slice(request.body().expect("request body"))
+                    .expect("JSON body");
+                captured_lengths
+                    .lock()
+                    .expect("lengths")
+                    .push(body["input"].as_array().expect("token input").len());
+                let embedding = if calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst) == 0 {
+                    vec![1.0, 0.0]
+                } else {
+                    vec![0.0, 1.0]
+                };
+                serde_json::json!({"data": [{"embedding": embedding}]}).to_string().into_bytes()
+            })
+            .expect(2)
+            .create();
+        let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url());
+        let result = gateway.calculate_embeddings(&text, None).await.expect("embeddings");
+        mock.assert();
+        assert_eq!(*chunk_lengths.lock().expect("lengths"), vec![8191, 100]);
+        let norm = (8191.0_f32.powi(2) + 100.0_f32.powi(2)).sqrt();
+        assert!((result[0] - 8191.0 / norm).abs() < 1e-6, "{result:?}");
+        assert!((result[1] - 100.0 / norm).abs() < 1e-6, "{result:?}");
+        assert!((result.iter().map(|v| v * v).sum::<f32>().sqrt() - 1.0).abs() < 1e-6);
     }
 
     /// Send one streaming request and return the JSON body the server received.
