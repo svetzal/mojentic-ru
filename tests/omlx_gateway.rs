@@ -231,6 +231,30 @@ mod configuration {
 // 2. Request body
 // ---------------------------------------------------------------------------
 
+#[tokio::test]
+async fn explicit_blank_keys_send_no_authorization_header() {
+    let mut server = mockito::Server::new_async().await;
+    let mock = server
+        .mock("GET", "/v1/models")
+        .match_header("authorization", Matcher::Missing)
+        .with_header("content-type", "application/json")
+        .with_body(MODELS)
+        .expect(3)
+        .create_async()
+        .await;
+    for key in ["", " ", "\t"] {
+        OmlxGateway::with_config(OmlxConfig {
+            host: server.url(),
+            api_key: Some(key.to_string()),
+            timeout: None,
+        })
+        .get_available_models()
+        .await
+        .unwrap();
+    }
+    mock.assert_async().await;
+}
+
 mod request_body {
     use super::*;
 

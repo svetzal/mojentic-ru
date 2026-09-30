@@ -45,9 +45,11 @@ cargo run --example omlx -- Qwen3.8-27B-MLX-8bit
 - Give the host without `/v1`. The gateway adds `/v1` to each path.
 - When you set an API key, the gateway sends `Authorization: Bearer <key>`.
   When you do not, it sends no authorization header. An empty `OMLX_API_KEY`
-  counts as no key.
-- One timeout applies to each request, which includes a model load and the
-  full length of a stream. Local models are slow, so the default is long.
+  counts as no key. An explicit empty or whitespace-only key also sends no
+  authorization header and does not fall back to the environment.
+- The timeout bounds non-streaming requests, including model load. Streaming
+  requests omit this whole-response timeout so long replies can finish. Drop
+  the stream to cancel its request.
   When `OMLX_TIMEOUT` is not a number, the gateway logs a warning and uses the
   default. Set `timeout: None` for no timeout.
 
@@ -165,6 +167,7 @@ gateway.unload_model(&models[0]).await?;
 # }
 ```
 
+- Blank model ids for load or unload fail before a request is sent.
 - `load_model` blocks until the model is in memory. A chat request loads its
   model when necessary, so use `load_model` only to warm up a model early.
 - `unload_model` for a model that is not loaded fails with the 400 error

@@ -79,7 +79,9 @@ pub struct OmlxConfig {
     pub host: String,
     /// Sent as `Authorization: Bearer <key>`. No header is sent without one.
     pub api_key: Option<String>,
-    /// Applies to every request, including model load and whole streams.
+    /// Bounds non-streaming requests, including model load.
+    /// Streams are cancelled by dropping them; a whole-response timeout
+    /// would cut off long replies.
     /// `None` means no timeout.
     pub timeout: Option<Duration>,
 }
@@ -215,28 +217,38 @@ impl OmlxGateway {
     }
 
     async fn model_action(&self, model: &str, action: &str) -> Result<()> {
+        if model.trim().is_empty() {
+            return Err(MojenticError::InvalidArgument(
+                "oMLX model id must not be blank".to_string(),
+            ));
+        }
         let model = utf8_percent_encode(model, PATH_SEGMENT);
-        let response =
-            self.request(Method::POST, &format!("/models/{model}/{action}")).send().await?;
+        let response = self
+            .request(Method::POST, &format!("/models/{model}/{action}"), false)
+            .send()
+            .await?;
         success(response).await?;
         Ok(())
     }
 
     /// A request to `/v1{path}` with authorization and timeout applied.
-    fn request(&self, method: Method, path: &str) -> RequestBuilder {
+    fn request(&self, method: Method, path: &str, streaming: bool) -> RequestBuilder {
         let url = format!("{}/v1{}", self.config.host.trim_end_matches('/'), path);
         let mut request = self.client.request(method, url);
-        if let Some(key) = &self.config.api_key {
+        if let Some(key) = self.config.api_key.as_ref().filter(|key| !key.trim().is_empty()) {
             request = request.bearer_auth(key);
         }
-        if let Some(timeout) = self.config.timeout {
-            request = request.timeout(timeout);
+        if !streaming {
+            if let Some(timeout) = self.config.timeout {
+                request = request.timeout(timeout);
+            }
         }
         request
     }
 
     fn chat_request(&self, body: &Value) -> RequestBuilder {
-        self.request(Method::POST, "/chat/completions").json(body)
+        self.request(Method::POST, "/chat/completions", body["stream"] == true)
+            .json(body)
     }
 
     /// Send a non-streaming chat request and read the response.
@@ -465,7 +477,7 @@ impl LlmGateway for OmlxGateway {
     async fn get_available_models(&self) -> Result<Vec<String>> {
         debug!("Fetching available oMLX models");
 
-        let response = success(self.request(Method::GET, "/models").send().await?).await?;
+        let response = success(self.request(Method::GET, "/models", false).send().await?).await?;
         let body: Value = response.json().await?;
 
         let mut models: Vec<String> = body["data"]
@@ -499,7 +511,8 @@ impl LlmGateway for OmlxGateway {
 
         let body = serde_json::json!({"model": model, "input": text});
         let response =
-            success(self.request(Method::POST, "/embeddings").json(&body).send().await?).await?;
+            success(self.request(Method::POST, "/embeddings", false).json(&body).send().await?)
+                .await?;
         let body: Value = response.json().await?;
 
         let embedding = body["data"][0]["embedding"]
@@ -585,6 +598,63 @@ impl LlmGateway for OmlxGateway {
 mod tests {
     use super::*;
     use futures::stream::StreamExt;
+
+    #[tokio::test]
+    async fn blank_model_actions_fail_before_a_request() {
+        let gateway = OmlxGateway::with_host("http://127.0.0.1:1");
+        for model in ["", "  ", "\t"] {
+            assert!(matches!(
+                gateway.load_model(model).await,
+                Err(MojenticError::InvalidArgument(_))
+            ));
+            assert!(matches!(
+                gateway.unload_model(model).await,
+                Err(MojenticError::InvalidArgument(_))
+            ));
+        }
+    }
+
+    #[tokio::test]
+    async fn event_stream_is_not_cut_off_by_the_whole_response_timeout() {
+        use crate::llm::stream_events::testing::endless_stream_server;
+        let (url, closed) =
+            endless_stream_server("data: {\"choices\":[{\"delta\":{\"content\":\"first\"}}]}\n\n")
+                .await;
+        let gateway = OmlxGateway::with_config(OmlxConfig {
+            host: url,
+            api_key: None,
+            timeout: Some(Duration::from_millis(50)),
+        });
+        let messages = [LlmMessage::user("Hi")];
+        let config = CompletionConfig::default();
+        let mut stream = gateway.complete_stream_events("m", &messages, &config).unwrap();
+        assert!(matches!(stream.next().await, Some(crate::llm::StreamEvent::Content(_))));
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        assert!(tokio::time::timeout(Duration::from_millis(20), stream.next()).await.is_err());
+        drop(stream);
+        tokio::time::timeout(Duration::from_secs(2), closed).await.unwrap().unwrap();
+    }
+
+    #[tokio::test]
+    async fn legacy_stream_outlives_the_timeout_and_cancels_on_drop() {
+        use crate::llm::stream_events::testing::endless_stream_server;
+        let (url, closed) =
+            endless_stream_server("data: {\"choices\":[{\"delta\":{\"content\":\"first\"}}]}\n\n")
+                .await;
+        let gateway = OmlxGateway::with_config(OmlxConfig {
+            host: url,
+            api_key: None,
+            timeout: Some(Duration::from_millis(50)),
+        });
+        let messages = [LlmMessage::user("Hi")];
+        let config = CompletionConfig::default();
+        let mut stream = gateway.complete_stream("m", &messages, None, &config);
+        assert!(matches!(stream.next().await, Some(Ok(StreamChunk::Content(_)))));
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        assert!(tokio::time::timeout(Duration::from_millis(20), stream.next()).await.is_err());
+        drop(stream);
+        tokio::time::timeout(Duration::from_secs(2), closed).await.unwrap().unwrap();
+    }
 
     #[tokio::test]
     async fn legacy_stream_keeps_a_character_split_across_network_chunks() {
