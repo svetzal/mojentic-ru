@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-09-30
+
+### Added
+
 - Add a single-response broker API for caller-owned context and native tool requests.
 - Support explicit unlimited tool rounds while retaining finite defaults.
 - The unlimited builder uses `usize::MAX` as a symbolic value and bypasses the iteration check; existing numeric configuration remains compatible.
@@ -22,11 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Stream events reject malformed OpenAI choice, finish-reason and tool-call fields, and malformed Ollama message, done and tool-call fields. Ollama retains evidence from earlier frames when later frames omit it.
 - oMLX omits authorization for explicit blank API keys and rejects blank load/unload model ids before sending a request. Both streaming APIs omit the whole-response timeout so long replies can finish; dropping either stream cancels its request. Non-streaming requests retain the configured timeout.
-
 - OpenAI user images preserve HTTP(S) URLs and data URIs instead of treating them as local filenames and dropping them. Local files keep their existing Base64 encoding.
-
 - OpenAI embeddings split long text into at most 8191 cl100k_base tokens per part and weight each vector by its part token count before unit normalization. Previously character estimates determined the parts, and vector dimensions produced an equal-weight mean. Single-part vectors remain unchanged.
-
 - Legacy streaming (`complete_stream`) in the OpenAI gateway, and in the oMLX gateway that shares its transport, lost a whole network chunk when the chunk ended inside a multi-byte UTF-8 character, dropping content, reasoning or tool-call data. The transport now buffers bytes and decodes each line once it is complete. A line that is not valid UTF-8 is logged and skipped.
 
 ## [1.5.0] - 2026-05-21
