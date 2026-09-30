@@ -13,9 +13,10 @@
 //! If you change a fixture, update all four ports.
 
 use async_trait::async_trait;
+use futures::StreamExt;
 use mojentic::error::Result;
-use mojentic::llm::gateway::CompletionConfig;
-use mojentic::llm::gateways::OpenAIGateway;
+use mojentic::llm::gateway::{CompletionConfig, LlmGateway};
+use mojentic::llm::gateways::{OmlxGateway, OpenAIGateway};
 use mojentic::llm::tools::{FunctionDescriptor, LlmTool, ToolDescriptor};
 use mojentic::llm::{LlmBroker, LlmMessage};
 use serde_json::{json, Value};
@@ -210,4 +211,80 @@ async fn test_openai_tool_call_max_iterations_exceeded() {
         "Unexpected error variant: {:?}",
         err
     );
+}
+
+// The provider sends the id only once, before either argument fragment.
+const SPLIT_TOOL_STREAM: &str = concat!(
+    "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"id\":\"call_split_weather\",\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"arguments\":\"\"}}]}}]}\n\n",
+    "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{\\\"location\\\":\"}}]}}]}\n\n",
+    "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"\\\"Paris\\\"}\"}}]}}]}\n\n",
+    "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"tool_calls\"}]}\n\n",
+    "data: [DONE]\n\n",
+);
+
+async fn assert_split_stream_tool_round_trip(omlx: bool) {
+    let mut server = mockito::Server::new_async().await;
+    let path = if omlx {
+        "/v1/chat/completions"
+    } else {
+        "/chat/completions"
+    };
+    let first = server
+        .mock("POST", path)
+        .match_body(mockito::Matcher::PartialJson(json!({
+            "stream": true,
+            "messages": [{"role": "user", "content": "Weather?"}]
+        })))
+        .with_header("content-type", "text/event-stream")
+        .with_body(SPLIT_TOOL_STREAM)
+        .expect(1)
+        .create();
+    let follow_up = server
+        .mock("POST", path)
+        .match_body(mockito::Matcher::PartialJson(json!({
+            "stream": true,
+            "messages": [
+                {"role": "user", "content": "Weather?"},
+                {"role": "assistant", "tool_calls": [{
+                    "id": "call_split_weather",
+                    "function": {"name": "get_weather", "arguments": "{\"location\":\"Paris\"}"}
+                }]},
+                {"role": "tool", "tool_call_id": "call_split_weather"}
+            ]
+        })))
+        .with_header("content-type", "text/event-stream")
+        .with_body("data: {\"choices\":[{\"delta\":{\"content\":\"Sunny.\"}}]}\n\ndata: [DONE]\n\n")
+        .expect(1)
+        .create();
+    let gateway: Arc<dyn LlmGateway> = if omlx {
+        Arc::new(OmlxGateway::with_host(server.url()))
+    } else {
+        Arc::new(OpenAIGateway::with_api_key_and_base_url("test-key", server.url()))
+    };
+    let broker = LlmBroker::new("gpt-4", gateway, None);
+    let calls = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let tools: Vec<Box<dyn LlmTool>> = vec![Box::new(GetWeatherTool {
+        calls: calls.clone(),
+    })];
+    let messages = vec![LlmMessage::user("Weather?")];
+    let chunks: Vec<_> =
+        broker.generate_stream(&messages, Some(&tools), None, None).collect().await;
+    let text: String = chunks.into_iter().map(|chunk| chunk.expect("successful stream")).collect();
+    assert_eq!(text, "Sunny.");
+    assert_eq!(
+        *calls.lock().unwrap(),
+        vec![HashMap::from([("location".to_string(), json!("Paris"))])]
+    );
+    first.assert();
+    follow_up.assert();
+}
+
+#[tokio::test]
+async fn openai_preserves_split_stream_tool_call_id_in_follow_up() {
+    assert_split_stream_tool_round_trip(false).await;
+}
+
+#[tokio::test]
+async fn omlx_preserves_split_stream_tool_call_id_in_follow_up() {
+    assert_split_stream_tool_round_trip(true).await;
 }
