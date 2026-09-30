@@ -23,6 +23,11 @@ let message = LlmMessage::user("Compare these images")
     ]);
 ```
 
+For the OpenAI gateway, `with_images()` also accepts HTTP(S) URLs and data
+URIs. These sources pass through unchanged in `image_url.url`; local files
+are encoded as Base64. This also applies to oMLX, which shares the adapter.
+Ollama image inputs remain local file paths.
+
 ## Complete Example
 
 ```rust

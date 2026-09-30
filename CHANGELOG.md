@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- OpenAI user images preserve HTTP(S) URLs and data URIs instead of treating them as local filenames and dropping them. Local files keep their existing Base64 encoding.
+
 - OpenAI embeddings split long text into at most 8191 cl100k_base tokens per part and weight each vector by its part token count before unit normalization. Previously character estimates determined the parts, and vector dimensions produced an equal-weight mean. Single-part vectors remain unchanged.
 
 - Legacy streaming (`complete_stream`) in the OpenAI gateway, and in the oMLX gateway that shares its transport, lost a whole network chunk when the chunk ended inside a multi-byte UTF-8 character, dropping content, reasoning or tool-call data. The transport now buffers bytes and decodes each line once it is complete. A line that is not valid UTF-8 is logged and skipped.

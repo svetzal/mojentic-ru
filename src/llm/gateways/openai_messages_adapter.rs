@@ -62,8 +62,14 @@ fn get_image_type(file_path: &str) -> &'static str {
     }
 }
 
-/// Read and encode an image file as base64.
+/// Preserve remote/data image sources, or encode a local image file as base64.
 fn encode_image_as_base64(file_path: &str) -> Result<String> {
+    if file_path.starts_with("https://")
+        || file_path.starts_with("http://")
+        || file_path.starts_with("data:")
+    {
+        return Ok(file_path.to_string());
+    }
     let bytes = std::fs::read(file_path)?;
     let base64_data = base64::engine::general_purpose::STANDARD.encode(&bytes);
     let image_type = get_image_type(file_path);
@@ -299,6 +305,23 @@ mod tests {
             .as_str()
             .unwrap()
             .starts_with("data:image/jpeg;base64,"));
+    }
+
+    #[test]
+    fn test_adapt_user_message_preserves_remote_and_data_images() {
+        let images = vec![
+            "https://example.com/image.png".to_string(),
+            "http://example.com/image.jpg".to_string(),
+            "data:image/png;base64,aGVsbG8=".to_string(),
+        ];
+        let messages = vec![LlmMessage::user("Describe").with_images(images.clone())];
+        let result = adapt_messages_to_openai(&messages).unwrap();
+        let parts = result[0]["content"].as_array().unwrap();
+        assert_eq!(parts.len(), 4);
+        for (part, source) in parts[1..].iter().zip(images) {
+            assert_eq!(part["type"], "image_url");
+            assert_eq!(part["image_url"]["url"], source);
+        }
     }
 
     #[test]
