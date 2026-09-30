@@ -60,6 +60,12 @@ impl OpenAiEventParser {
     }
 
     fn parse_choice(&mut self, choice: &Value) -> Vec<StreamEvent> {
+        if !choice.is_object() {
+            return vec![invalid_event("choice is not an object")];
+        }
+        if !(choice["finish_reason"].is_null() || choice["finish_reason"].is_string()) {
+            return vec![invalid_event("finish reason is not a string")];
+        }
         if let Some(reason) = choice["finish_reason"].as_str() {
             self.evidence.finish_reason = Some(reason.to_string());
         }
@@ -67,6 +73,9 @@ impl OpenAiEventParser {
         let delta = &choice["delta"];
         if !(delta.is_null() || delta.is_object()) {
             return vec![invalid_event("delta is not an object")];
+        }
+        if !(delta["tool_calls"].is_null() || delta["tool_calls"].is_array()) {
+            return vec![invalid_event("tool calls is not an array")];
         }
         if delta["tool_calls"].as_array().is_some_and(|calls| !calls.is_empty()) {
             return vec![StreamEvent::Error(StreamEventError::UnexpectedToolCalls)];
@@ -183,6 +192,9 @@ mod tests {
     fn malformed_frames_are_invalid_stream_events() {
         for line in [
             "data: {not json",
+            r#"data: {"choices":[null]}"#,
+            r#"data: {"choices":[{"delta":{},"finish_reason":42}]}"#,
+            r#"data: {"choices":[{"delta":{"tool_calls":{}}}]}"#,
             r#"data: {"object":"chat.completion.chunk"}"#,
             r#"data: {"choices":[{"delta":{"content":42}}]}"#,
             r#"data: {"choices":[{"delta":"text"}]}"#,

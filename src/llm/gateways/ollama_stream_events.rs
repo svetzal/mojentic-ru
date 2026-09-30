@@ -11,7 +11,7 @@ use serde_json::Value;
 /// `stop`. Thinking text is not assistant content and is not yielded.
 #[derive(Default)]
 pub(crate) struct OllamaEventParser {
-    /// Evidence from frames seen so far; the final frame replaces it.
+    /// Evidence reported across frames; absent fields do not erase it.
     evidence: ResponseEvidence,
 }
 
@@ -32,9 +32,31 @@ impl FrameParser for OllamaEventParser {
                 frame["error"].clone(),
             ))];
         }
-        self.evidence = ollama_evidence(&frame);
+        if !(frame["done"].is_null() || frame["done"].is_boolean()) {
+            return vec![invalid_event("done is not a boolean")];
+        }
+        if !(frame["done_reason"].is_null() || frame["done_reason"].is_string()) {
+            return vec![invalid_event("done reason is not a string")];
+        }
+        let reported = ollama_evidence(&frame);
+        if reported.usage.is_some() {
+            self.evidence.usage = reported.usage;
+        }
+        if reported.provider_model.is_some() {
+            self.evidence.provider_model = reported.provider_model;
+        }
+        if reported.finish_reason.is_some() {
+            self.evidence.finish_reason = reported.finish_reason;
+        }
+        self.evidence.metadata.extend(reported.metadata);
 
         let message = &frame["message"];
+        if !(message.is_null() || message.is_object()) {
+            return vec![invalid_event("message is not an object")];
+        }
+        if !(message["tool_calls"].is_null() || message["tool_calls"].is_array()) {
+            return vec![invalid_event("tool calls is not an array")];
+        }
         if message["tool_calls"].as_array().is_some_and(|calls| !calls.is_empty()) {
             return vec![StreamEvent::Error(StreamEventError::UnexpectedToolCalls)];
         }
@@ -46,6 +68,8 @@ impl FrameParser for OllamaEventParser {
             _ => return vec![invalid_event("content is not a string")],
         };
         if frame["done"].as_bool() == Some(true) {
+            // Completion requires a reason on this terminal frame itself.
+            self.evidence.finish_reason = frame["done_reason"].as_str().map(String::from);
             events.push(terminal_event(self.evidence.clone()));
         }
         events
@@ -143,6 +167,17 @@ mod tests {
     }
 
     #[test]
+    fn a_terminal_frame_cannot_borrow_an_earlier_stop_reason() {
+        let events = parse(&[
+            r#"{"message":{"content":"Hi"},"done":false,"done_reason":"stop"}"#,
+            r#"{"done":true}"#,
+        ]);
+        assert!(
+            matches!(events.last(), Some(StreamEvent::Error(StreamEventError::IncompleteCompletion(evidence))) if evidence.finish_reason.is_none())
+        );
+    }
+
+    #[test]
     fn tool_call_frame_is_unexpected() {
         let events = parse(&[
             r#"{"message":{"role":"assistant","content":"","tool_calls":[{"function":{"name":"f","arguments":{}}}]},"done":false}"#,
@@ -177,10 +212,25 @@ mod tests {
     }
 
     #[test]
+    fn frames_without_evidence_preserve_previously_reported_values() {
+        let mut parser = OllamaEventParser::default();
+        parser.parse_line(
+            r#"{"model":"m","message":{"content":"first"},"done":false,"eval_count":2}"#,
+        );
+        parser.parse_line(r#"{"message":{"content":"second"},"done":false}"#);
+        let evidence = parser.partial_evidence().expect("retain earlier evidence");
+        assert_eq!(evidence.provider_model.as_deref(), Some("m"));
+        assert_eq!(evidence.usage, Some(serde_json::json!({"eval_count":2})));
+    }
+
+    #[test]
     fn malformed_frames_are_invalid_stream_events() {
         for line in [
             "{not json",
             "[1,2]",
+            r#"{"message":42,"done":false}"#,
+            r#"{"done":"true","done_reason":"stop"}"#,
+            r#"{"message":{"tool_calls":{}},"done":false}"#,
             r#"{"message":{"content":7},"done":false}"#,
         ] {
             let events = parse(&[line]);

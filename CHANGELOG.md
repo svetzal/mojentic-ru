@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Stream events reject malformed OpenAI choice, finish-reason and tool-call fields, and malformed Ollama message, done and tool-call fields. Ollama retains evidence from earlier frames when later frames omit it.
+
 - OpenAI user images preserve HTTP(S) URLs and data URIs instead of treating them as local filenames and dropping them. Local files keep their existing Base64 encoding.
 
 - OpenAI embeddings split long text into at most 8191 cl100k_base tokens per part and weight each vector by its part token count before unit normalization. Previously character estimates determined the parts, and vector dimensions produced an equal-weight mean. Single-part vectors remain unchanged.
