@@ -119,6 +119,7 @@ impl BaseAsyncAgent for DecisioningAgent {
                     content: Some(prompt),
                     tool_calls: None,
                     image_paths: None,
+                    reasoning_content: None,
                 }],
                 None,
                 decisioning_event.correlation_id.clone(),

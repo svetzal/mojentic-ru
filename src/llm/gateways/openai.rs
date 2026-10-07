@@ -148,17 +148,23 @@ impl OpenAIGateway {
         }
 
         // Handle reasoning effort for reasoning models
-        if let Some(reasoning_effort) = config
-            .reasoning_effort
-            .filter(|effort| *effort != crate::llm::gateway::ReasoningEffort::Disabled)
-        {
+        if let Some(reasoning_effort) = config.reasoning_effort.filter(|effort| {
+            !matches!(
+                effort,
+                crate::llm::gateway::ReasoningEffort::Disabled
+                    | crate::llm::gateway::ReasoningEffort::Enabled
+            )
+        }) {
             if capabilities.model_type == ModelType::Reasoning {
                 use crate::llm::gateway::ReasoningEffort;
                 let effort_str = match reasoning_effort {
-                    ReasoningEffort::Disabled => unreachable!("disabled effort was filtered"),
+                    ReasoningEffort::Disabled | ReasoningEffort::Enabled => {
+                        unreachable!("disabled effort was filtered")
+                    }
                     ReasoningEffort::Low => "low",
                     ReasoningEffort::Medium => "medium",
                     ReasoningEffort::High => "high",
+                    ReasoningEffort::XHigh => "xhigh",
                 };
                 params.insert("reasoning_effort".to_string(), serde_json::json!(effort_str));
             } else {
@@ -182,6 +188,7 @@ impl OpenAIGateway {
         messages: &[LlmMessage],
         config: &CompletionConfig,
     ) -> Result<(Value, bool)> {
+        validate_reasoning_config(config)?;
         let openai_messages = adapt_messages_to_openai(messages)?;
         let (adapted_params, supports_tools) = self.adapt_parameters_for_model(model, config);
 
@@ -335,6 +342,7 @@ impl LlmGateway for OpenAIGateway {
     ) -> Result<LlmGatewayResponse<Value>> {
         info!("Requesting structured output from OpenAI");
 
+        validate_reasoning_config(config)?;
         let openai_messages = adapt_messages_to_openai(messages)?;
         let (adapted_params, _) = self.adapt_parameters_for_model(model, config);
 
@@ -594,6 +602,18 @@ pub(crate) fn openai_response_format(format: &ResponseFormat) -> Value {
 }
 
 /// Forward the configured response format, leaving the body unchanged when none is set.
+fn validate_reasoning_config(config: &CompletionConfig) -> Result<()> {
+    config.validate_reasoning()?;
+    if config.preserve_reasoning
+        || config.reasoning_effort == Some(crate::llm::gateway::ReasoningEffort::Enabled)
+    {
+        return Err(MojenticError::ConfigError(
+            "OpenAI gateway does not support native reasoning history or boolean reasoning enablement; use a supported named effort".into(),
+        ));
+    }
+    Ok(())
+}
+
 pub(crate) fn add_response_format(body: &mut Value, config: &CompletionConfig) {
     if let Some(format) = &config.response_format {
         body["response_format"] = openai_response_format(format);
@@ -602,6 +622,21 @@ pub(crate) fn add_response_format(body: &mut Value, config: &CompletionConfig) {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn unsupported_new_reasoning_controls_fail_instead_of_disappearing() {
+        use crate::llm::gateway::{CompletionConfig, ReasoningEffort};
+        assert!(super::validate_reasoning_config(&CompletionConfig::default()).is_ok());
+        assert!(super::validate_reasoning_config(&CompletionConfig {
+            reasoning_effort: Some(ReasoningEffort::Enabled),
+            ..Default::default()
+        })
+        .is_err());
+        assert!(super::validate_reasoning_config(&CompletionConfig {
+            preserve_reasoning: true,
+            ..Default::default()
+        })
+        .is_err());
+    }
     use super::*;
     use futures::stream::StreamExt;
     use std::sync::Mutex;

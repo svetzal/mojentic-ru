@@ -87,12 +87,17 @@ length for each model.
 | `reasoning_effort` | Sent as |
 | ------------------ | ------- |
 | not set | nothing. The model uses its default. Qwen 3 models think by default |
-| `Low`, `Medium`, `High` | `reasoning_effort: "low"`, `"medium"` or `"high"` |
+| `Low`, `Medium`, `High`, `XHigh` | Exact named string in reasoning_effort |
+| `Enabled` | enable_thinking=true |
 | `Disabled` | `enable_thinking: false`, and no `reasoning_effort` |
 
 oMLX gives `reasoning_effort` to the model's chat template, so the effect of
 `low`, `medium` and `high` depends on the model. `enable_thinking: false`
 turns thinking off.
+
+The explicit Qwen3.8 profile rejects high and accepts xhigh. See
+[reasoning controls and native history](reasoning_effort.md) for model
+validation, opt-in retention, and prototype migration requirements.
 
 ## Thinking
 
@@ -130,7 +135,7 @@ header. When you asked for structured output (the object APIs, or a
 
 - puts the header value in `response.evidence.metadata` with the key
   `response_format_warning` (the constant `omlx::RESPONSE_FORMAT_WARNING`).
-  It joins several `Warning` headers with `, `.
+  It joins several `Warning` headers with `,`.
 - logs a warning.
 
 The gateway does not retry and does not fail. The warning is evidence. For a

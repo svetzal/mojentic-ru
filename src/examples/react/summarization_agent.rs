@@ -68,6 +68,7 @@ impl BaseAsyncAgent for SummarizationAgent {
                     content: Some(prompt),
                     tool_calls: None,
                     image_paths: None,
+                    reasoning_content: None,
                 }],
                 None,
                 None,

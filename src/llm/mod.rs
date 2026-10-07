@@ -3,6 +3,8 @@ pub mod chat_session;
 pub mod gateway;
 pub mod gateways;
 pub mod models;
+pub mod reasoning;
+pub use reasoning::ReasoningProfile;
 pub mod stream_events;
 pub mod tools;
 

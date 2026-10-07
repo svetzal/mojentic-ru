@@ -78,6 +78,14 @@ fn encode_image_as_base64(file_path: &str) -> Result<String> {
 
 /// Adapt LLM messages to OpenAI format.
 pub fn adapt_messages_to_openai(messages: &[LlmMessage]) -> Result<Vec<Value>> {
+    adapt_messages_to_openai_with_reasoning(messages, false)
+}
+
+/// Adapt messages for compatible servers that accept assistant reasoning_content.
+pub fn adapt_messages_to_openai_with_reasoning(
+    messages: &[LlmMessage],
+    native_reasoning: bool,
+) -> Result<Vec<Value>> {
     let mut result = Vec::new();
 
     for msg in messages {
@@ -147,6 +155,11 @@ pub fn adapt_messages_to_openai(messages: &[LlmMessage]) -> Result<Vec<Value>> {
                     assistant_msg["content"] = serde_json::json!(content);
                 }
 
+                if native_reasoning {
+                    if let Some(reasoning) = &msg.reasoning_content {
+                        assistant_msg["reasoning_content"] = serde_json::json!(reasoning);
+                    }
+                }
                 // Add tool calls if present
                 if let Some(ref tool_calls) = msg.tool_calls {
                     let formatted_calls: Vec<Value> = tool_calls
@@ -341,6 +354,7 @@ mod tests {
             content: None,
             tool_calls: Some(vec![tool_call]),
             image_paths: None,
+            reasoning_content: None,
         }];
 
         let result = adapt_messages_to_openai(&messages).unwrap();
@@ -369,6 +383,7 @@ mod tests {
                 arguments: HashMap::new(),
             }]),
             image_paths: None,
+            reasoning_content: None,
         }];
 
         let result = adapt_messages_to_openai(&messages).unwrap();

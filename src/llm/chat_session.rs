@@ -846,6 +846,7 @@ mod tests {
             content: None,
             tool_calls: None,
             image_paths: None,
+            reasoning_content: None,
         };
 
         session.insert_message(message);

@@ -215,6 +215,10 @@ impl LlmBroker {
                 content: response.content.clone(),
                 tool_calls: Some(response.tool_calls.clone()),
                 image_paths: None,
+                reasoning_content: config
+                    .preserve_reasoning
+                    .then(|| response.thinking.clone())
+                    .flatten(),
             });
 
             let outcomes = self
@@ -237,6 +241,7 @@ impl LlmBroker {
                     content: Some(content),
                     tool_calls: Some(vec![call.clone()]),
                     image_paths: None,
+                    reasoning_content: None,
                 });
             }
 
@@ -501,6 +506,7 @@ impl LlmBroker {
             }
 
             let mut accumulated_content = String::new();
+            let mut accumulated_reasoning = String::new();
             let mut accumulated_tool_calls = Vec::new();
 
             // Measure stream duration
@@ -523,8 +529,10 @@ impl LlmBroker {
                     Ok(StreamChunk::ToolCalls(tool_calls)) => {
                         accumulated_tool_calls = tool_calls;
                     }
-                    Ok(StreamChunk::Thinking(_))
-                    | Ok(StreamChunk::Progress(_))
+                    Ok(StreamChunk::Thinking(thinking)) => {
+                        if config.preserve_reasoning { accumulated_reasoning.push_str(&thinking); }
+                    }
+                    Ok(StreamChunk::Progress(_))
                     | Ok(StreamChunk::Metrics(_)) => {}
                     Err(e) => {
                         yield Err(e);
@@ -579,6 +587,7 @@ impl LlmBroker {
                         content: Some(accumulated_content),
                         tool_calls: Some(accumulated_tool_calls.clone()),
                         image_paths: None,
+                        reasoning_content: (!accumulated_reasoning.is_empty()).then_some(accumulated_reasoning),
                     });
 
                     let outcomes = match self
@@ -619,6 +628,7 @@ impl LlmBroker {
                             content: Some(content),
                             tool_calls: Some(vec![call.clone()]),
                             image_paths: None,
+                            reasoning_content: None,
                         });
                     }
 
@@ -1612,6 +1622,8 @@ mod tests {
             top_k: None,
             response_format: None,
             reasoning_effort: None,
+            reasoning_profile: None,
+            preserve_reasoning: false,
             max_tool_iterations: 10,
         };
 
@@ -1740,6 +1752,8 @@ mod tests {
             top_k: None,
             response_format: None,
             reasoning_effort: None,
+            reasoning_profile: None,
+            preserve_reasoning: false,
             max_tool_iterations: 10,
         };
 

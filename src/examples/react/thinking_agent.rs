@@ -77,6 +77,7 @@ impl BaseAsyncAgent for ThinkingAgent {
                     content: Some(prompt),
                     tool_calls: None,
                     image_paths: None,
+                    reasoning_content: None,
                 }],
                 None,
                 thinking_event.correlation_id.clone(),

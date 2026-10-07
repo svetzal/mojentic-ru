@@ -31,6 +31,9 @@ pub struct LlmMessage {
     pub tool_calls: Option<Vec<LlmToolCall>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub image_paths: Option<Vec<String>>,
+    /// Native assistant reasoning, separate from visible content. Never inline as user text.
+    #[serde(default, alias = "thinking", skip_serializing_if = "Option::is_none")]
+    pub reasoning_content: Option<String>,
 }
 
 fn default_role() -> MessageRole {
@@ -74,6 +77,7 @@ impl LlmMessage {
             content: Some(content.into()),
             tool_calls: None,
             image_paths: None,
+            reasoning_content: None,
         }
     }
 
@@ -84,6 +88,7 @@ impl LlmMessage {
             content: Some(content.into()),
             tool_calls: None,
             image_paths: None,
+            reasoning_content: None,
         }
     }
 
@@ -94,7 +99,14 @@ impl LlmMessage {
             content: Some(content.into()),
             tool_calls: None,
             image_paths: None,
+            reasoning_content: None,
         }
+    }
+
+    /// Attach native reasoning to an assistant message for supported gateways.
+    pub fn with_reasoning(mut self, reasoning: impl Into<String>) -> Self {
+        self.reasoning_content = Some(reasoning.into());
+        self
     }
 
     /// Add image paths to this message

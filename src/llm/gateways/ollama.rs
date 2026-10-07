@@ -198,16 +198,8 @@ impl LlmGateway for OllamaGateway {
     ) -> Result<LlmGatewayResponse<Value>> {
         info!("Requesting structured output from Ollama");
 
-        let ollama_messages = adapt_messages_to_ollama(messages)?;
-        let options = extract_ollama_options(config);
-
-        let body = serde_json::json!({
-            "model": model,
-            "messages": ollama_messages,
-            "options": options,
-            "format": schema,
-            "stream": false
-        });
+        let mut body = chat_body(model, messages, config, false)?;
+        body["format"] = schema;
 
         let response = self.chat_request(&body).send().await?;
 
@@ -229,6 +221,7 @@ impl LlmGateway for OllamaGateway {
         Ok(LlmGatewayResponse {
             content: Some(content.to_string()),
             object: Some(object),
+            thinking: response_body["message"]["thinking"].as_str().map(String::from),
             evidence: ollama_evidence(&response_body),
             ..Default::default()
         })
@@ -554,6 +547,11 @@ fn adapt_messages_to_ollama(messages: &[LlmMessage]) -> Result<Vec<Value>> {
                 "content": msg.content.as_deref().unwrap_or("")
             });
 
+            if msg.role == MessageRole::Assistant {
+                if let Some(reasoning) = &msg.reasoning_content {
+                    ollama_msg["thinking"] = serde_json::json!(reasoning);
+                }
+            }
             // Add images for user messages - Ollama requires base64-encoded images
             if let Some(image_paths) = &msg.image_paths {
                 let encoded_images: Result<Vec<String>> = image_paths
@@ -609,6 +607,7 @@ fn chat_body(
     config: &CompletionConfig,
     stream: bool,
 ) -> Result<Value> {
+    config.validate_reasoning()?;
     let mut body = serde_json::json!({
         "model": model,
         "messages": adapt_messages_to_ollama(messages)?,
@@ -616,12 +615,13 @@ fn chat_body(
         "stream": stream
     });
 
-    // Ollama uses a boolean `think` parameter and supports explicit disablement.
-    if let Some(reasoning_effort) = config.reasoning_effort {
-        body["think"] = serde_json::json!(!matches!(
-            reasoning_effort,
-            crate::llm::gateway::ReasoningEffort::Disabled
-        ));
+    if let Some(effort) = config.reasoning_effort {
+        use crate::llm::gateway::ReasoningEffort;
+        body["think"] = match effort {
+            ReasoningEffort::Disabled => Value::Bool(false),
+            ReasoningEffort::Enabled => Value::Bool(true),
+            named => serde_json::to_value(named)?,
+        };
     }
 
     add_response_format(&mut body, config);
@@ -817,6 +817,7 @@ mod tests {
             content: None,
             tool_calls: Some(vec![tool_call]),
             image_paths: None,
+            reasoning_content: None,
         }];
 
         let result = adapt_messages_to_ollama(&messages).unwrap();
@@ -834,6 +835,7 @@ mod tests {
             content: None,
             tool_calls: None,
             image_paths: None,
+            reasoning_content: None,
         }];
 
         let result = adapt_messages_to_ollama(&messages).unwrap();
@@ -849,6 +851,7 @@ mod tests {
             content: Some("Tool result".to_string()),
             tool_calls: None,
             image_paths: None,
+            reasoning_content: None,
         }];
 
         let result = adapt_messages_to_ollama(&messages).unwrap();
@@ -869,6 +872,8 @@ mod tests {
             top_k: None,
             response_format: None,
             reasoning_effort: None,
+            reasoning_profile: None,
+            preserve_reasoning: false,
             max_tool_iterations: 10,
         };
 
@@ -892,6 +897,8 @@ mod tests {
             top_k: None,
             response_format: None,
             reasoning_effort: None,
+            reasoning_profile: None,
+            preserve_reasoning: false,
             max_tool_iterations: 10,
         };
 
@@ -914,6 +921,8 @@ mod tests {
             top_k: None,
             response_format: None,
             reasoning_effort: None,
+            reasoning_profile: None,
+            preserve_reasoning: false,
             max_tool_iterations: 10,
         };
 
@@ -937,6 +946,8 @@ mod tests {
             top_k: None,
             response_format: None,
             reasoning_effort: None,
+            reasoning_profile: None,
+            preserve_reasoning: false,
             max_tool_iterations: 10,
         };
 
@@ -961,6 +972,8 @@ mod tests {
             top_k: None,
             response_format: None,
             reasoning_effort: None,
+            reasoning_profile: None,
+            preserve_reasoning: false,
             max_tool_iterations: 10,
         };
 
@@ -983,6 +996,8 @@ mod tests {
             top_k: Some(40),
             response_format: None,
             reasoning_effort: None,
+            reasoning_profile: None,
+            preserve_reasoning: false,
             max_tool_iterations: 10,
         };
 
@@ -1004,6 +1019,8 @@ mod tests {
             top_k: Some(50),
             response_format: None,
             reasoning_effort: None,
+            reasoning_profile: None,
+            preserve_reasoning: false,
             max_tool_iterations: 10,
         };
 
@@ -1029,6 +1046,8 @@ mod tests {
             top_k: None,
             response_format: Some(ResponseFormat::Text),
             reasoning_effort: None,
+            reasoning_profile: None,
+            preserve_reasoning: false,
             max_tool_iterations: 10,
         };
 
@@ -1056,6 +1075,8 @@ mod tests {
             top_k: None,
             response_format: Some(ResponseFormat::JsonObject { schema: None }),
             reasoning_effort: None,
+            reasoning_profile: None,
+            preserve_reasoning: false,
             max_tool_iterations: 10,
         };
 
@@ -1092,6 +1113,8 @@ mod tests {
                 schema: Some(schema.clone()),
             }),
             reasoning_effort: None,
+            reasoning_profile: None,
+            preserve_reasoning: false,
             max_tool_iterations: 10,
         };
 
@@ -1116,6 +1139,8 @@ mod tests {
             top_k: None,
             response_format: None,
             reasoning_effort: None,
+            reasoning_profile: None,
+            preserve_reasoning: false,
             max_tool_iterations: 10,
         };
 
@@ -1650,7 +1675,7 @@ mod tests {
         let mock = server
             .mock("POST", "/api/chat")
             .match_body(mockito::Matcher::PartialJson(
-                serde_json::json!({"think": true}),
+                serde_json::json!({"think": "high"}),
             ))
             .with_status(200)
             .with_body(r#"{"message":{"role":"assistant","content":"Response","thinking":"Internal reasoning..."}}"#)
@@ -1718,7 +1743,7 @@ mod tests {
         let mock = server
             .mock("POST", "/api/chat")
             .match_body(mockito::Matcher::PartialJson(
-                serde_json::json!({"stream": true, "think": true}),
+                serde_json::json!({"stream": true, "think": "high"}),
             ))
             .with_status(200)
             .with_body(

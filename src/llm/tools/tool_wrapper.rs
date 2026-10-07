@@ -53,6 +53,7 @@ impl ToolWrapper {
             content: Some(self.behaviour.clone()),
             tool_calls: None,
             image_paths: None,
+            reasoning_content: None,
         }]
     }
 }
@@ -78,6 +79,7 @@ impl LlmTool for ToolWrapper {
             content: Some(input.to_string()),
             tool_calls: None,
             image_paths: None,
+            reasoning_content: None,
         });
 
         let response = self.broker.generate(&messages, Some(&self.tools), None, None).await?;

@@ -23,9 +23,13 @@ pub enum ResponseFormat {
 pub enum ReasoningEffort {
     /// Disable provider-native extended thinking when the provider supports it.
     Disabled,
+    /// Enable reasoning using the model default (for boolean-control models).
+    Enabled,
     Low,
     Medium,
     High,
+    /// Extra-high reasoning effort; distinct from high.
+    XHigh,
 }
 
 /// Configuration for LLM completion
@@ -39,11 +43,24 @@ pub struct CompletionConfig {
     pub top_k: Option<u32>,
     pub response_format: Option<ResponseFormat>,
     pub reasoning_effort: Option<ReasoningEffort>,
+    /// Explicit model capabilities. None delegates support/defaults to the provider.
+    pub reasoning_profile: Option<crate::llm::reasoning::ReasoningProfile>,
+    /// Retain completed assistant reasoning during broker-managed tool rounds.
+    /// This does not turn reasoning on, and does not retain cancelled partial calls.
+    pub preserve_reasoning: bool,
     /// Maximum tool rounds; use `with_unlimited_tool_iterations` to disable the limit.
     pub max_tool_iterations: usize,
 }
 
 impl CompletionConfig {
+    /// Validate explicit model capabilities before sending a provider request.
+    pub fn validate_reasoning(&self) -> Result<()> {
+        if let Some(profile) = &self.reasoning_profile {
+            profile.validate(self.reasoning_effort, self.preserve_reasoning)?;
+        }
+        Ok(())
+    }
+
     /// Disable the tool-round limit while retaining the existing numeric configuration API.
     /// `usize::MAX` is a symbolic unlimited value; the broker skips its limit check.
     pub fn with_unlimited_tool_iterations(mut self) -> Self {
@@ -67,6 +84,8 @@ impl Default for CompletionConfig {
             top_k: None,
             response_format: None,
             reasoning_effort: None,
+            reasoning_profile: None,
+            preserve_reasoning: false,
             max_tool_iterations: 10,
         }
     }
@@ -224,6 +243,8 @@ mod tests {
             top_k: Some(40),
             response_format: Some(ResponseFormat::Text),
             reasoning_effort: None,
+            reasoning_profile: None,
+            preserve_reasoning: false,
             max_tool_iterations: 10,
         };
 
@@ -247,6 +268,8 @@ mod tests {
             top_k: Some(50),
             response_format: Some(ResponseFormat::JsonObject { schema: None }),
             reasoning_effort: None,
+            reasoning_profile: None,
+            preserve_reasoning: false,
             max_tool_iterations: 10,
         };
 
@@ -305,6 +328,8 @@ mod tests {
                 schema: Some(serde_json::json!({"type": "object"})),
             }),
             reasoning_effort: None,
+            reasoning_profile: None,
+            preserve_reasoning: false,
             max_tool_iterations: 10,
         };
 
@@ -353,6 +378,8 @@ mod tests {
             top_k: None,
             response_format: None,
             reasoning_effort: Some(ReasoningEffort::High),
+            reasoning_profile: None,
+            preserve_reasoning: false,
             max_tool_iterations: 10,
         };
 

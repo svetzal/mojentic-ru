@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Rust prototype: native assistant reasoning history, opt-in broker retention,
+  explicit model reasoning profiles, and Enabled/XHigh effort controls.
+
+### Fixed
+
+- Preserve named Ollama effort values rather than collapsing them to true.
+- Apply reasoning controls to structured Ollama requests as well as normal and
+  streaming calls. Preserve native history through oMLX and Ollama tool rounds.
+
+### Compatibility
+
+- New public message/config fields and enum variants require Rust literal/match
+  migrations. No release version or tag is assigned to this prototype.
+
 ## [2.1.0] - 2026-09-30
 
 ### Added

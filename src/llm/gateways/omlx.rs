@@ -16,7 +16,9 @@ use crate::llm::gateways::openai::{add_response_format, openai_response_evidence
 use crate::llm::gateways::openai_legacy_stream::{
     legacy_body_stream, read_legacy_line, LegacyLine, OpenAiLegacyParser,
 };
-use crate::llm::gateways::openai_messages_adapter::{adapt_messages_to_openai, convert_tool_calls};
+use crate::llm::gateways::openai_messages_adapter::{
+    adapt_messages_to_openai_with_reasoning, convert_tool_calls,
+};
 use crate::llm::gateways::openai_stream_events::OpenAiEventParser;
 use crate::llm::models::{LlmGatewayResponse, LlmMessage, ResponseEvidence};
 use crate::llm::stream_events::{
@@ -320,12 +322,16 @@ fn requests_structured_output(config: &CompletionConfig) -> bool {
 ///
 /// `num_ctx` and `num_predict` are not sent: oMLX sets context length per model.
 fn chat_body(model: &str, messages: &[LlmMessage], config: &CompletionConfig) -> Result<Value> {
+    config.validate_reasoning()?;
     let mut body = serde_json::json!({
         "model": model,
-        "messages": adapt_messages_to_openai(messages)?,
+        "messages": adapt_messages_to_openai_with_reasoning(messages, true)?,
         "temperature": config.temperature,
         "max_tokens": config.max_tokens,
     });
+    if config.preserve_reasoning {
+        body["chat_template_kwargs"] = serde_json::json!({"preserve_thinking": true});
+    }
     if let Some(top_p) = config.top_p {
         body["top_p"] = serde_json::json!(top_p);
     }
@@ -335,6 +341,7 @@ fn chat_body(model: &str, messages: &[LlmMessage], config: &CompletionConfig) ->
     match config.reasoning_effort {
         // oMLX turns thinking off with its own flag, not an effort level.
         Some(ReasoningEffort::Disabled) => body["enable_thinking"] = Value::Bool(false),
+        Some(ReasoningEffort::Enabled) => body["enable_thinking"] = Value::Bool(true),
         Some(effort) => body["reasoning_effort"] = serde_json::to_value(effort)?,
         None => {}
     }
