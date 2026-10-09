@@ -1,0 +1,70 @@
+Feature request: Consistent transient-error recovery across Mojentic libraries
+
+Problem
+
+Mojentic's Rust Ollama streaming path currently makes one request and propagates a non-success HTTP status as a gateway error. Our coding harness lost a long-running session to a 504 Gateway Timeout after 39 completed requests. Its subsequent unload check still found the local model/runner active. The final wire response was not captured, so we have not established which infrastructure layer originated the timeout.
+
+We need equivalent recovery capabilities across all maintained Mojentic language libraries and applicable provider adapters, including Ollama and oMLX. Recovery should preserve the conversation and avoid accidentally starting overlapping inference or repeating tool actions.
+
+1. Structured provider errors
+
+Expose a stable error model containing, when available:
+
+- Error category: transport, HTTP, provider response, protocol/parsing, cancellation or client timeout.
+- Provider, operation, HTTP status, provider error code, Retry-After and provider request ID.
+- Failure phase: connecting, sending, awaiting headers, streaming or decoding.
+- Whether the request may have been accepted by the provider; represent unknown explicitly.
+- Observed response progress: headers, raw bytes, semantic reasoning/content, tool-call fragments and completed tool calls. A keepalive byte is not semantic output.
+- Retry eligibility/classification and its reason, separately from permission to retry.
+- Original cause and final attempt details, without exposing credentials or request contents by default.
+
+A timeout or absent output does not establish that inference has ended. Do not hide HTTP status inside an unstructured message.
+
+2. Configurable bounded retries
+
+Provide a shared policy for streaming and non-streaming completion requests: maximum attempts including the initial attempt, exponential backoff with jitter, a delay ceiling, and Retry-After handling. Allow callers to supply an optional recovery deadline/budget and select retryable categories/statuses.
+
+Support transient cases such as connection failures, 429 and selected 5xx responses. Authentication, invalid requests, unsupported options and malformed responses must not be blindly retried. Keep cancellation authoritative and stop promptly during requests, admission checks and backoff.
+
+Preserve backward compatibility with retries disabled by default. Document identical policy semantics across libraries, with idiomatic language APIs. Do not introduce a fixed wall-clock cutoff for active local generation as part of this feature.
+
+3. Recovery admission and request identity
+
+Expose an asynchronous caller hook before a retry is admitted, with the failure, attempt number, request identity and observed progress. The hook can allow, reject or wait for recovery and must remain cancellable. A pending decision must not count as approval.
+
+This lets a harness verify model ownership, memory and termination of previous inference before resending. Provide provider-specific cancellation/status facilities where supported; expose unsupported/unknown rather than claiming termination. Do not kill unrelated models or processes. Local-provider automatic retries must require safe termination evidence or explicit caller admission when prior request execution is ambiguous.
+
+Keep a logical request ID across attempts and a distinct attempt ID for each wire request. Honor provider idempotency facilities where actually supported; do not imply that a client-generated ID makes inference idempotent.
+
+4. Streaming and tool safety
+
+Never silently append a retried response to a partial stream. Initially support transparent recovery only before semantic output has been delivered, subject to recovery admission. After reasoning, content or tool fragments have reached the caller, return an explicit interrupted-stream outcome carrying progress/error metadata. Any future replay or continuation must be opt-in and clearly specified.
+
+Do not automatically execute tools again, replay a broker tool loop or restart the whole agent. Preserve the same messages, native reasoning history, tools and generation controls across eligible request retries; allow only documented attempt/idempotency metadata to vary. Never turn an exhausted stream into a successful complete response.
+
+5. Observable recovery
+
+Emit structured lifecycle events for attempts, failures, admission decisions, scheduled delays, retry starts, exhaustion and cancellation. Include actual wire-attempt counts and progress metadata. Keep transport attempts distinct from semantic model interactions/tool depth so the harness can account for both without silently changing its interaction budget. Trace observers must be able to capture each attempt's exact request and response independently.
+
+Acceptance tests
+
+Use deterministic fake providers; live models are not required for library conformance:
+
+- 503 then success: exact configured attempts, unchanged semantic payload, observable recovery.
+- 429: honor Retry-After within the caller's configured recovery limits.
+- Persistent 504: bounded exhaustion with final structured error and attempt history.
+- Ambiguous timeout: no second request until caller admission confirms recovery; rejection prevents resend.
+- Cancellation during backoff or admission: prompt exit and no later attempt.
+- Partial reasoning/content/tool fragments followed by failure: explicit interruption, no silent replay and no duplicated tool execution.
+- 400/401 and protocol errors: no retry unless explicitly supported by a documented policy.
+- A keepalive-only response is distinguished from delivered semantic output.
+- Equivalent contracts across every maintained language implementation and Ollama/oMLX adapters, including unsupported capability reporting.
+- Existing behavior remains unchanged with retries disabled; secrets remain absent from errors/events.
+
+Responsibility boundary
+
+Mojentic owns structured errors, request-level retry mechanics, streaming semantics, admission hooks and lifecycle events. The harness owns experiment policy, local resource/ownership admission, trace persistence and whether an agent session may recover. Whole-run retry orchestration remains separate.
+
+Deliverable
+
+Implement and document the shared contract in each maintained Mojentic library, with provider capability notes, migration examples and deterministic conformance tests. Pin implementation versions in the harness while integrating and validating recovery in a fresh registered experiment. Do not restart the stopped benchmark as part of library implementation.
