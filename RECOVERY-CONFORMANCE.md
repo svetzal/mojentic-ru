@@ -134,18 +134,18 @@ management operation was used. `tests/recovery.rs` exercises public APIs:
 | 503 → success | Ordinary and streaming on all adapters: exact sends, byte-identical payload, stable logical/distinct attempt IDs, history and ordered lifecycle |
 | Structured requests | All adapters: parsed object and frozen schema; Ollama/oMLX native reasoning; existing OpenAI restrictions preserved |
 | Tools/schema/history/controls | Combined immutable request on all adapters; successful streamed native reasoning/tool broker history retained |
-| 429 | Numeric/date (all three date forms), past date, invalid value, ceiling refusal, budget refusal; deterministic injected sleeps |
+| 429 | All adapters and ordinary/structured/streaming APIs: numeric/IMF date floor within limits, ceiling and budget refusal, exact lifecycle/attempt IDs/history/frozen payload; existing tests cover all three date forms, past/invalid values |
 | Persistent 504 | All adapters: bounded sends, final numeric status, one-based identities, complete bounded history |
 | Local ambiguity | Missing/rejected/pending/explicitly allowed admission; pending does not dispatch or consume an attempt |
 | Cancellation | Active ordinary HTTP, paused streaming consumer, pending admission, backoff, pre-dispatch: prompt closure/no resend and retained evidence |
 | Partial interruption | Content, reasoning, tool fragments on every adapter; newline-free and truncated framing; partial HTTP200 JSON body; no replay or false success |
-| Keepalive | oMLX raw-only frame → EOF → admitted recovery; zero observed/delivered semantics in failed history |
+| Keepalive | All adapters: valid raw-only frame → EOF → admitted recovery; exact raw history, zero failed-attempt semantics, immutable resend and ordered lifecycle |
 | Permanent/protocol/options | 400/401/403, including truncated bodies across all adapters and ordinary/structured/stream APIs despite selected statuses and explicit admission: exactly one send; malformed JSON and unsupported reasoning remain terminal |
 | Privacy/causes | Secret sentinel absent from safe events/errors/serialization; raw evidence inspectable; typed capture cause retained; unsafe metadata omitted |
-| Broker/session | Tool execution once across post-tool 503 recovery; streaming tool depth retained; partial session reply never committed; broker/session structured failures retain cause/history/progress |
+| Broker/session | All adapters: broker ordinary/structured/streaming and session ordinary/streaming retain exact HTTP/protocol/transport/interruption evidence; no partial assistant commit, incomplete tool execution or repeated completed-tool execution |
 | Limits | Absolute deadline refuses only retry; admitted generation completes after recovery budget; legacy provider timeout does not become active timeout |
 | Capture failure | Request/header/body capture errors: no resend, original cause retained, failed actual attempt in history/lifecycle; all adapters retain observed content/reasoning/tool evidence on Body capture failure with zero delivery |
-| Compatibility/capabilities | Default one attempt, native prototype preserved, truthful unsupported/unknown facilities; original repository regression suite |
+| Compatibility/capabilities | All adapters: recovery-wrapped public raw broker events retain exact legacy 503 error and one send with no recovery observer calls; native prototype preserved; original regression suite |
 
 `.foundry/proof.json` contains actual seed assertion evidence and final check
 results. The seed proof is not itself whole-contract parity certification.
@@ -171,6 +171,44 @@ frames on all adapters, retaining observed progress with no semantic delivery.
 Broker/session tests assert exact raw/header/progress/identity/history retention.
 The reviewer found no further production blocker in the reviewed contract paths;
 this does not exhaust every input combination or certify six-port parity.
+
+## Independent-review remainder on bc8150a
+
+This work extends the public conformance measurements on
+`bc8150a381a540e6320cd4fd91a8bbecadb9a735`. It changes tests and evidence only;
+no runtime, dependency, package version or release behavior changed.
+The task started clean and synced with `origin/main`. No prior
+`.foundry/proof.json` was present in this checkout; the new record retains
+baseline/final source fingerprints and captured logs without inventing prior proof.
+
+Seven added matrix tests measure 144 cases across all three maintained adapters
+through public APIs. Retry-After floors and cancellation in admission/backoff cover ordinary,
+structured and streaming completion. An injected pending sleeper makes backoff
+cancellation deterministic. Pending admission also stays unsent until explicit
+allow. Truncated successful bodies cover ordinary and structured completion;
+keepalive recovery uses provider-valid empty messages or SSE comment frames.
+
+Broker failure assertions cover ordinary, structured and streaming APIs. Session
+assertions cover ordinary and streaming; `ChatSession` has no structured API.
+HTTP bodies/headers match synthetic evidence exactly. Protocol causes retain the
+original `serde_json::Error`, including classification and location. Body transport
+causes retain `reqwest::Error` and the precise nested HTTP truncation evidence.
+Final/history causes share object identity. Streaming transport tests before
+semantic output disable transport eligibility explicitly to measure terminal
+cause propagation; this policy does not test default transparent transport retry.
+Interruption tests retain exact observed/delivered content, reasoning and tool
+fragment counters, without completing tools or committing partial replies.
+A separate completed-tool/follow-up-failure matrix proves one execution and a
+new logical completion identity through both broker and session.
+
+Initial failing runs exposed test compilation/assertion/fixture mistakes, not a
+runtime contract defect. Those logs are retained as measurement-development RED;
+GREEN runs validate corrected public assertions. No production RED/GREEN fix
+was necessary. Read-only independent Codex review inspected the whole contract,
+including raw event delegation and native reasoning compatibility. Its final
+minor progress-counter assertion gap was closed. Foundry still owns final review
+and Git finalization; the base SHA is the reviewed landed implementation, and
+there is no newly landed SHA for this uncommitted measurement extension.
 
 ## Cancellation correction
 
@@ -205,17 +243,18 @@ of this work. The current gates passed:
 | --- | --- |
 | `cargo fmt --check` | Passed |
 | `cargo clippy --all-targets --all-features -- -D warnings` | Passed |
-| `cargo test --verbose --all-features` | Passed: 634 unit/integration tests, 19 doctests; 24 existing ignored doctests |
+| `cargo test --verbose --all-features` | Passed: 641 unit/integration tests, 19 doctests; 24 existing ignored doctests |
 | `cargo test` | Passed with default features: same counts |
 | `cargo build --verbose --all-features` | Passed |
 | `cargo doc --no-deps --all-features` | Passed |
 | `cargo deny check` | Passed unfiltered; existing duplicate dependency warnings |
 | `cargo audit` | Passed unfiltered |
-| `cargo tarpaulin --all-features --fail-under 56` | Passed: 69.18% (3233/4673 lines); unchanged 56% floor |
+| `cargo tarpaulin --all-features --fail-under 56` | Passed: 69.33% (3240/4673 lines); unchanged 56% floor |
 | `mdbook build book` | Exit 0, HTML generated; existing `truncate-long-entries` configuration diagnostic remains |
+| Markdown lint | Passed with MD013 disabled for existing long tables/URLs |
 
 Independent read-only Codex review found no remaining blocker in the inspected
-contract paths. Its separate public cancellation run passed all 6 matching tests.
+contract paths. Its separate public matrix run passed all 7 matching tests.
 The full logs, RED failures, GREEN assertion cases and source fingerprints are
 retained in `.foundry/proof.json`. No claim of exhaustive concurrent cancellation
 or every possible input combination follows from these checks.
@@ -223,6 +262,6 @@ or every possible input combination follows from these checks.
 There is no claim of six-port parity or live-provider efficacy. A fresh registered
 harness experiment, finalized implementation commit, and harness lockfile pin
 remain the controller's integration work. Never restart the frozen experiment.
-The recovery suite contains 35 tests, many iterating all three adapters and
+The recovery suite contains 42 tests, many iterating all three adapters and
 multiple failure modes. Foundry owns review and ref finalization; this worktree
 intentionally remains uncommitted and has no reviewed landed SHA yet.

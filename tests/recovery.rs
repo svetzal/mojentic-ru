@@ -2106,3 +2106,840 @@ async fn cancellation_active_body_all_adapters_has_one_ordered_terminal_lifecycl
         }
     }
 }
+
+// Every case enters a maintained adapter's public API, never the retry engine.
+macro_rules! adapter_case {
+    ($check:ident, $provider:expr, $url:expr $(, $arg:expr)*) => {
+        match $provider {
+            Provider::Ollama => $check(OllamaGateway::with_host($url), $provider $(, $arg)*).await,
+            Provider::Omlx => $check(omlx($url), $provider $(, $arg)*).await,
+            Provider::OpenAi => $check(OpenAIGateway::with_api_key_and_base_url(
+                "synthetic-secret", $url), $provider $(, $arg)*).await,
+        }
+    };
+}
+const ADAPTERS: [Provider; 3] = [Provider::Ollama, Provider::Omlx, Provider::OpenAi];
+
+fn transitions(capture: &Capture) -> Vec<Transition> {
+    capture.events.lock().expect("events").iter().map(|e| e.transition).collect()
+}
+fn assert_single_failure(error: &RecoveryError, capture: &Capture, provider: Provider) {
+    assert_eq!(error.failure.provider, provider);
+    assert_eq!(error.history.len(), 1);
+    let prior = &error.history[0];
+    assert_eq!(prior.identity, error.failure.identity);
+    assert_eq!(prior.progress, error.failure.progress);
+    if error.outcome != Outcome::Cancelled {
+        assert_eq!(prior.category, error.failure.category);
+    }
+    assert_eq!(prior.inspect_response_bytes(), error.failure.inspect_response_bytes());
+    assert_eq!(prior.inspect_response_headers(), error.failure.inspect_response_headers());
+    let cause = error.failure.inspect_cause().expect("original cause");
+    let prior_cause = prior.inspect_cause().expect("history cause");
+    assert!(std::ptr::eq(cause, prior_cause), "cause identity retained");
+    let requests = capture.requests.lock().expect("requests");
+    assert_eq!(requests.len(), 1);
+    assert_eq!(Some(&requests[0].0), error.failure.identity.as_ref());
+    assert_eq!(requests[0].0.wire_attempt, 1);
+    assert!(!error.failure.remote_termination_confirmed);
+}
+fn assert_resend(report: &RecoveryReport, capture: &Capture) {
+    assert_eq!(report.history.len(), 1);
+    let requests = capture.requests.lock().expect("requests");
+    assert_eq!(requests.len(), 2);
+    assert_eq!(requests[0].1, requests[1].1, "immutable encoded payload");
+    assert_eq!(requests[0].0.logical_request_id, requests[1].0.logical_request_id);
+    assert_ne!(requests[0].0.attempt_id, requests[1].0.attempt_id);
+    assert_eq!(requests[0].0.wire_attempt, 1);
+    assert_eq!(requests[1].0.wire_attempt, 2);
+    assert_eq!(report.history[0].identity.as_ref(), Some(&requests[0].0));
+    assert_eq!(report.identity, requests[1].0);
+    assert_eq!(
+        transitions(capture),
+        vec![
+            Transition::AttemptStarted,
+            Transition::AttemptFailed,
+            Transition::AdmissionPending,
+            Transition::AdmissionAllowed,
+            Transition::DelayScheduled,
+            Transition::RetryStarted,
+            Transition::AttemptStarted,
+            Transition::AttemptSucceeded,
+        ]
+    );
+}
+
+// A deterministic sleeping boundary that only cancellation can release.
+struct BackoffWait;
+#[async_trait]
+impl Timing for BackoffWait {
+    fn monotonic(&self) -> Instant {
+        Instant::now()
+    }
+    fn wall(&self) -> SystemTime {
+        SystemTime::UNIX_EPOCH + Duration::from_secs(1_000_000)
+    }
+    fn jitter(&self, ceiling: Duration) -> Duration {
+        ceiling / 2
+    }
+    async fn sleep(&self, _: Duration) {
+        std::future::pending().await
+    }
+}
+
+async fn reviewed_operation<G: RecoveryProvider>(
+    gateway: &RecoveryGateway<G>,
+    operation: Operation,
+    call: &RecoveryCall,
+) -> std::result::Result<RecoveryReport, RecoveryError> {
+    let messages = [LlmMessage::user("question")];
+    let config = CompletionConfig::default();
+    match operation {
+        Operation::Ordinary => gateway
+            .complete_with_recovery("qwen3", &messages, None, &config, call)
+            .await
+            .map(|r| r.report),
+        Operation::Structured => gateway
+            .complete_json_with_recovery(
+                "qwen3",
+                &messages,
+                json!({"type":"object"}),
+                &config,
+                call,
+            )
+            .await
+            .map(|r| r.report),
+        Operation::Streaming => {
+            let mut stream =
+                gateway.complete_stream_with_recovery("qwen3", &messages, None, &config, call);
+            let mut terminal = None;
+            while let Some(event) = stream.next().await {
+                match event {
+                    RecoveryStreamEvent::Completed(result) => {
+                        assert!(terminal.is_none());
+                        terminal = Some(Ok(result.report));
+                    }
+                    RecoveryStreamEvent::Failed(error) => {
+                        assert!(terminal.is_none());
+                        terminal = Some(Err(error));
+                    }
+                    _ => {
+                        assert!(terminal.is_none(), "no output after terminal");
+                    }
+                }
+            }
+            terminal.expect("one terminal result")
+        }
+    }
+}
+const OPERATIONS: [Operation; 3] = [
+    Operation::Ordinary,
+    Operation::Structured,
+    Operation::Streaming,
+];
+
+#[tokio::test]
+async fn review_retry_after_numeric_date_ceiling_budget_matrix() {
+    async fn check<G: RecoveryProvider>(
+        inner: G,
+        provider: Provider,
+        server: &mut mockito::ServerGuard,
+        header: &str,
+        limit: &str,
+        operation: Operation,
+    ) {
+        let capture = Arc::new(Capture::default());
+        let clock = Arc::new(Clock::default());
+        let mut p = policy(2, &capture);
+        p.timing = clock.clone();
+        p.base_delay = Duration::from_secs(2);
+        p.delay_ceiling = Duration::from_secs(if limit == "ceiling" { 1 } else { 3 });
+        p.budget = Some(Duration::from_secs(if limit == "budget" { 2 } else { 3 }));
+        let fail = server
+            .mock("POST", path(provider))
+            .with_status(429)
+            .with_header("retry-after", header)
+            .with_body("synthetic-secret failure")
+            .expect(1)
+            .create_async()
+            .await;
+        let done = server
+            .mock("POST", path(provider))
+            .with_body(if operation == Operation::Streaming {
+                final_stream(provider)
+            } else {
+                response(
+                    provider,
+                    if operation == Operation::Structured {
+                        "{}"
+                    } else {
+                        "ok"
+                    },
+                )
+                .to_string()
+            })
+            .expect(usize::from(limit == "within"))
+            .create_async()
+            .await;
+        let gateway = RecoveryGateway::new(inner, p).expect("gateway");
+        let result = reviewed_operation(&gateway, operation, &RecoveryCall::default()).await;
+        if limit == "within" {
+            let result = result.expect("floor fits ceiling and budget");
+            assert_resend(&result, &capture);
+            assert_eq!(*clock.sleeps.lock().expect("sleeps"), vec![Duration::from_secs(2)]);
+            assert_eq!(result.history[0].inspect_response_bytes(), b"synthetic-secret failure");
+            assert!(!result.history[0].progress.observed.any());
+        } else {
+            let error = result.expect_err("floor cannot be shortened");
+            assert_single_failure(&error, &capture, provider);
+            assert_eq!(
+                error.outcome,
+                if limit == "ceiling" {
+                    Outcome::DelayCeiling
+                } else {
+                    Outcome::BudgetExpired
+                }
+            );
+            assert!(clock.sleeps.lock().expect("sleeps").is_empty());
+            assert_eq!(
+                transitions(&capture),
+                vec![Transition::AttemptStarted, Transition::AttemptFailed]
+            );
+        }
+        {
+            let events = capture.events.lock().expect("events");
+            let failure = events[1].failure.as_ref().expect("failed attempt");
+            assert_eq!(
+                failure.retry_after,
+                if header == "2" {
+                    RetryAfter::Seconds(2)
+                } else {
+                    RetryAfter::Date {
+                        unix_seconds: 1_000_002,
+                        remaining: Duration::from_secs(2),
+                    }
+                }
+            );
+            assert_eq!(failure.progress.raw_bytes, 24);
+            assert_eq!(
+                failure.inspect_cause().expect("HTTP cause").to_string(),
+                "synthetic-secret failure"
+            );
+            assert_eq!(failure.inspect_response_bytes(), b"synthetic-secret failure");
+            assert_eq!(failure.inspect_response_headers().expect("headers")["retry-after"], header);
+            assert!(!failure.progress.observed.any());
+            assert!(!failure.progress.delivered.any());
+        }
+        fail.assert_async().await;
+        done.assert_async().await;
+    }
+    for provider in ADAPTERS {
+        for operation in OPERATIONS {
+            for header in ["2", "Mon, 12 Jan 1970 13:46:42 GMT"] {
+                for limit in ["within", "ceiling", "budget"] {
+                    let mut server = mockito::Server::new_async().await;
+                    let url = server.url();
+                    adapter_case!(check, provider, &url, &mut server, header, limit, operation);
+                }
+            }
+        }
+    }
+}
+
+#[tokio::test]
+async fn review_pending_and_backoff_cancel_matrix() {
+    async fn check<G: RecoveryProvider>(
+        inner: G,
+        provider: Provider,
+        server: &HttpFixture,
+        pending: bool,
+        operation: Operation,
+    ) {
+        let capture = Arc::new(Capture::default());
+        let mut p = policy(3, &capture);
+        if pending {
+            p.admission = Some(Arc::new(Pending));
+        } else {
+            p.base_delay = Duration::from_secs(10);
+            p.timing = Arc::new(BackoffWait);
+        }
+        let gateway = RecoveryGateway::new(inner, p).expect("gateway");
+        let call = RecoveryCall::default();
+        let future = reviewed_operation(&gateway, operation, &call);
+        tokio::pin!(future);
+        let wait_for = if pending {
+            Transition::AdmissionPending
+        } else {
+            Transition::DelayScheduled
+        };
+        tokio::time::timeout(Duration::from_secs(2), async {
+            tokio::select! {
+                result = &mut future => panic!("wait completed before cancellation: {}", result.is_ok()),
+                _ = async { while !transitions(&capture).contains(&wait_for) { tokio::task::yield_now().await; } } => {}
+            }
+        }).await.expect("entered wait");
+        assert_eq!(server.sends.load(Ordering::SeqCst), 1);
+        call.cancellation.cancel();
+        let error = tokio::time::timeout(Duration::from_secs(2), future)
+            .await
+            .expect("cancel promptly")
+            .expect_err("cancelled");
+        assert_single_failure(&error, &capture, provider);
+        assert_eq!(error.outcome, Outcome::Cancelled);
+        assert_eq!(error.failure.category, Category::Cancellation);
+        assert_eq!(error.history[0].category, Category::Http);
+        assert_eq!(error.failure.http_status, Some(503));
+        assert_eq!(error.failure.inspect_response_bytes(), b"synthetic-secret failure");
+        assert_eq!(
+            error.failure.inspect_cause().expect("cause").to_string(),
+            "synthetic-secret failure"
+        );
+        assert_eq!(error.failure.progress.raw_bytes, 24);
+        assert_fixture_headers(&error.failure, "synthetic-secret failure", false);
+        if !pending {
+            assert_eq!(
+                capture.events.lock().expect("events")[4].delay,
+                Some(Duration::from_secs(5))
+            );
+        }
+        assert!(!error.failure.progress.observed.any());
+        assert!(!error.failure.progress.delivered.any());
+        let mut expected = vec![
+            Transition::AttemptStarted,
+            Transition::AttemptFailed,
+            Transition::AdmissionPending,
+        ];
+        if !pending {
+            expected.extend([Transition::AdmissionAllowed, Transition::DelayScheduled]);
+        }
+        expected.push(Transition::Cancelled);
+        assert_eq!(transitions(&capture), expected);
+        assert_eq!(server.sends.load(Ordering::SeqCst), 1);
+    }
+    for provider in ADAPTERS {
+        for operation in OPERATIONS {
+            for pending in [true, false] {
+                let server =
+                    fixture(vec![(503, "synthetic-secret failure".into(), false, false)]).await;
+                adapter_case!(check, provider, &server.url, &server, pending, operation);
+            }
+        }
+    }
+}
+
+#[tokio::test]
+async fn review_keepalive_and_partial_http200_matrix() {
+    async fn check<G: RecoveryProvider>(
+        inner: G,
+        provider: Provider,
+        server: &HttpFixture,
+        keepalive: bool,
+        body: &str,
+        operation: Operation,
+    ) {
+        let capture = Arc::new(Capture::default());
+        let gateway = RecoveryGateway::new(inner, policy(2, &capture)).expect("gateway");
+        let call = RecoveryCall::default();
+        if keepalive {
+            let mut stream = gateway.complete_stream_with_recovery(
+                "qwen3",
+                &[LlmMessage::user("question")],
+                None,
+                &CompletionConfig::default(),
+                &call,
+            );
+            let mut completed = None;
+            while let Some(event) = stream.next().await {
+                match event {
+                    RecoveryStreamEvent::Completed(result) => {
+                        assert!(completed.is_none());
+                        completed = Some(result);
+                    }
+                    RecoveryStreamEvent::Failed(error) => panic!("keepalive recovery: {error}"),
+                    RecoveryStreamEvent::Content(text) => assert_eq!(text, "done"),
+                    _ => panic!("unexpected semantic event"),
+                }
+            }
+            let result = completed.expect("one completion");
+            assert_resend(&result.report, &capture);
+            let prior = &result.report.history[0];
+            assert_eq!(prior.progress.raw_bytes, body.len() as u64);
+            assert!(!prior.progress.observed.any());
+            assert!(!prior.progress.delivered.any());
+            assert_eq!(prior.inspect_response_bytes(), body.as_bytes());
+            assert_eq!(
+                prior.inspect_cause().expect("EOF cause").to_string(),
+                "stream ended without terminal proof"
+            );
+            assert_eq!(server.sends.load(Ordering::SeqCst), 2);
+            let bodies = server.bodies.lock().expect("bodies");
+            assert_eq!(bodies[0], bodies[1]);
+        } else {
+            let error = reviewed_operation(&gateway, operation, &call)
+                .await
+                .expect_err("partial HTTP200");
+            assert_single_failure(&error, &capture, provider);
+            assert_eq!(error.outcome, Outcome::Failed);
+            assert!(!error.failure.classification.eligible);
+            assert_eq!(error.failure.http_status, Some(200));
+            assert_eq!(error.failure.progress.raw_bytes, body.len() as u64);
+            assert_eq!(error.failure.inspect_response_bytes(), body.as_bytes());
+            assert!(!error.failure.progress.delivered.any());
+            assert_eq!(
+                transitions(&capture),
+                vec![Transition::AttemptStarted, Transition::AttemptFailed]
+            );
+            assert_eq!(server.sends.load(Ordering::SeqCst), 1);
+        }
+    }
+    for provider in ADAPTERS {
+        for operation in OPERATIONS {
+            if operation == Operation::Streaming {
+                continue;
+            }
+            for keepalive in [true, false] {
+                if keepalive && operation != Operation::Ordinary {
+                    continue;
+                }
+                let body = if keepalive {
+                    if provider == Provider::Ollama {
+                        "{\"message\":{},\"done\":false}\n"
+                    } else {
+                        ": keepalive\n\n"
+                    }
+                } else if provider == Provider::Ollama {
+                    "{\"message\":{\"content\":\"half"
+                } else {
+                    "{\"choices\":[{\"message\":{\"content\":\"half"
+                };
+                let replies = if keepalive {
+                    vec![
+                        (200, body.into(), false, false),
+                        (200, final_stream(provider), false, false),
+                    ]
+                } else {
+                    vec![(200, body.into(), true, false)]
+                };
+                let server = fixture(replies).await;
+                adapter_case!(check, provider, &server.url, &server, keepalive, body, operation);
+            }
+        }
+    }
+}
+
+fn assert_fixture_headers(failure: &Failure, body: &str, truncated: bool) {
+    let mut expected = reqwest::header::HeaderMap::new();
+    expected.insert("content-type", "text/event-stream".parse().expect("header"));
+    expected.insert(
+        "content-length",
+        (body.len() + if truncated { 100 } else { 0 })
+            .to_string()
+            .parse()
+            .expect("length"),
+    );
+    expected
+        .insert("x-request-id", "req_550e8400-e29b-41d4-a716-446655440000".parse().expect("id"));
+    expected.insert("retry-after", "0".parse().expect("floor"));
+    expected.insert("connection", "close".parse().expect("connection"));
+    assert_eq!(failure.inspect_response_headers(), Some(&expected));
+}
+
+#[tokio::test]
+async fn review_broker_session_failure_evidence_matrix() {
+    async fn check<G: RecoveryProvider + 'static>(
+        inner: G,
+        provider: Provider,
+        server: &HttpFixture,
+        kind: &str,
+        session_api: bool,
+        body: &str,
+        operation: Operation,
+    ) {
+        let capture = Arc::new(Capture::default());
+        let mut p = policy(3, &capture);
+        if operation == Operation::Streaming && kind == "transport" {
+            p.retryable_categories.remove(&Category::Transport);
+        }
+        let gateway = RecoveryGateway::new(inner, p).expect("gateway");
+        let broker = LlmBroker::new("qwen3", Arc::new(gateway), None);
+        let count = Arc::new(AtomicUsize::new(0));
+        let tools: Vec<Box<dyn LlmTool>> = vec![Box::new(CountTool(count.clone()))];
+        let streaming = operation == Operation::Streaming;
+        let mut delivered = vec![];
+        let error = if session_api {
+            let mut session = mojentic::llm::ChatSession::builder(broker).tools(tools).build();
+            let initial = session.messages().len();
+            let error = if streaming {
+                let mut stream = session.send_stream("question");
+                let mut errors = vec![];
+                while let Some(chunk) = stream.next().await {
+                    match chunk {
+                        Ok(text) => delivered.push(text),
+                        Err(error) => errors.push(error),
+                    }
+                }
+                assert_eq!(errors.len(), 1, "one terminal error");
+                errors.pop().expect("failure")
+            } else {
+                session.send("question").await.expect_err("failure")
+            };
+            assert_eq!(session.messages().len(), initial + 1, "only user is committed");
+            assert_eq!(
+                session.messages().last().expect("user retained").role(),
+                mojentic::llm::MessageRole::User
+            );
+            error
+        } else if streaming {
+            let messages = [LlmMessage::user("question")];
+            let mut stream = broker.generate_stream(&messages, Some(&tools), None, None);
+            let mut errors = vec![];
+            while let Some(chunk) = stream.next().await {
+                match chunk {
+                    Ok(text) => delivered.push(text),
+                    Err(error) => errors.push(error),
+                }
+            }
+            assert_eq!(errors.len(), 1, "one terminal error");
+            errors.pop().expect("failure")
+        } else if operation == Operation::Structured {
+            broker
+                .generate_object::<Value>(&[LlmMessage::user("question")], None, None)
+                .await
+                .expect_err("structured failure")
+        } else {
+            broker
+                .generate(&[LlmMessage::user("question")], Some(&tools), None, None)
+                .await
+                .expect_err("failure")
+        };
+        let mojentic::MojenticError::Recovery(error) = error else {
+            panic!("structured error retained")
+        };
+        assert_single_failure(&error, &capture, provider);
+        assert_eq!(error.failure.operation, operation);
+        assert_eq!(server.sends.load(Ordering::SeqCst), 1);
+        assert_eq!(count.load(Ordering::SeqCst), 0, "no incomplete tool execution");
+        assert_eq!(error.failure.http_status, Some(if kind == "http" { 401 } else { 200 }));
+        assert!(error.failure.progress.headers_received);
+        assert_eq!(error.failure.retry_after, RetryAfter::Seconds(0));
+        assert_eq!(error.failure.acceptance, Acceptance::Unknown);
+        assert_eq!(
+            error.failure.provider_request_id.as_ref().expect("validated ID").as_str(),
+            "req_550e8400-e29b-41d4-a716-446655440000"
+        );
+        assert!(!error.failure.classification.eligible);
+        assert_eq!(
+            error.failure.classification.reason,
+            match kind {
+                "http" => Reason::Permanent,
+                "interrupted" => Reason::SemanticOutput,
+                _ if operation != Operation::Streaming => Reason::PartialResponse,
+                "protocol" => Reason::Malformed,
+                _ => Reason::Permanent,
+            }
+        );
+        assert_eq!(error.failure.progress.raw_bytes, body.len() as u64);
+        assert_eq!(error.failure.inspect_response_bytes(), body.as_bytes());
+        assert_fixture_headers(&error.failure, body, kind == "transport" || kind == "interrupted");
+        let cause = error.failure.inspect_cause().expect("inspectable original cause");
+        match kind {
+            "http" => {
+                assert_eq!(error.failure.category, Category::Http);
+                assert_eq!(cause.to_string(), body);
+                assert_eq!(error.outcome, Outcome::Failed);
+            }
+            "protocol" => {
+                assert_eq!(error.failure.category, Category::Protocol);
+                let original = cause
+                    .source()
+                    .expect("original decoder error")
+                    .downcast_ref::<serde_json::Error>()
+                    .expect("serde error retained");
+                let expected =
+                    serde_json::from_str::<Value>(body).expect_err("synthetic invalid JSON");
+                assert_eq!(original.to_string(), expected.to_string());
+                assert_eq!(original.classify(), expected.classify());
+                assert_eq!(
+                    (original.line(), original.column()),
+                    (expected.line(), expected.column())
+                );
+                assert_eq!(cause.to_string(), expected.to_string());
+                assert_eq!(error.outcome, Outcome::Failed);
+            }
+            "transport" | "interrupted" => {
+                assert_eq!(error.failure.category, Category::Transport);
+                let original =
+                    cause.downcast_ref::<reqwest::Error>().expect("original body transport error");
+                assert!(original.is_decode());
+                assert_eq!(original.to_string(), "error decoding response body");
+                let source = std::error::Error::source(original).expect("HTTP framing cause");
+                assert_eq!(source.to_string(), "error reading a body from connection");
+                assert_eq!(
+                    source.source().expect("truncation evidence").to_string(),
+                    "end of file before message length reached"
+                );
+                assert_eq!(
+                    error.outcome,
+                    if kind == "interrupted" {
+                        Outcome::Interrupted
+                    } else {
+                        Outcome::Failed
+                    }
+                );
+            }
+            _ => panic!("unknown fixture"),
+        }
+        if kind == "interrupted" {
+            assert_eq!(delivered, vec!["partial"]);
+            assert_eq!(error.failure.progress.observed.content_bytes, 7);
+            assert_eq!(error.failure.progress.delivered.content_bytes, 7);
+            assert_eq!(error.failure.progress.observed.reasoning_bytes, 26);
+            assert_eq!(error.failure.progress.delivered.reasoning_bytes, 26);
+            assert_eq!(error.failure.progress.delivered.completed_tool_calls, 0);
+            assert_eq!(error.failure.progress.observed.tool_fragments, 1);
+            assert_eq!(error.failure.progress.observed.completed_tool_calls, 0);
+            assert_eq!(error.failure.progress.delivered.tool_fragments, 1);
+        } else {
+            assert!(delivered.is_empty());
+            assert!(!error.failure.progress.observed.any());
+            assert!(!error.failure.progress.delivered.any());
+        }
+        let mut expected = vec![Transition::AttemptStarted, Transition::AttemptFailed];
+        if kind == "interrupted" {
+            expected.push(Transition::Interrupted);
+        }
+        assert_eq!(transitions(&capture), expected);
+        assert!(!format!(
+            "{error:?} {error} {}",
+            serde_json::to_string(&error).expect("safe summary")
+        )
+        .contains("synthetic-secret"));
+    }
+    for provider in ADAPTERS {
+        for session_api in [false, true] {
+            for operation in OPERATIONS {
+                if session_api && operation == Operation::Structured {
+                    continue;
+                }
+                for kind in ["http", "protocol", "transport", "interrupted"] {
+                    if kind == "interrupted" && operation != Operation::Streaming {
+                        continue;
+                    }
+                    let body = match kind {
+                        "http" => "synthetic-secret HTTP failure".into(),
+                        "protocol" if operation == Operation::Streaming => {
+                            if provider == Provider::Ollama {
+                                "synthetic-secret not JSON\n"
+                            } else {
+                                "data: synthetic-secret not JSON\n\n"
+                            }
+                            .into()
+                        }
+                        "protocol" => "synthetic-secret not JSON".into(),
+                        "transport" if operation == Operation::Streaming => {
+                            if provider == Provider::Ollama {
+                                "{\"message\":{},\"done\":false}\n"
+                            } else {
+                                ": keepalive\n\n"
+                            }
+                            .into()
+                        }
+                        "transport" => "{\"synthetic-secret\":".into(),
+                        _ => format!(
+                            "{}{}{}",
+                            frame(provider, "content"),
+                            frame(provider, "reasoning"),
+                            frame(provider, "tools")
+                        ),
+                    };
+                    let server = fixture(vec![(
+                        if kind == "http" { 401 } else { 200 },
+                        body.clone(),
+                        kind == "transport" || kind == "interrupted",
+                        false,
+                    )])
+                    .await;
+                    adapter_case!(
+                        check,
+                        provider,
+                        &server.url,
+                        &server,
+                        kind,
+                        session_api,
+                        &body,
+                        operation
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[tokio::test]
+async fn review_explicit_pending_admission_all_adapters() {
+    async fn check<G: RecoveryProvider>(inner: G, _: Provider, server: &HttpFixture) {
+        let capture = Arc::new(Capture::default());
+        let admission = Arc::new(DecideLater {
+            signal: tokio::sync::Notify::new(),
+        });
+        let mut p = policy(2, &capture);
+        p.admission = Some(admission.clone());
+        let gateway = RecoveryGateway::new(inner, p).expect("gateway");
+        let call = RecoveryCall::default();
+        let future = reviewed_operation(&gateway, Operation::Ordinary, &call);
+        tokio::pin!(future);
+        tokio::time::timeout(Duration::from_secs(2), async {
+            tokio::select! {
+                result = &mut future => panic!("pending cannot dispatch: {}", result.is_ok()),
+                _ = async { while !transitions(&capture).contains(&Transition::AdmissionPending) { tokio::task::yield_now().await; } } => {}
+            }
+        }).await.expect("pending admission");
+        assert_eq!(server.sends.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            transitions(&capture),
+            vec![
+                Transition::AttemptStarted,
+                Transition::AttemptFailed,
+                Transition::AdmissionPending
+            ]
+        );
+        admission.signal.notify_one();
+        let report = tokio::time::timeout(Duration::from_secs(2), future)
+            .await
+            .expect("allowed")
+            .expect("success");
+        assert_resend(&report, &capture);
+        assert_eq!(server.sends.load(Ordering::SeqCst), 2);
+    }
+    for provider in ADAPTERS {
+        let server = fixture(vec![
+            (503, "failure".into(), false, false),
+            (200, response(provider, "done").to_string(), false, false),
+        ])
+        .await;
+        adapter_case!(check, provider, &server.url, &server);
+    }
+}
+
+#[tokio::test]
+async fn review_completed_tool_not_reexecuted_after_followup_failure() {
+    async fn check<G: RecoveryProvider + 'static>(
+        inner: G,
+        provider: Provider,
+        server: &HttpFixture,
+        session_api: bool,
+    ) {
+        let capture = Arc::new(Capture::default());
+        let gateway = RecoveryGateway::new(inner, policy(3, &capture)).expect("gateway");
+        let broker = LlmBroker::new("qwen3", Arc::new(gateway), None);
+        let count = Arc::new(AtomicUsize::new(0));
+        let tools: Vec<Box<dyn LlmTool>> = vec![Box::new(CountTool(count.clone()))];
+        let error = if session_api {
+            let mut session = mojentic::llm::ChatSession::builder(broker).tools(tools).build();
+            let initial = session.messages().len();
+            let error = session.send("tool").await.expect_err("followup protocol failure");
+            assert_eq!(session.messages().len(), initial + 1);
+            assert_eq!(
+                session.messages().last().expect("user").role(),
+                mojentic::llm::MessageRole::User
+            );
+            error
+        } else {
+            broker
+                .generate(&[LlmMessage::user("tool")], Some(&tools), None, None)
+                .await
+                .expect_err("followup protocol failure")
+        };
+        let mojentic::MojenticError::Recovery(error) = error else {
+            panic!("recovery error")
+        };
+        assert_eq!(count.load(Ordering::SeqCst), 1);
+        assert_eq!(server.sends.load(Ordering::SeqCst), 2);
+        assert_eq!(error.outcome, Outcome::Failed);
+        assert_eq!(error.failure.provider, provider);
+        assert_eq!(error.failure.category, Category::Protocol);
+        assert_eq!(error.history.len(), 1, "history belongs to failed followup, not tool turn");
+        assert_eq!(error.history[0].identity, error.failure.identity);
+        let requests = capture.requests.lock().expect("requests");
+        assert_eq!(requests.len(), 2);
+        assert_ne!(requests[0].0.logical_request_id, requests[1].0.logical_request_id);
+        assert_eq!(requests[1].0.wire_attempt, 1);
+        assert_eq!(error.failure.identity.as_ref(), Some(&requests[1].0));
+        let body: Value = serde_json::from_slice(&requests[1].1).expect("followup payload");
+        assert!(body["messages"]
+            .as_array()
+            .expect("messages")
+            .iter()
+            .any(|m| m["role"] == "tool"));
+        assert_eq!(error.failure.inspect_response_bytes(), b"synthetic-secret not JSON");
+        assert_fixture_headers(&error.failure, "synthetic-secret not JSON", false);
+        let cause = error.failure.inspect_cause().expect("original cause");
+        let decoder = cause
+            .source()
+            .expect("decoder retained")
+            .downcast_ref::<serde_json::Error>()
+            .expect("serde cause");
+        assert_eq!(
+            decoder.to_string(),
+            serde_json::from_str::<Value>("synthetic-secret not JSON")
+                .expect_err("fixture")
+                .to_string()
+        );
+        assert_eq!(
+            transitions(&capture),
+            vec![
+                Transition::AttemptStarted,
+                Transition::AttemptSucceeded,
+                Transition::AttemptStarted,
+                Transition::AttemptFailed
+            ]
+        );
+    }
+    for provider in ADAPTERS {
+        for session_api in [false, true] {
+            let tool_response = if provider == Provider::Ollama {
+                json!({"message":{"tool_calls":[{"function":{"name":"count","arguments":{}}}]},"done":true,"done_reason":"stop"})
+            } else {
+                json!({"choices":[{"message":{"tool_calls":[{"id":"call1","function":{"name":"count","arguments":"{}"}}]},"finish_reason":"tool_calls"}]})
+            };
+            let server = fixture(vec![
+                (200, tool_response.to_string(), false, false),
+                (200, "synthetic-secret not JSON".into(), false, false),
+            ])
+            .await;
+            adapter_case!(check, provider, &server.url, &server, session_api);
+        }
+    }
+}
+
+#[tokio::test]
+async fn review_raw_broker_stream_events_remain_single_send_legacy() {
+    async fn check<G: RecoveryProvider + 'static>(inner: G, _: Provider, server: &HttpFixture) {
+        let capture = Arc::new(Capture::default());
+        let gateway = RecoveryGateway::new(inner, policy(3, &capture)).expect("gateway");
+        let broker = LlmBroker::new("qwen3", Arc::new(gateway), None);
+        let messages = [LlmMessage::user("question")];
+        let events: Vec<_> = broker.generate_stream_events(&messages, None, None).collect().await;
+        assert_eq!(events.len(), 1);
+        let mojentic::llm::stream_events::StreamEvent::Error(error) = &events[0] else {
+            panic!("legacy terminal error")
+        };
+        let mojentic::llm::stream_events::StreamEventError::ProviderError { status, error } = error
+        else {
+            panic!("legacy provider error retained")
+        };
+        assert_eq!(*status, Some(503));
+        assert_eq!(*error, json!("synthetic-secret raw failure"));
+        assert_eq!(server.sends.load(Ordering::SeqCst), 1);
+        assert!(
+            capture.requests.lock().expect("requests").is_empty(),
+            "raw API bypasses recovery"
+        );
+        assert!(transitions(&capture).is_empty());
+    }
+    for provider in ADAPTERS {
+        let server =
+            fixture(vec![(503, "synthetic-secret raw failure".into(), false, false)]).await;
+        adapter_case!(check, provider, &server.url, &server);
+    }
+}
