@@ -667,6 +667,9 @@ async fn cancellation_retains_received_semantics_and_closes_when_consumer_pauses
             &CompletionConfig::default(),
             &call,
         );
+        if provider == Provider::Ollama {
+            assert!(matches!(stream.next().await, Some(RecoveryStreamEvent::Progress { .. })));
+        }
         assert!(matches!(stream.next().await, Some(RecoveryStreamEvent::Content(_))));
         call.cancellation.cancel();
         tokio::time::timeout(Duration::from_secs(2), async {
@@ -2457,6 +2460,9 @@ async fn review_keepalive_and_partial_http200_matrix() {
                     }
                     RecoveryStreamEvent::Failed(error) => panic!("keepalive recovery: {error}"),
                     RecoveryStreamEvent::Content(text) => assert_eq!(text, "done"),
+                    RecoveryStreamEvent::Progress { .. } | RecoveryStreamEvent::Metrics { .. } => {
+                        assert_eq!(provider, Provider::Ollama);
+                    }
                     _ => panic!("unexpected semantic event"),
                 }
             }
@@ -2942,4 +2948,432 @@ async fn review_raw_broker_stream_events_remain_single_send_legacy() {
             fixture(vec![(503, "synthetic-secret raw failure".into(), false, false)]).await;
         adapter_case!(check, provider, &server.url, &server);
     }
+}
+
+#[tokio::test]
+async fn recovery_metadata_public_red_green() {
+    use mojentic::llm::gateway::{LlmGateway, StreamChunk};
+    let body = "{\"message\":{},\"done\":false}\n{\"message\":{},\"done\":true,\"done_reason\":\"stop\"}\n";
+    let server = fixture(vec![(200, body.into(), false, false)]).await;
+    let gateway =
+        RecoveryGateway::new(OllamaGateway::with_host(&server.url), RecoveryPolicy::default())
+            .expect("gateway");
+    let config = CompletionConfig::default();
+    let chunks: Vec<_> = gateway.complete_stream("qwen3", &[], None, &config).collect().await;
+    assert_eq!(
+        chunks.iter().filter(|c| matches!(c, Ok(StreamChunk::Progress(_)))).count(),
+        2,
+        "every valid NDJSON frame needs decoded progress, including keepalive"
+    );
+    assert_eq!(
+        chunks.iter().filter(|c| matches!(c, Ok(StreamChunk::Metrics(_)))).count(),
+        1,
+        "terminal metrics must survive recovery compatibility mapping"
+    );
+}
+
+fn frozen_ollama_telemetry() -> String {
+    [
+        json!({"done":false}),
+        json!({"message":{"thinking":"思考🦀"},"done":false}),
+        json!({"message":{"content":"hé🦀"},"done":false}),
+        json!({"message":{"tool_calls":[{"id":"call-1","function":{"name":"count","arguments":{"value":"🦀"}}}]},"done":false}),
+        json!({"message":{},"done":true,"done_reason":"stop","total_duration":9000000000_u64,"load_duration":1000000000_u64,"prompt_eval_count":7,"prompt_eval_duration":2000000000_u64,"eval_count":12,"eval_duration":6000000000_u64}),
+    ].iter().map(|v| format!("{v}\n")).collect()
+}
+
+#[tokio::test]
+async fn recovery_metadata_frozen_ollama_matches_original_and_compatibility() {
+    use mojentic::llm::gateway::{LlmGateway, StreamChunk, StreamMetrics, StreamProgress};
+    let body = frozen_ollama_telemetry();
+    let server = fixture(vec![(200, body.clone(), false, false); 3]).await;
+    let config = CompletionConfig {
+        reasoning_effort: Some(mojentic::llm::gateway::ReasoningEffort::Enabled),
+        ..Default::default()
+    };
+    let messages = [LlmMessage::user("question")];
+    let inner = OllamaGateway::with_host(&server.url);
+    let old: Vec<_> = inner.complete_stream("qwen3", &messages, None, &config).collect().await;
+    let capture = Arc::new(Capture::default());
+    let gateway = RecoveryGateway::new(inner, policy(1, &capture)).expect("gateway");
+    let call = RecoveryCall::default();
+    let events: Vec<_> = gateway
+        .complete_stream_with_recovery("qwen3", &messages, None, &config, &call)
+        .collect()
+        .await;
+    let mut progress = vec![];
+    let mut metrics = vec![];
+    let mut identities = vec![];
+    let mut order = vec![];
+    let mut completed = None;
+    for event in events {
+        match event {
+            RecoveryStreamEvent::Progress {
+                identity,
+                progress: value,
+            } => {
+                identities.push(identity);
+                progress.push(value);
+                order.push("progress");
+            }
+            RecoveryStreamEvent::Metrics {
+                identity,
+                metrics: value,
+            } => {
+                identities.push(identity);
+                metrics.push(value);
+                order.push("metrics");
+            }
+            RecoveryStreamEvent::Reasoning(text) => {
+                assert_eq!(text, "思考🦀");
+                order.push("reasoning");
+            }
+            RecoveryStreamEvent::Content(text) => {
+                assert_eq!(text, "hé🦀");
+                order.push("content");
+            }
+            RecoveryStreamEvent::ToolFragment(value) => {
+                assert_eq!(value["function"]["arguments"]["value"], "🦀");
+                order.push("fragment");
+            }
+            RecoveryStreamEvent::Completed(result) => {
+                assert!(completed.is_none());
+                completed = Some(result);
+                order.push("completed");
+            }
+            RecoveryStreamEvent::Failed(e) => panic!("{e}"),
+        }
+    }
+    assert_eq!(
+        order,
+        [
+            "progress",
+            "progress",
+            "reasoning",
+            "progress",
+            "content",
+            "progress",
+            "fragment",
+            "progress",
+            "metrics",
+            "completed"
+        ]
+    );
+    let result = completed.expect("terminal proof");
+    assert!(identities.iter().all(|id| id == &result.report.identity));
+    assert_eq!(result.value.tool_calls.len(), 1);
+    assert_eq!(result.value.tool_calls[0].arguments["value"], "🦀");
+    assert_eq!(result.value.thinking.as_deref(), Some("思考🦀"));
+    assert_eq!(result.report.progress.raw_bytes, body.len() as u64);
+    assert_eq!(result.report.progress.delivered.reasoning_bytes, "思考🦀".len() as u64);
+    assert_eq!(result.report.progress.delivered.content_bytes, "hé🦀".len() as u64);
+    assert_eq!(result.report.progress.delivered.tool_fragments, 1);
+    assert_eq!(result.report.progress.delivered.completed_tool_calls, 1);
+    let old_progress: Vec<_> = old
+        .iter()
+        .filter_map(|c| match c.as_ref().expect("old stream") {
+            StreamChunk::Progress(p) => Some(p.clone()),
+            _ => None,
+        })
+        .collect();
+    let old_metrics: Vec<_> = old
+        .iter()
+        .filter_map(|c| match c.as_ref().expect("old stream") {
+            StreamChunk::Metrics(m) => Some(m.clone()),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(progress, old_progress);
+    assert_eq!(metrics, old_metrics);
+    assert_eq!(
+        progress[1],
+        StreamProgress {
+            provider: "ollama".into(),
+            frame_index: 2,
+            done: false,
+            content_chars: 0,
+            thinking_chars: "思考🦀".len(),
+            tool_call_count: 0,
+            accumulated_tool_call_count: 0
+        }
+    );
+    assert_eq!(
+        progress.iter().map(|p| p.accumulated_tool_call_count).collect::<Vec<_>>(),
+        [0, 0, 0, 0, 1]
+    );
+    assert_eq!(
+        metrics,
+        [StreamMetrics {
+            provider: "ollama".into(),
+            total_duration_ns: Some(9000000000),
+            load_duration_ns: Some(1000000000),
+            prompt_eval_count: Some(7),
+            prompt_eval_duration_ns: Some(2000000000),
+            eval_count: Some(12),
+            eval_duration_ns: Some(6000000000),
+            tokens_per_second: Some(2.0)
+        }]
+    );
+    let compatible: Vec<_> =
+        gateway.complete_stream("qwen3", &messages, None, &config).collect().await;
+    // Complete tool delivery follows terminal metrics once, just as in the original stream.
+    assert_eq!(
+        old.iter()
+            .map(|c| format!("{:?}", c.as_ref().expect("old")))
+            .collect::<Vec<_>>(),
+        compatible
+            .iter()
+            .map(|c| format!("{:?}", c.as_ref().expect("compatible")))
+            .collect::<Vec<_>>()
+    );
+    assert_eq!(server.sends.load(Ordering::SeqCst), 3);
+    let bodies = server.bodies.lock().expect("payloads");
+    assert_eq!(bodies[0], bodies[1]);
+    assert_eq!(bodies[1], bodies[2]);
+    assert_ne!(
+        serde_json::from_slice::<Value>(&bodies[1]).expect("json")["think"],
+        json!(false)
+    );
+    let requests = capture.requests.lock().expect("wire identity");
+    assert_eq!(requests.len(), 2);
+    assert_eq!(requests[0].0, result.report.identity);
+}
+
+#[tokio::test]
+async fn recovery_metadata_frame_accounting_after_503_and_keepalive_failure() {
+    for keepalive in [false, true] {
+        let prior = if keepalive {
+            "{\"message\":{},\"done\":false}\n"
+        } else {
+            "unavailable"
+        };
+        let server = fixture(vec![
+            (if keepalive { 200 } else { 503 }, prior.into(), keepalive, false),
+            (200, frozen_ollama_telemetry(), false, false),
+        ])
+        .await;
+        let capture = Arc::new(Capture::default());
+        let gateway =
+            RecoveryGateway::new(OllamaGateway::with_host(&server.url), policy(2, &capture))
+                .expect("gateway");
+        let call = RecoveryCall::default();
+        let events: Vec<_> = gateway
+            .complete_stream_with_recovery("qwen3", &[], None, &CompletionConfig::default(), &call)
+            .collect()
+            .await;
+        let mut frames = vec![];
+        let mut metrics = vec![];
+        let mut completed = None;
+        for event in events {
+            match event {
+                RecoveryStreamEvent::Progress { identity, progress } => {
+                    frames.push((identity, progress))
+                }
+                RecoveryStreamEvent::Metrics {
+                    identity,
+                    metrics: value,
+                } => metrics.push((identity, value)),
+                RecoveryStreamEvent::Completed(result) => completed = Some(result),
+                RecoveryStreamEvent::Failed(e) => panic!("{e}"),
+                _ => {}
+            }
+        }
+        let result = completed.expect("safe admitted recovery");
+        assert_resend(&result.report, &capture);
+        let prior_id = result.report.history[0].identity.as_ref().expect("first send");
+        if keepalive {
+            assert_eq!(&frames[0].0, prior_id);
+            assert_eq!(frames[0].1.frame_index, 1);
+            assert!(!frames[0].1.done);
+        }
+        let second = &frames[usize::from(keepalive)..];
+        assert_eq!(second.len(), 5);
+        for (index, (id, p)) in second.iter().enumerate() {
+            assert_eq!(id, &result.report.identity);
+            assert_eq!(p.frame_index, index + 1);
+        }
+        assert_eq!(metrics.len(), 1);
+        assert_eq!(metrics[0].0, result.report.identity);
+        assert!(!result.report.history[0].progress.observed.any());
+        assert!(!result.report.history[0].progress.delivered.any());
+        assert_eq!(result.report.history[0].progress.raw_bytes, prior.len() as u64);
+        assert_eq!(server.sends.load(Ordering::SeqCst), 2);
+        let bodies = server.bodies.lock().expect("same immutable bytes");
+        assert_eq!(bodies[0], bodies[1]);
+    }
+}
+
+#[tokio::test]
+async fn recovery_metadata_absent_counters_are_not_fabricated() {
+    let server = fixture(vec![(
+        200,
+        "{\"message\":{},\"done\":true,\"done_reason\":\"stop\"}\n".into(),
+        false,
+        false,
+    )])
+    .await;
+    let gateway =
+        RecoveryGateway::new(OllamaGateway::with_host(&server.url), RecoveryPolicy::default())
+            .expect("gateway");
+    let call = RecoveryCall::default();
+    let events: Vec<_> = gateway
+        .complete_stream_with_recovery("qwen3", &[], None, &CompletionConfig::default(), &call)
+        .collect()
+        .await;
+    assert_eq!(events.len(), 3);
+    match &events[1] {
+        RecoveryStreamEvent::Metrics { metrics, .. } => {
+            assert_eq!(metrics.provider, "ollama");
+            assert_eq!(
+                (
+                    metrics.total_duration_ns,
+                    metrics.load_duration_ns,
+                    metrics.prompt_eval_count,
+                    metrics.prompt_eval_duration_ns,
+                    metrics.eval_count,
+                    metrics.eval_duration_ns,
+                    metrics.tokens_per_second
+                ),
+                (None, None, None, None, None, None, None)
+            );
+        }
+        _ => panic!("final metrics"),
+    }
+    match &events[2] {
+        RecoveryStreamEvent::Completed(result) => {
+            assert!(!result.report.progress.observed.any());
+            assert!(!result.report.progress.delivered.any());
+        }
+        _ => panic!("completed"),
+    }
+}
+
+#[tokio::test]
+async fn recovery_metadata_unsupported_adapters_emit_no_ollama_telemetry() {
+    use mojentic::llm::gateway::{LlmGateway, StreamChunk};
+    async fn check<G: RecoveryProvider>(inner: G, server: &HttpFixture) {
+        let gateway = RecoveryGateway::new(inner, RecoveryPolicy::default()).expect("gateway");
+        let call = RecoveryCall::default();
+        let config = CompletionConfig::default();
+        let events: Vec<_> = gateway
+            .complete_stream_with_recovery("m", &[], None, &config, &call)
+            .collect()
+            .await;
+        assert!(matches!(events.last(), Some(RecoveryStreamEvent::Completed(_))));
+        assert!(!events.iter().any(|e| matches!(
+            e,
+            RecoveryStreamEvent::Progress { .. } | RecoveryStreamEvent::Metrics { .. }
+        )));
+        let chunks: Vec<_> = gateway.complete_stream("m", &[], None, &config).collect().await;
+        assert!(chunks.iter().all(|c| matches!(c, Ok(StreamChunk::Content(_)))));
+        assert_eq!(server.sends.load(Ordering::SeqCst), 2);
+    }
+    for provider in [Provider::Omlx, Provider::OpenAi] {
+        let server = fixture(vec![(200, final_stream(provider), false, false); 2]).await;
+        match provider {
+            Provider::Omlx => check(omlx(&server.url), &server).await,
+            Provider::OpenAi => {
+                check(
+                    OpenAIGateway::with_api_key_and_base_url("synthetic-secret", &server.url),
+                    &server,
+                )
+                .await
+            }
+            _ => unreachable!("SSE adapters"),
+        }
+    }
+}
+
+#[tokio::test]
+async fn recovery_metadata_paused_keepalive_cancellation_has_no_semantic_delivery() {
+    let body = "{\"message\":{},\"done\":false}\n";
+    let server = fixture(vec![(200, body.into(), false, true)]).await;
+    let capture = Arc::new(Capture::default());
+    let gateway = RecoveryGateway::new(OllamaGateway::with_host(&server.url), policy(3, &capture))
+        .expect("gateway");
+    let call = RecoveryCall::default();
+    let mut stream = gateway.complete_stream_with_recovery(
+        "qwen3",
+        &[],
+        None,
+        &CompletionConfig::default(),
+        &call,
+    );
+    let identity = match stream.next().await.expect("decoded keepalive") {
+        RecoveryStreamEvent::Progress { identity, progress } => {
+            assert_eq!(progress.frame_index, 1);
+            assert!(!progress.done);
+            identity
+        }
+        _ => panic!("progress"),
+    };
+    call.cancellation.cancel();
+    tokio::time::timeout(Duration::from_secs(2), async {
+        while server.closed.load(Ordering::SeqCst) == 0 {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("paused consumer still closes socket");
+    let error = match stream.next().await.expect("terminal failure") {
+        RecoveryStreamEvent::Failed(e) => e,
+        _ => panic!("cancelled"),
+    };
+    assert_eq!(error.outcome, Outcome::Cancelled);
+    assert_eq!(error.failure.identity.as_ref(), Some(&identity));
+    assert!(!error.failure.progress.observed.any());
+    assert!(!error.failure.progress.delivered.any());
+    assert_eq!(error.failure.progress.raw_bytes, body.len() as u64);
+    assert_eq!(error.history.len(), 1);
+    assert_eq!(server.sends.load(Ordering::SeqCst), 1);
+    assert_eq!(
+        transitions(&capture),
+        [
+            Transition::AttemptStarted,
+            Transition::AttemptFailed,
+            Transition::Cancelled
+        ]
+    );
+    assert!(stream.next().await.is_none());
+}
+
+#[tokio::test]
+async fn recovery_metadata_terminal_progress_cancellation_never_completes() {
+    let server = fixture(vec![(200,"{\"message\":{},\"done\":true,\"done_reason\":\"stop\",\"eval_count\":12,\"eval_duration\":6000000000}\n".into(),false,false)]).await;
+    let capture = Arc::new(Capture::default());
+    let gateway = RecoveryGateway::new(OllamaGateway::with_host(&server.url), policy(3, &capture))
+        .expect("gateway");
+    let call = RecoveryCall::default();
+    let mut stream = gateway.complete_stream_with_recovery(
+        "qwen3",
+        &[],
+        None,
+        &CompletionConfig::default(),
+        &call,
+    );
+    assert!(
+        matches!(stream.next().await,Some(RecoveryStreamEvent::Progress {progress,..}) if progress.done)
+    );
+    // Allow the worker to fill its bounded metadata buffer while the consumer pauses.
+    for _ in 0..10 {
+        tokio::task::yield_now().await;
+    }
+    call.cancellation.cancel();
+    let error = match stream.next().await.expect("terminal failure") {
+        RecoveryStreamEvent::Failed(e) => e,
+        _ => panic!("cancellation after terminal metadata must win"),
+    };
+    assert_eq!(error.outcome, Outcome::Cancelled);
+    assert_eq!(
+        transitions(&capture),
+        [
+            Transition::AttemptStarted,
+            Transition::AttemptFailed,
+            Transition::Cancelled
+        ]
+    );
+    assert!(!error.failure.progress.observed.any());
+    assert!(!error.failure.progress.delivered.any());
+    assert_eq!(server.sends.load(Ordering::SeqCst), 1);
+    assert!(stream.next().await.is_none());
 }

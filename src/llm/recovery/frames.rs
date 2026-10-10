@@ -1,6 +1,10 @@
 use super::{engine::PrivateEvidence, *};
 use crate::llm::{
-    gateways::{ollama::ollama_evidence, openai::openai_response_evidence},
+    gateway::StreamProgress,
+    gateways::{
+        ollama::{frame_progress_counts, ollama_evidence, ollama_stream_metrics},
+        openai::openai_response_evidence,
+    },
     models::{LlmGatewayResponse, LlmToolCall, ResponseEvidence},
 };
 use serde_json::Value;
@@ -135,6 +139,7 @@ struct Tool {
 }
 pub(super) struct Frames {
     provider: Provider,
+    frame_index: usize,
     pub terminal: bool,
     finish: Option<String>,
     content: String,
@@ -147,6 +152,7 @@ impl Frames {
     pub fn new(provider: Provider) -> Self {
         Self {
             provider,
+            frame_index: 0,
             terminal: false,
             finish: None,
             content: String::new(),
@@ -160,6 +166,7 @@ impl Frames {
         &mut self,
         line: &[u8],
         progress: &mut SemanticProgress,
+        identity: Option<&Identity>,
     ) -> Result<Vec<RecoveryStreamEvent>, PrivateEvidence> {
         let line = std::str::from_utf8(line).map_err(PrivateEvidence::from_error)?.trim();
         if line.is_empty() || line.starts_with(':') {
@@ -221,10 +228,28 @@ impl Frames {
             }
             &choices[0]["delta"]
         };
-        if !delta.is_object() {
+        if !delta.is_object() && !(self.provider == Provider::Ollama && delta.is_null()) {
             return Err(invalid("missing stream delta"));
         }
         let mut output = Vec::new();
+        if self.provider == Provider::Ollama {
+            self.frame_index += 1;
+            let (content_chars, thinking_chars, tool_call_count) = frame_progress_counts(&frame);
+            if let Some(identity) = identity {
+                output.push(RecoveryStreamEvent::Progress {
+                    identity: identity.clone(),
+                    progress: StreamProgress {
+                        provider: "ollama".into(),
+                        frame_index: self.frame_index,
+                        done: frame["done"].as_bool().unwrap_or(false),
+                        content_chars,
+                        thinking_chars,
+                        tool_call_count,
+                        accumulated_tool_call_count: self.ollama_tools.len(),
+                    },
+                });
+            }
+        }
         for (field, reasoning) in [
             ("content", false),
             (
@@ -286,6 +311,18 @@ impl Frames {
                     return Err(invalid("incomplete stream finish"));
                 }
                 self.terminal = true;
+            }
+        }
+        if self.provider == Provider::Ollama && self.terminal {
+            if let Some(identity) = identity {
+                // Match the provider's existing final metric extraction, including missing values.
+                output.insert(
+                    1,
+                    RecoveryStreamEvent::Metrics {
+                        identity: identity.clone(),
+                        metrics: ollama_stream_metrics(&frame),
+                    },
+                );
             }
         }
         if self.terminal || self.finish.as_deref() == Some("tool_calls") {

@@ -494,7 +494,7 @@ fn reported_fields(frame: &Value, fields: &[&str]) -> HashMap<String, Value> {
         .collect()
 }
 
-fn frame_progress_counts(json: &Value) -> (usize, usize, usize) {
+pub(crate) fn frame_progress_counts(json: &Value) -> (usize, usize, usize) {
     let Some(message) = json["message"].as_object() else {
         return (0, 0, 0);
     };
@@ -516,7 +516,7 @@ fn frame_progress_counts(json: &Value) -> (usize, usize, usize) {
     (content_chars, thinking_chars, tool_call_count)
 }
 
-fn ollama_stream_metrics(json: &Value) -> StreamMetrics {
+pub(crate) fn ollama_stream_metrics(json: &Value) -> StreamMetrics {
     let eval_count = json["eval_count"].as_u64();
     let eval_duration_ns = json["eval_duration"].as_u64();
     StreamMetrics {
