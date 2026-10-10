@@ -45,6 +45,14 @@ pub struct OllamaGateway {
 }
 
 impl OllamaGateway {
+    /// Opt into per-request recovery without changing legacy entrypoints.
+    pub fn with_recovery(
+        self,
+        policy: crate::llm::recovery::RecoveryPolicy,
+    ) -> Result<crate::llm::recovery::RecoveryGateway<Self>> {
+        crate::llm::recovery::RecoveryGateway::new(self, policy)
+    }
+
     /// Create a new Ollama gateway with default configuration
     pub fn new() -> Self {
         Self::with_config(OllamaConfig::default())
@@ -670,6 +678,33 @@ fn add_response_format(body: &mut Value, config: &CompletionConfig) {
                 // Text is the default, no need to add format field
             }
         }
+    }
+}
+
+impl crate::llm::recovery::RecoveryProvider for OllamaGateway {
+    fn recovery_provider(&self) -> crate::llm::recovery::Provider {
+        crate::llm::recovery::Provider::Ollama
+    }
+    fn prepare_recovery(
+        &self,
+        model: &str,
+        messages: &[LlmMessage],
+        tools: Option<&[Box<dyn LlmTool>]>,
+        config: &CompletionConfig,
+        schema: Option<Value>,
+        stream: bool,
+    ) -> Result<reqwest::Request> {
+        let mut body = chat_body(model, messages, config, stream)?;
+        if let Some(schema) = schema {
+            body["format"] = schema;
+        }
+        if let Some(tools) = tools {
+            body["tools"] =
+                serde_json::to_value(tools.iter().map(|t| t.descriptor()).collect::<Vec<_>>())?;
+        }
+        let mut request = self.chat_request(&body).build()?;
+        *request.timeout_mut() = None;
+        Ok(request)
     }
 }
 

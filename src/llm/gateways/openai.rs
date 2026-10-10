@@ -49,6 +49,14 @@ pub struct OpenAIGateway {
 }
 
 impl OpenAIGateway {
+    /// Opt into per-request recovery without changing legacy entrypoints.
+    pub fn with_recovery(
+        self,
+        policy: crate::llm::recovery::RecoveryPolicy,
+    ) -> Result<crate::llm::recovery::RecoveryGateway<Self>> {
+        crate::llm::recovery::RecoveryGateway::new(self, policy)
+    }
+
     /// Create a new OpenAI gateway with default configuration.
     pub fn new() -> Self {
         Self::with_config(OpenAIConfig::default())
@@ -617,6 +625,42 @@ fn validate_reasoning_config(config: &CompletionConfig) -> Result<()> {
 pub(crate) fn add_response_format(body: &mut Value, config: &CompletionConfig) {
     if let Some(format) = &config.response_format {
         body["response_format"] = openai_response_format(format);
+    }
+}
+
+impl crate::llm::recovery::RecoveryProvider for OpenAIGateway {
+    fn recovery_provider(&self) -> crate::llm::recovery::Provider {
+        crate::llm::recovery::Provider::OpenAi
+    }
+    fn prepare_recovery(
+        &self,
+        model: &str,
+        messages: &[LlmMessage],
+        tools: Option<&[Box<dyn LlmTool>]>,
+        config: &CompletionConfig,
+        schema: Option<Value>,
+        stream: bool,
+    ) -> Result<reqwest::Request> {
+        let mut config = config.clone();
+        if let Some(schema) = schema {
+            config.response_format = Some(ResponseFormat::JsonObject {
+                schema: Some(schema),
+            });
+        }
+        let (mut body, supports_tools) = self.chat_body(model, messages, &config)?;
+        body["stream"] = Value::Bool(stream);
+        if stream {
+            body["stream_options"] = serde_json::json!({"include_usage": true});
+        }
+        if let Some(tools) = tools {
+            if supports_tools {
+                body["tools"] =
+                    serde_json::to_value(tools.iter().map(|t| t.descriptor()).collect::<Vec<_>>())?;
+            }
+        }
+        let mut request = self.chat_request(&body).build()?;
+        *request.timeout_mut() = None;
+        Ok(request)
     }
 }
 

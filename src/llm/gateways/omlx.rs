@@ -168,6 +168,14 @@ pub struct OmlxGateway {
 }
 
 impl OmlxGateway {
+    /// Opt into per-request recovery without changing legacy entrypoints.
+    pub fn with_recovery(
+        self,
+        policy: crate::llm::recovery::RecoveryPolicy,
+    ) -> Result<crate::llm::recovery::RecoveryGateway<Self>> {
+        crate::llm::recovery::RecoveryGateway::new(self, policy)
+    }
+
     /// Create a gateway configured from the environment. See [`OmlxConfig`].
     pub fn new() -> Self {
         Self::with_config(OmlxConfig::default())
@@ -304,8 +312,11 @@ async fn success(response: Response) -> Result<Response> {
 
 /// Every `Warning` header value, joined with `, `.
 fn format_warning(response: &Response) -> Option<String> {
-    let values: Vec<_> = response
-        .headers()
+    format_warning_headers(response.headers())
+}
+
+pub(crate) fn format_warning_headers(headers: &reqwest::header::HeaderMap) -> Option<String> {
+    let values: Vec<_> = headers
         .get_all(reqwest::header::WARNING)
         .iter()
         .map(|value| String::from_utf8_lossy(value.as_bytes()).into_owned())
@@ -598,6 +609,36 @@ impl LlmGateway for OmlxGateway {
         body["stream_options"] = serde_json::json!({"include_usage": true});
 
         Ok(drive_event_stream(self.chat_request(&body), OmlxEventParser::default()))
+    }
+}
+
+impl crate::llm::recovery::RecoveryProvider for OmlxGateway {
+    fn recovery_provider(&self) -> crate::llm::recovery::Provider {
+        crate::llm::recovery::Provider::Omlx
+    }
+    fn prepare_recovery(
+        &self,
+        model: &str,
+        messages: &[LlmMessage],
+        tools: Option<&[Box<dyn LlmTool>]>,
+        config: &CompletionConfig,
+        schema: Option<Value>,
+        stream: bool,
+    ) -> Result<reqwest::Request> {
+        let mut config = config.clone();
+        if let Some(schema) = schema {
+            config.response_format = Some(ResponseFormat::JsonObject {
+                schema: Some(schema),
+            });
+        }
+        let mut body = chat_body(model, messages, &config)?;
+        body["stream"] = Value::Bool(stream);
+        if let Some(tools) = tools {
+            body["tools"] = tool_definitions(tools)?;
+        }
+        let mut request = self.chat_request(&body).build()?;
+        *request.timeout_mut() = None;
+        Ok(request)
     }
 }
 
