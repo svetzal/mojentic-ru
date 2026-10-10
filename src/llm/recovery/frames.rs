@@ -1,6 +1,10 @@
 use super::{engine::PrivateEvidence, *};
 use crate::llm::{
-    gateways::{ollama::ollama_evidence, openai::openai_response_evidence},
+    gateway::StreamProgress,
+    gateways::{
+        ollama::{frame_progress_counts, ollama_evidence, ollama_stream_metrics},
+        openai::openai_response_evidence,
+    },
     models::{LlmGatewayResponse, LlmToolCall, ResponseEvidence},
 };
 use serde_json::Value;
@@ -135,6 +139,7 @@ struct Tool {
 }
 pub(super) struct Frames {
     provider: Provider,
+    frame_index: usize,
     pub terminal: bool,
     finish: Option<String>,
     content: String,
@@ -147,6 +152,7 @@ impl Frames {
     pub fn new(provider: Provider) -> Self {
         Self {
             provider,
+            frame_index: 0,
             terminal: false,
             finish: None,
             content: String::new(),
@@ -160,17 +166,39 @@ impl Frames {
         &mut self,
         line: &[u8],
         progress: &mut SemanticProgress,
-    ) -> Result<Vec<RecoveryStreamEvent>, PrivateEvidence> {
+        identity: Option<&Identity>,
+    ) -> (Vec<RecoveryStreamEvent>, Result<(), PrivateEvidence>) {
+        let mut output = Vec::new();
+        let result = self.parse_frame(line, progress, identity, &mut output);
+        if result.is_err() {
+            // A rejected finish cannot deliver semantic output or completed tools.
+            // Retain only telemetry extracted from structurally validated fields.
+            output.retain(|event| {
+                matches!(
+                    event,
+                    RecoveryStreamEvent::Progress { .. } | RecoveryStreamEvent::Metrics { .. }
+                )
+            });
+        }
+        (output, result)
+    }
+    fn parse_frame(
+        &mut self,
+        line: &[u8],
+        progress: &mut SemanticProgress,
+        identity: Option<&Identity>,
+        output: &mut Vec<RecoveryStreamEvent>,
+    ) -> Result<(), PrivateEvidence> {
         let line = std::str::from_utf8(line).map_err(PrivateEvidence::from_error)?.trim();
         if line.is_empty() || line.starts_with(':') {
-            return Ok(vec![]);
+            return Ok(());
         }
         if self.terminal {
             return Err(invalid("frame after terminal marker"));
         }
         let line = if self.provider != Provider::Ollama {
             if line.starts_with("event:") || line.starts_with("id:") {
-                return Ok(vec![]);
+                return Ok(());
             }
             line.strip_prefix("data:").ok_or_else(|| invalid("invalid SSE field"))?.trim()
         } else {
@@ -181,14 +209,14 @@ impl Frames {
                 return Err(invalid("terminal marker without safe finish reason"));
             }
             self.terminal = true;
-            return Ok(vec![]);
+            return Ok(());
         }
         let frame: Value = serde_json::from_str(line).map_err(PrivateEvidence::from_error)?;
         if !frame.is_object() {
             return Err(invalid("frame must be an object"));
         }
         if self.provider == Provider::Omlx && frame["model"] == "keepalive" {
-            return Ok(vec![]);
+            return Ok(());
         }
         if !frame["error"].is_null() {
             return Err(PrivateEvidence::new(line.as_bytes().to_vec()));
@@ -210,7 +238,7 @@ impl Frames {
         } else {
             let choices = frame["choices"].as_array().ok_or_else(|| invalid("missing choices"))?;
             if choices.is_empty() && !frame["usage"].is_null() {
-                return Ok(vec![]);
+                return Ok(());
             }
             if choices.len() != 1 {
                 return Err(invalid("expected one choice"));
@@ -221,10 +249,10 @@ impl Frames {
             }
             &choices[0]["delta"]
         };
-        if !delta.is_object() {
+        if !delta.is_object() && !(self.provider == Provider::Ollama && delta.is_null()) {
             return Err(invalid("missing stream delta"));
         }
-        let mut output = Vec::new();
+        let accumulated_tool_call_count = self.ollama_tools.len();
         for (field, reasoning) in [
             ("content", false),
             (
@@ -279,9 +307,44 @@ impl Frames {
             if !(frame["done"].is_null() || frame["done"].is_boolean()) {
                 return Err(invalid("invalid done field"));
             }
+            let finish = if frame["done"] == true {
+                text(&frame["done_reason"])?
+            } else {
+                None
+            };
+            self.frame_index += 1;
+            let (content_chars, thinking_chars, tool_call_count) = frame_progress_counts(&frame);
+            if let Some(identity) = identity {
+                output.insert(
+                    0,
+                    RecoveryStreamEvent::Progress {
+                        identity: identity.clone(),
+                        progress: StreamProgress {
+                            provider: "ollama".into(),
+                            frame_index: self.frame_index,
+                            done: frame["done"].as_bool().unwrap_or(false),
+                            content_chars,
+                            thinking_chars,
+                            tool_call_count,
+                            accumulated_tool_call_count,
+                        },
+                    },
+                );
+            }
             if frame["done"] == true {
-                self.finish = text(&frame["done_reason"])?;
+                self.finish = finish;
                 self.evidence.finish_reason = self.finish.clone();
+                if let Some(identity) = identity {
+                    // Metrics describe the received terminal frame, even when its
+                    // finish reason does not prove successful completion.
+                    output.insert(
+                        1,
+                        RecoveryStreamEvent::Metrics {
+                            identity: identity.clone(),
+                            metrics: ollama_stream_metrics(&frame),
+                        },
+                    );
+                }
                 if self.finish.as_deref() != Some("stop") {
                     return Err(invalid("incomplete stream finish"));
                 }
@@ -291,7 +354,7 @@ impl Frames {
         if self.terminal || self.finish.as_deref() == Some("tool_calls") {
             progress.completed_tool_calls = self.build_tools()?.len() as u64;
         }
-        Ok(output)
+        Ok(())
     }
     fn build_tools(&self) -> Result<Vec<LlmToolCall>, PrivateEvidence> {
         if self.provider == Provider::Ollama {

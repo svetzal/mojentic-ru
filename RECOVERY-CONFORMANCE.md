@@ -243,13 +243,13 @@ of this work. The current gates passed:
 | --- | --- |
 | `cargo fmt --check` | Passed |
 | `cargo clippy --all-targets --all-features -- -D warnings` | Passed |
-| `cargo test --verbose --all-features` | Passed: 641 unit/integration tests, 19 doctests; 24 existing ignored doctests |
+| `cargo test --verbose --all-features` | Passed: 648 unit/integration tests, 19 doctests; 24 existing ignored doctests |
 | `cargo test` | Passed with default features: same counts |
 | `cargo build --verbose --all-features` | Passed |
 | `cargo doc --no-deps --all-features` | Passed |
 | `cargo deny check` | Passed unfiltered; existing duplicate dependency warnings |
 | `cargo audit` | Passed unfiltered |
-| `cargo tarpaulin --all-features --fail-under 56` | Passed: 69.33% (3240/4673 lines); unchanged 56% floor |
+| `cargo tarpaulin --all-features --fail-under 56` | Passed: 69.47% (3263/4697 lines); unchanged 56% floor |
 | `mdbook build book` | Exit 0, HTML generated; existing `truncate-long-entries` configuration diagnostic remains |
 | Markdown lint | Passed with MD013 disabled for existing long tables/URLs |
 
@@ -262,6 +262,64 @@ or every possible input combination follows from these checks.
 There is no claim of six-port parity or live-provider efficacy. A fresh registered
 harness experiment, finalized implementation commit, and harness lockfile pin
 remain the controller's integration work. Never restart the frozen experiment.
-The recovery suite contains 42 tests, many iterating all three adapters and
+The recovery suite contains 55 tests, many iterating all three adapters and
 multiple failure modes. Foundry owns review and ref finalization; this worktree
 intentionally remains uncommitted and has no reviewed landed SHA yet.
+
+## Recovery stream telemetry prerequisite
+
+The additive public events are `Progress { identity: Identity, progress:
+StreamProgress }` and `Metrics { identity: Identity, metrics: StreamMetrics }`.
+They map unchanged to compatibility `StreamChunk` variants. Ollama reuses its
+existing provider helpers: UTF-8 byte counts, pre-frame accumulated tool count,
+actual final durations/counts, optional metrics, and throughput calculation.
+Each attempt has its own frame index. Metadata is nonsemantic and does not
+change retry admission, terminal proof, or interaction accounting.
+OpenAI/oMLX retain their original lack of these telemetry events; no equivalent
+Ollama counters are invented. See the migration section in
+[recovery documentation](book/src/core/recovery.md#decoded-stream-progress-and-metrics).
+
+The assertion-bearing RED measured zero decoded progress events in the recovery
+compatibility stream versus two required frames. GREEN proves both frame events
+and final metrics. A frozen HTTP script compares original Ollama, public recovery,
+and compatibility values/order, Unicode output, tools, identity, immutable native
+reasoning payloads and actual metrics. Further tests measure frame resets after
+503 or safely admitted keepalive-only failure, absent metrics, unsupported SSE
+telemetry, and paused keepalive cancellation with no semantic delivery.
+A second RED exposed completion finalized behind buffered terminal metadata.
+The worker now reserves delivery capacity before advancing the provider stream;
+GREEN proves paused terminal-progress cancellation ends with `AttemptFailed`
+then one `Cancelled`, without `AttemptSucceeded` or completed tools.
+The earlier adapter cancellation/capture/interruption and Foundry remainder
+matrices remain intact; only metadata-aware consumption assertions were added.
+Full capture logs and source fingerprints are in `.foundry/proof.json`.
+Foundry owns independent review and finalization; no reviewed landed SHA exists
+for these uncommitted changes. The coordinator must wait for that finalized
+revision before repinning Harness or launching fresh real inference.
+
+## Rejected terminal telemetry correction
+
+This continuation imports only implementation commit
+`638c41e16f5d8b07b163c211137cfeeb81bc9b8f` from
+`foundry-task/mojentic-ru-35342b89ceaa` as a patch on reviewed base
+`a76124ad` (the full base SHA is recorded in proof). Its earlier recovery matrix
+and paused-terminal cancellation correction are preserved. Git refs are unchanged.
+
+Assertion-bearing HTTP RED tests reproduced dropped telemetry independently on
+raw recovery and compatibility streams for valid Ollama `done=true`,
+`done_reason="length"`, `eval_count=12`, `eval_duration=6000000000`. The decoder
+now returns validated telemetry alongside the original finish-validation error.
+GREEN compares every progress/metric field to legacy Ollama and asserts exact
+terminal `Progress -> Metrics -> Failed` ordering, identity, one attempt per
+call, identical request payloads, and no completed tool delivery or retry.
+Earlier Unicode content/reasoning/tool fragments retain delivered evidence;
+semantic fields inside the rejected frame remain observed-only. Malformed text,
+tool arguments, done flag and finish reason emit no fabricated telemetry.
+OpenAI/oMLX length termination remains a failure without invented Ollama metrics.
+Capture failures and cancellation at either terminal metadata boundary preserve
+evidence, prevent completion/retry, and retain ordered terminal lifecycle events.
+
+Current full gate results, source fingerprints and independent review evidence
+are recorded in `.foundry/proof.json`; historical gate counts above are retained
+as prior-stage context. No live inference or Harness writes are part of this
+work. Foundry must finalize a reviewed commit before supplying a landed SHA.

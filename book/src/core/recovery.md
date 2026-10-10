@@ -52,8 +52,9 @@ future stays pending and is cancelled when the call is cancelled or its recovery
 budget expires. Every retry invokes the hook when configured, including OpenAI.
 
 `complete_json_with_recovery` returns a parsed object and the same report.
-`complete_stream_with_recovery` returns content, reasoning, tool fragments, and
-exactly one `Completed` or `Failed` event. Fragments are inspection data; execute
+`complete_stream_with_recovery` returns content, reasoning, tool fragments,
+nonsemantic progress/metrics when supported, and exactly one `Completed` or
+`Failed` event. Fragments are inspection data; execute
 only complete calls after terminal success. Wrapping the gateway also enables
 recovery on `LlmGateway::complete_stream`, including broker/session streaming.
 Native thinking remains available to broker-managed tool rounds when
@@ -63,7 +64,7 @@ Native thinking remains available to broker-managed tool rounds when
 Any observed reasoning, content, or tool fragment prevents replay, including
 output buffered before delivery. A partial successful HTTP JSON body also
 prevents replay conservatively. Incomplete stream frames fail closed. Complete
-keepalive frames affect raw bytes only. Cancellation yields `Cancelled`, retains
+keepalive frames affect raw bytes and decoded frame progress only. Cancellation yields `Cancelled`, retains
 received evidence, and closes owned response resources even if a streaming
 consumer pauses. Dropping a recovery stream cancels its owned worker. Closing a
 socket proves local cleanup; it does not prove remote inference terminated.
@@ -111,3 +112,47 @@ repository for assertions, limitations, and validation evidence.
 Known HTTP 400/401/403 responses remain permanent even when their bodies are
 truncated. A body transport error preserves the HTTP status and private original
 cause; selecting those statuses or allowing admission cannot authorize a resend.
+
+## Decoded stream progress and metrics
+
+Recovery streams now expose `RecoveryStreamEvent::Progress { identity, progress }`
+and `RecoveryStreamEvent::Metrics { identity, metrics }`. Add these arms to
+exhaustive event matches when migrating. `identity` correlates each event to the
+logical request, attempt ID, and one-based wire attempt. Ollama frame indices
+start at one again on each attempt, including after a safely admitted retry.
+
+The values are the same `StreamProgress` and `StreamMetrics` used by the original
+`OllamaGateway::complete_stream`. Progress precedes semantic output from each
+valid NDJSON frame, including empty keepalives and the terminal frame. Its
+accumulated tool count describes calls accumulated **before** that frame.
+The existing `content_chars` and `thinking_chars` fields measure UTF-8 byte
+lengths; their names and values are preserved for compatibility. Terminal metrics
+follow terminal progress; completed tool calls are delivered only after provider
+terminal proof. Recovery's `LlmGateway::complete_stream` maps these events to
+`StreamChunk::Progress` and `StreamChunk::Metrics`, preserving the values.
+
+A structurally valid Ollama terminal frame with an unsuccessful finish reason
+(for example `done_reason="length"`) still emits exact `Progress`, then `Metrics`,
+then `Failed`. Compatibility streams emit the same metadata followed by the
+recovery error. Telemetry describes what the provider reported, rather than
+certifying a successful reply. Semantic fields in that rejected frame count as
+observed evidence, but are withheld from delivery; no completed tools or retry
+follow. Earlier delivered semantic output remains accounted for. Malformed
+fields do not produce telemetry from unvalidated data. Cancellation and capture
+failure can stop delivery before metadata reaches the consumer while retaining
+received semantic evidence in the failure report.
+
+Ollama durations/counts come directly from provider fields; absent fields and
+undefined throughput remain `None`. OpenAI and oMLX do not expose these Ollama
+frame counters or final duration metrics through their existing compatibility
+streams, so recovery emits neither event for them. Provider response evidence
+remains available on completion. Do not infer missing telemetry or fabricate
+local/cloud equivalents.
+
+Progress and metrics are nonsemantic metadata. They do not increment delivered
+content, reasoning, tool fragments, completed tools, or model/tool interactions.
+Keepalives can inform a harness's progress/stall classification, but never prove
+remote termination or authorize another attempt. Wire body observation remains
+raw transport evidence and is not a substitute for decoded frame progress.
+Cancellation and capture failures retain the existing observed/delivered
+semantic counters; metadata never changes replay safety or admission requirements.

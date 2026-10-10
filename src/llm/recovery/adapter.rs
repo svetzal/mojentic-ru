@@ -206,6 +206,8 @@ impl<G: RecoveryProvider> LlmGateway for RecoveryGateway<G> {
             let mut stream = self.complete_stream_with_recovery(model, messages, tools, config, &call);
             while let Some(event) = stream.next().await {
                 match event {
+                    RecoveryStreamEvent::Progress { progress, .. } => yield Ok(StreamChunk::Progress(progress)),
+                    RecoveryStreamEvent::Metrics { metrics, .. } => yield Ok(StreamChunk::Metrics(metrics)),
                     RecoveryStreamEvent::Content(text) => yield Ok(StreamChunk::Content(text)),
                     RecoveryStreamEvent::Reasoning(text) => yield Ok(StreamChunk::Thinking(text)),
                     RecoveryStreamEvent::Completed(response) => { if !response.value.tool_calls.is_empty() { yield Ok(StreamChunk::ToolCalls(response.value.tool_calls)); } },

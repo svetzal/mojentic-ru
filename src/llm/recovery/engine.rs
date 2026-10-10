@@ -3,7 +3,11 @@ use super::{
     frames::Frames,
     *,
 };
-use crate::llm::{models::LlmGatewayResponse, stream_events::LineBuffer};
+use crate::llm::{
+    gateway::{StreamMetrics, StreamProgress},
+    models::LlmGatewayResponse,
+    stream_events::LineBuffer,
+};
 use futures::{Stream, StreamExt};
 use std::future::Future;
 use std::{
@@ -12,8 +16,19 @@ use std::{
 };
 use uuid::Uuid;
 
-/// Semantic output for one logical completion. Completed and Failed are terminal.
+/// Output and nonsemantic telemetry for one logical completion.
+/// Completed and Failed are terminal; progress never proves remote termination.
 pub enum RecoveryStreamEvent {
+    /// Decoded provider frame metadata; does not count as delivered semantic output.
+    Progress {
+        identity: Identity,
+        progress: StreamProgress,
+    },
+    /// Provider-reported final metrics; absent when unsupported, never estimated.
+    Metrics {
+        identity: Identity,
+        metrics: StreamMetrics,
+    },
     Content(String),
     Reasoning(String),
     /// Raw provider tool fragment, for explicit inspection only; never execute it.
@@ -672,13 +687,22 @@ pub(super) fn stream<G: RecoveryProvider>(
         let worker_delivered = delivered.clone();
         tokio::spawn(async move {
             let mut source = stream_owned(owner, request, worker_call.clone(), worker_delivered);
-            while let Some(event) = source.next().await {
+            loop {
+                // Reserve delivery capacity before advancing the provider stream. In
+                // particular, do not finalize success behind buffered terminal metadata
+                // while a paused consumer can still cancel the active attempt.
+                let permit = tokio::select! { biased;
+                    _ = worker_call.cancellation.cancelled() => None,
+                    permit = sender.reserve() => match permit {
+                        Ok(permit) => Some(permit),
+                        Err(_) => break,
+                    },
+                };
+                let Some(event) = source.next().await else { break; };
                 let terminal = matches!(event, RecoveryStreamEvent::Completed(_) | RecoveryStreamEvent::Failed(_));
-                if terminal { let _ = sender.send(event).await; break; }
-                tokio::select! { biased;
-                    _ = worker_call.cancellation.cancelled() => {},
-                    result = sender.send(event) => { if result.is_err() { break; } },
-                }
+                if let Some(permit) = permit { permit.send(event); }
+                else if terminal { let _ = sender.send(event).await; }
+                if terminal { break; }
             }
         });
         while let Some(mut event) = receiver.recv().await {
@@ -738,10 +762,9 @@ fn stream_owned(
                     // Account for all semantic evidence in a received chunk before yielding any part.
                     let mut output = Vec::new();
                     for line in lines.push(&chunk) {
-                        match frames.parse(&line, &mut state.current.progress.observed) {
-                            Ok(events) => output.extend(events),
-                            Err(cause) => { state.decode_failure(cause); failed = true; break; },
-                        }
+                        let (events, result) = frames.parse(&line, &mut state.current.progress.observed, state.current.identity.as_ref());
+                        output.extend(events);
+                        if let Err(cause) = result { state.decode_failure(cause); failed = true; break; }
                     }
                     if let Err(error) = state.wire(|id| WireEvent::Body { identity: id, bytes: &chunk }) { yield RecoveryStreamEvent::Failed(error); return; }
                     for event in output {
