@@ -14,3 +14,5 @@ pub use gateway::{CompletionConfig, LlmGateway};
 pub use models::{LlmGatewayResponse, LlmMessage, LlmToolCall, MessageRole, ResponseEvidence};
 pub use stream_events::{StreamEvent, StreamEventError, StreamEventStream};
 pub use tools::{FunctionDescriptor, LlmTool, ToolDescriptor, ToolWrapper};
+
+pub mod recovery;

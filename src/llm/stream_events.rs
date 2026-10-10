@@ -202,6 +202,10 @@ pub(crate) struct LineBuffer {
 }
 
 impl LineBuffer {
+    pub(crate) fn has_pending(&self) -> bool {
+        !self.pending.is_empty()
+    }
+
     pub(crate) fn push(&mut self, chunk: &[u8]) -> Vec<Vec<u8>> {
         self.pending.extend_from_slice(chunk);
         let Some(last_newline) = self.pending.iter().rposition(|byte| *byte == b'\n') else {
