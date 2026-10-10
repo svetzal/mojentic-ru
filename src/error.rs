@@ -8,6 +8,9 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum MojenticError {
+    /// Structured opt-in completion recovery failure.
+    #[error("{0}")]
+    Recovery(Box<crate::llm::recovery::RecoveryError>),
     #[error("LLM gateway error: {0}")]
     GatewayError(String),
 
