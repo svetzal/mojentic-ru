@@ -1,0 +1,7 @@
+ Downloading crates ...
+  Downloaded schemars_derive v1.2.3
+  Downloaded schemars v1.2.3
+   Compiling schemars_derive v1.2.3
+    Checking schemars v1.2.3
+    Checking mojentic v2.1.0 (/home/svetzal/Work/Projects/Personal/mojentic-unify/mojentic-ru)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 17.98s
