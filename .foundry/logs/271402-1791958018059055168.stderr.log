@@ -1,0 +1,17 @@
+   Compiling tokio v1.53.3
+   Compiling tokio-util v0.7.20
+   Compiling tower v0.5.3
+   Compiling tokio-rustls v0.26.5
+   Compiling tokio-native-tls v0.3.1
+   Compiling tokio-stream v0.1.19
+   Compiling tokio-tungstenite v0.30.0
+   Compiling tokio-test v0.4.6
+   Compiling tower-http v0.6.11
+   Compiling h2 v0.4.19
+   Compiling hyper v1.11.1
+   Compiling hyper-util v0.1.21
+   Compiling hyper-rustls v0.27.10
+   Compiling mockito v1.7.2
+   Compiling reqwest v0.13.5
+   Compiling mojentic v2.1.0 (/home/svetzal/Work/Projects/Personal/mojentic-unify/mojentic-ru)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 40.00s
