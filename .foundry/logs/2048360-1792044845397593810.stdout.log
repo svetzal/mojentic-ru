@@ -1,0 +1,40 @@
+Crate:     rustls
+Version:   0.23.45
+Title:     `Debug` impls for client session values expose TLS secrets
+Date:      2026-10-14
+ID:        RUSTSEC-2026-0346
+URL:       https://rustsec.org/advisories/RUSTSEC-2026-0346
+Severity:  4 (medium)
+Solution:  Upgrade to >=0.23.46
+
+Crate:     rustls
+Version:   0.23.45
+Title:     Unauthenticated ServerHello can downgrade later connections to classical key exchange
+Date:      2026-10-14
+ID:        RUSTSEC-2026-0349
+URL:       https://rustsec.org/advisories/RUSTSEC-2026-0349
+Severity:  3.7 (low)
+Solution:  Upgrade to >=0.23.46
+
+Crate:     rustls
+Version:   0.23.45
+Title:     Buffered application data sent to outer server after ECH rejection
+Date:      2026-10-14
+ID:        RUSTSEC-2026-0347
+URL:       https://rustsec.org/advisories/RUSTSEC-2026-0347
+Severity:  2.3 (low)
+Solution:  Upgrade to >=0.23.46
+
+Crate:     rustls
+Version:   0.23.45
+Title:     Brotli certificate decompression can allocate up to 1 GiB before authentication
+Date:      2026-10-14
+ID:        RUSTSEC-2026-0348
+URL:       https://rustsec.org/advisories/RUSTSEC-2026-0348
+Severity:  3.7 (low)
+Solution:  Upgrade to >=0.23.46
+
+Crate:     yoke-derive
+Version:   0.8.3
+Warning:   yanked
+
