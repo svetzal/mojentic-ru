@@ -319,10 +319,11 @@ OpenAI/oMLX length termination remains a failure without invented Ollama metrics
 Capture failures and cancellation at either terminal metadata boundary preserve
 evidence, prevent completion/retry, and retain ordered terminal lifecycle events.
 
-Current full gate results, source fingerprints and independent review evidence
-are recorded in `.foundry/proof.json`; historical gate counts above are retained
-as prior-stage context. No live inference or Harness writes are part of this
-work. Foundry must finalize a reviewed commit before supplying a landed SHA.
+Current scoped gate results, tested source identity and coverage reconciliation
+are recorded in [CONFORMANCE-3.0.0.md](CONFORMANCE-3.0.0.md). Historical gate
+counts and scratch-evidence references above are prior-stage context only;
+Foundry scratch is not durable repository evidence. No live inference or Harness
+writes are part of this work. Foundry must finalize a reviewed commit before supplying a landed SHA.
 
 
 ## October 12 amendment item 2 correction
