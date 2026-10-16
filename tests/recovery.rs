@@ -3685,3 +3685,325 @@ async fn recovery_rejected_terminal_metadata_cancellation_wins() {
         assert_eq!(server.sends.load(Ordering::SeqCst), 1);
     }
 }
+
+struct Unresolved;
+#[async_trait]
+impl Admission for Unresolved {
+    async fn decide(&self, _: AdmissionContext) -> AdmissionDecision {
+        AdmissionDecision::Unresolved
+    }
+}
+
+#[tokio::test]
+async fn admission_unresolved_http_matrix() {
+    async fn check<G: RecoveryProvider>(
+        inner: G,
+        provider: Provider,
+        server: &HttpFixture,
+        operation: Operation,
+    ) {
+        let capture = Arc::new(Capture::default());
+        let mut p = policy(3, &capture);
+        p.admission = Some(Arc::new(Unresolved));
+        let gateway = RecoveryGateway::new(inner, p).expect("gateway");
+        let error = reviewed_operation(&gateway, operation, &RecoveryCall::default())
+            .await
+            .expect_err("unresolved admission must stop");
+        assert_eq!(error.outcome, Outcome::AdmissionUnresolved);
+        assert_single_failure(&error, &capture, provider);
+        assert_eq!(error.failure.operation, operation);
+        assert_eq!(error.failure.http_status, Some(503));
+        assert_eq!(error.failure.inspect_response_bytes(), b"synthetic-secret failure");
+        assert_eq!(server.sends.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            transitions(&capture),
+            vec![
+                Transition::AttemptStarted,
+                Transition::AttemptFailed,
+                Transition::AdmissionPending,
+                Transition::AdmissionUnresolved,
+            ]
+        );
+        let events = capture.events.lock().expect("events");
+        for event in events.iter().skip(1) {
+            assert_eq!(event.identity, error.failure.identity);
+            assert_eq!(event.failure.as_ref().expect("failure").http_status, Some(503));
+        }
+        assert!(!format!("{error:?} {error}").contains("synthetic-secret"));
+        assert!(!serde_json::to_string(&error).expect("safe error").contains("synthetic-secret"));
+        assert!(!serde_json::to_string(&*events)
+            .expect("safe events")
+            .contains("synthetic-secret"));
+        assert_eq!(serde_json::to_value(error.outcome).expect("outcome"), "admission_unresolved");
+        assert_eq!(
+            serde_json::to_value(events.last().expect("terminal").transition).expect("reason"),
+            "admission_unresolved"
+        );
+    }
+    for provider in ADAPTERS {
+        for operation in OPERATIONS {
+            let server = fixture(vec![
+                (503, "synthetic-secret failure".into(), false, false),
+                (200, response(provider, "unexpected resend").to_string(), false, false),
+            ])
+            .await;
+            adapter_case!(check, provider, &server.url, &server, operation);
+        }
+    }
+}
+
+#[tokio::test]
+async fn admission_unresolved_broker_session_http_matrix() {
+    async fn check<G: RecoveryProvider + 'static>(
+        inner: G,
+        provider: Provider,
+        server: &HttpFixture,
+        session_api: bool,
+        operation: Operation,
+    ) {
+        let capture = Arc::new(Capture::default());
+        let mut p = policy(3, &capture);
+        p.admission = Some(Arc::new(Unresolved));
+        let gateway = RecoveryGateway::new(inner, p).expect("gateway");
+        let broker = LlmBroker::new("qwen3", Arc::new(gateway), None);
+        let count = Arc::new(AtomicUsize::new(0));
+        let tools: Vec<Box<dyn LlmTool>> = vec![Box::new(CountTool(count.clone()))];
+        let streaming = operation == Operation::Streaming;
+        let mut delivered = vec![];
+        let error = if session_api {
+            let mut session = mojentic::llm::ChatSession::builder(broker).tools(tools).build();
+            let initial = session.messages().len();
+            let error = if streaming {
+                let mut stream = session.send_stream("question");
+                let mut errors = vec![];
+                while let Some(chunk) = stream.next().await {
+                    match chunk {
+                        Ok(text) => delivered.push(text),
+                        Err(error) => errors.push(error),
+                    }
+                }
+                assert_eq!(errors.len(), 1, "one terminal error");
+                errors.pop().expect("failure")
+            } else {
+                session.send("question").await.expect_err("failure")
+            };
+            assert_eq!(session.messages().len(), initial + 1, "only user is committed");
+            assert_eq!(
+                session.messages().last().expect("user retained").role(),
+                mojentic::llm::MessageRole::User
+            );
+            error
+        } else if streaming {
+            let messages = [LlmMessage::user("question")];
+            let mut stream = broker.generate_stream(&messages, Some(&tools), None, None);
+            let mut errors = vec![];
+            while let Some(chunk) = stream.next().await {
+                match chunk {
+                    Ok(text) => delivered.push(text),
+                    Err(error) => errors.push(error),
+                }
+            }
+            assert_eq!(errors.len(), 1, "one terminal error");
+            errors.pop().expect("failure")
+        } else if operation == Operation::Structured {
+            broker
+                .generate_object::<Value>(&[LlmMessage::user("question")], None, None)
+                .await
+                .expect_err("structured failure")
+        } else {
+            broker
+                .generate(&[LlmMessage::user("question")], Some(&tools), None, None)
+                .await
+                .expect_err("failure")
+        };
+        let mojentic::MojenticError::Recovery(error) = error else {
+            panic!("structured error retained")
+        };
+        assert_single_failure(&error, &capture, provider);
+        assert_eq!(error.failure.operation, operation);
+        assert_eq!(server.sends.load(Ordering::SeqCst), 1);
+        assert_eq!(count.load(Ordering::SeqCst), 0, "no incomplete tool execution");
+        assert_eq!(error.outcome, Outcome::AdmissionUnresolved);
+        assert_eq!(error.failure.http_status, Some(503));
+        assert_eq!(error.failure.inspect_response_bytes(), b"synthetic-secret failure");
+        assert!(delivered.is_empty(), "no semantic output on unresolved admission");
+        assert_eq!(
+            transitions(&capture),
+            vec![
+                Transition::AttemptStarted,
+                Transition::AttemptFailed,
+                Transition::AdmissionPending,
+                Transition::AdmissionUnresolved,
+            ]
+        );
+        assert!(!serde_json::to_string(&error).expect("safe error").contains("synthetic-secret"));
+        assert!(!serde_json::to_string(&*capture.events.lock().expect("events"))
+            .expect("safe events")
+            .contains("synthetic-secret"));
+    }
+    for provider in ADAPTERS {
+        for operation in OPERATIONS {
+            for session_api in [false, true] {
+                // ChatSession has ordinary and streaming APIs; structured is broker-only.
+                if session_api && operation == Operation::Structured {
+                    continue;
+                }
+                let server = fixture(vec![
+                    (503, "synthetic-secret failure".into(), false, false),
+                    (200, response(provider, "unexpected resend").to_string(), false, false),
+                ])
+                .await;
+                adapter_case!(check, provider, &server.url, &server, session_api, operation);
+            }
+        }
+    }
+}
+
+#[tokio::test]
+async fn admission_explicit_decisions_http_matrix() {
+    async fn check<G: RecoveryProvider>(
+        inner: G,
+        provider: Provider,
+        server: &HttpFixture,
+        operation: Operation,
+        allow: bool,
+    ) {
+        let capture = Arc::new(Capture::default());
+        let mut p = policy(3, &capture);
+        if !allow {
+            p.admission = Some(Arc::new(Reject));
+        }
+        let gateway = RecoveryGateway::new(inner, p).expect("gateway");
+        let result = reviewed_operation(&gateway, operation, &RecoveryCall::default()).await;
+        if allow {
+            assert_resend(&result.expect("explicit allow"), &capture);
+            assert_eq!(server.sends.load(Ordering::SeqCst), 2);
+        } else {
+            let error = result.expect_err("explicit reject");
+            assert_eq!(error.outcome, Outcome::AdmissionRejected);
+            assert_single_failure(&error, &capture, provider);
+            assert_eq!(server.sends.load(Ordering::SeqCst), 1);
+            assert_eq!(
+                transitions(&capture),
+                vec![
+                    Transition::AttemptStarted,
+                    Transition::AttemptFailed,
+                    Transition::AdmissionPending,
+                    Transition::AdmissionRejected
+                ]
+            );
+        }
+    }
+    for provider in ADAPTERS {
+        for operation in OPERATIONS {
+            for allow in [true, false] {
+                let success = match operation {
+                    Operation::Streaming => final_stream(provider),
+                    Operation::Structured => response(provider, "{}").to_string(),
+                    Operation::Ordinary => response(provider, "done").to_string(),
+                };
+                let server = fixture(vec![
+                    (503, "synthetic-secret failure".into(), false, false),
+                    (200, success, false, false),
+                ])
+                .await;
+                adapter_case!(check, provider, &server.url, &server, operation, allow);
+            }
+        }
+    }
+}
+
+#[tokio::test]
+async fn admission_pending_budget_http_matrix() {
+    async fn check<G: RecoveryProvider>(
+        inner: G,
+        provider: Provider,
+        server: &HttpFixture,
+        operation: Operation,
+    ) {
+        let capture = Arc::new(Capture::default());
+        let mut p = policy(3, &capture);
+        p.admission = Some(Arc::new(Pending));
+        p.budget = Some(Duration::from_secs(1));
+        p.timing = Arc::new(Clock::default());
+        let gateway = RecoveryGateway::new(inner, p).expect("gateway");
+        let error = tokio::time::timeout(
+            Duration::from_secs(2),
+            reviewed_operation(&gateway, operation, &RecoveryCall::default()),
+        )
+        .await
+        .expect("pending hook budget expires")
+        .expect_err("budget expired");
+        assert_eq!(error.outcome, Outcome::BudgetExpired);
+        assert_single_failure(&error, &capture, provider);
+        assert_eq!(server.sends.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            transitions(&capture),
+            vec![
+                Transition::AttemptStarted,
+                Transition::AttemptFailed,
+                Transition::AdmissionPending
+            ]
+        );
+    }
+    for provider in ADAPTERS {
+        for operation in OPERATIONS {
+            let server =
+                fixture(vec![(503, "synthetic-secret failure".into(), false, false)]).await;
+            adapter_case!(check, provider, &server.url, &server, operation);
+        }
+    }
+}
+
+#[tokio::test]
+async fn admission_absent_local_remote_http_matrix() {
+    async fn check<G: RecoveryProvider>(
+        inner: G,
+        provider: Provider,
+        server: &HttpFixture,
+        operation: Operation,
+    ) {
+        let capture = Arc::new(Capture::default());
+        let mut p = policy(3, &capture);
+        p.admission = None;
+        let gateway = RecoveryGateway::new(inner, p).expect("gateway");
+        let result = reviewed_operation(&gateway, operation, &RecoveryCall::default()).await;
+        if provider == Provider::OpenAi {
+            let report = result.expect("remote no-hook retry");
+            assert_eq!(report.history.len(), 1);
+            assert_eq!(report.identity.wire_attempt, 2);
+            assert_eq!(server.sends.load(Ordering::SeqCst), 2);
+            assert!(transitions(&capture).contains(&Transition::RetryStarted));
+        } else {
+            let error = result.expect_err("ambiguous local retry requires permission");
+            assert_eq!(error.outcome, Outcome::AdmissionRequired);
+            assert_single_failure(&error, &capture, provider);
+            assert_eq!(server.sends.load(Ordering::SeqCst), 1);
+            assert_eq!(
+                transitions(&capture),
+                vec![
+                    Transition::AttemptStarted,
+                    Transition::AttemptFailed,
+                    Transition::AdmissionRequired
+                ]
+            );
+        }
+        assert!(!transitions(&capture).contains(&Transition::AdmissionPending));
+        assert!(!transitions(&capture).contains(&Transition::AdmissionAllowed));
+    }
+    for provider in ADAPTERS {
+        for operation in OPERATIONS {
+            let success = match operation {
+                Operation::Streaming => final_stream(provider),
+                Operation::Structured => response(provider, "{}").to_string(),
+                Operation::Ordinary => response(provider, "done").to_string(),
+            };
+            let server = fixture(vec![
+                (503, "synthetic-secret failure".into(), false, false),
+                (200, success, false, false),
+            ])
+            .await;
+            adapter_case!(check, provider, &server.url, &server, operation);
+        }
+    }
+}

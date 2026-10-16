@@ -323,3 +323,16 @@ Current full gate results, source fingerprints and independent review evidence
 are recorded in `.foundry/proof.json`; historical gate counts above are retained
 as prior-stage context. No live inference or Harness writes are part of this
 work. Foundry must finalize a reviewed commit before supplying a landed SHA.
+
+
+## October 12 amendment item 2 correction
+
+See [CONFORMANCE-3.0.0.md](CONFORMANCE-3.0.0.md) for the scoped current mapping,
+executable set identity, tested base/correction distinction, gate results and
+missing consumer verification. `admission_unresolved_http_matrix` and
+`admission_unresolved_broker_session_http_matrix` prove completed unresolved
+admission stops with `AdmissionUnresolved`, retaining the first HTTP failure and
+attempt identity without resend, tool execution, AdmissionAllowed or RetryStarted.
+Explicit permission/rejection and pending cancellation/budget regressions are
+mapped there. Earlier whole-contract statements above are historical evidence,
+not verification of untouched 3.0.0 initiative decisions.

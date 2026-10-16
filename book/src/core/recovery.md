@@ -46,7 +46,14 @@ let broker = LlmBroker::new("qwen3", Arc::new(gateway), None);
 The default policy allows only one attempt. Setting a larger maximum selects
 eligibility; it does not authorize an ambiguous local inference resend. Implement
 `Admission::decide(AdmissionContext)` to await your harness's checks and return
-`Allow` or `Reject`. The context includes the previous failure, logical and
+`AdmissionDecision::Allow`, `Reject`, or `Unresolved`. Only `Allow` permits a
+resend. Return `Unresolved` when the hook completes without a decision (for
+example, an external approval source has no answer). Recovery then terminates
+with `Outcome::AdmissionUnresolved` and `Transition::AdmissionUnresolved`
+(serialized as `admission_unresolved`), distinct from caller rejection. It
+retains the failed attempt, history, and private evidence without executing tools
+or emitting `AdmissionAllowed`, `DelayScheduled`, or `RetryStarted`.
+The context includes the previous failure, logical and
 attempt identity, next wire number, and observed/delivered progress. A pending
 future stays pending and is cancelled when the call is cancelled or its recovery
 budget expires. Every retry invokes the hook when configured, including OpenAI.
@@ -156,3 +163,11 @@ remote termination or authorize another attempt. Wire body observation remains
 raw transport evidence and is not a substitute for decoded frame progress.
 Cancellation and capture failures retain the existing observed/delivered
 semantic counters; metadata never changes replay safety or admission requirements.
+
+For migration, update exhaustive matches on `AdmissionDecision`, `Outcome`, and
+`Transition` for the unresolved variants. Existing hook implementations still
+return the same future result type; use `Unresolved` for a completed absence of
+permission. Continue awaiting when the decision is still pending. Cancellation
+and budget expiry continue to terminate pending hooks, and absent-hook local
+safety checks and remote retry rules are unchanged. The scoped verification map
+and consumer coordination gap are in `CONFORMANCE-3.0.0.md`.

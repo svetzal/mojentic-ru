@@ -284,11 +284,17 @@ impl<'a> Attempt<'a> {
                 decision = admission.decide(context) => decision,
                 _ = expiry => return Err(self.end(Outcome::BudgetExpired)),
             };
-            if decision == AdmissionDecision::Reject {
-                self.emit(Transition::AdmissionRejected, None, true);
-                return Err(self.end(Outcome::AdmissionRejected));
+            match decision {
+                AdmissionDecision::Allow => self.emit(Transition::AdmissionAllowed, None, true),
+                AdmissionDecision::Reject => {
+                    self.emit(Transition::AdmissionRejected, None, true);
+                    return Err(self.end(Outcome::AdmissionRejected));
+                }
+                AdmissionDecision::Unresolved => {
+                    self.emit(Transition::AdmissionUnresolved, None, true);
+                    return Err(self.end(Outcome::AdmissionUnresolved));
+                }
             }
-            self.emit(Transition::AdmissionAllowed, None, true);
         } else if self.provider.local()
             && self.current.acceptance != Acceptance::No
             && !self.current.remote_termination_confirmed

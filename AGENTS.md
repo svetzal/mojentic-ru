@@ -1,30 +1,20 @@
 # Usage Rules for Mojentic Rust
 
-## Coordinated 2.1.0 release authorization
+## Coordinated 3.0.0 scope authorization
 
-Stacey authorized this release on September 30, 2026. If `v2.1.0` does not
-exist yet, the next release is exactly **2.1.0**, even when a normal major or
-minor bump would choose a different version. All six ports are ready at their
-audited main commits. Use September 30, 2026 as the changelog date.
+Stacey authorized the coordinated 3.0.0 initiative on October 15, 2026.
+The binding scope and release coordination live in [../RELEASE-3.0.0.md](../RELEASE-3.0.0.md):
+finished transient recovery including the October 12 amendment, native reasoning,
+context-window/first-token support, and the initiative's specified audit fixes.
+All six ports must be ready before coordinated publication. Preserve publication
+holds and report cross-repository verification gaps to the initiative.
 
-Keep scope to release preparation. Disabled reasoning parity is deferred to
-2.2.0. Ordinary generate finish handling is deferred to a later major release.
-Swift and Kotlin keep whole-text embeddings as the accepted 2.1.0 exception.
-Do not add features, update dependencies, or change runtime behavior.
-
-This AGENTS.md section is the release coordinator's known, authorized edit.
-The clone was synced before it was added. Preserve it and include it in the
-release commit after all required gates pass. Do not stash or revert it.
-Fetch again before work; rebase only if the tree permits it and stop on conflicts.
-
-Update all actual package versions and lockfile root versions, finalize the
-Unreleased changelog as 2.1.0, then commit on main and tag that commit v2.1.0.
-Create and publish a GitHub release using those changelog notes so workflows
-that require the release-published event run. No branch or PR.
-For Kotlin use gradle.properties version=2.1.0 and the configured
-com.vetzal.mojentic group. Tag push runs the Maven Central workflow. For Swift,
-the git tag is the package version; do not change swift-tools-version.
-Verify the tag points at the version/changelog HEAD commit before pushing.
+This Foundry correction implements only recovery amendment item 2 (a completed
+admission hook without a decision), its tests, and accompanying documentation.
+Do not bump versions, tag, publish, change dependencies or runtime behavior outside
+that correction. Foundry owns Git finalization; leave changes in the working tree
+without committing, pushing, merging, rebasing, or modifying refs. Other initiative
+decisions remain unverified by this correction; see CONFORMANCE-3.0.0.md.
 
 Why this project exists and what problem does it solve: @CHARTER.md
 

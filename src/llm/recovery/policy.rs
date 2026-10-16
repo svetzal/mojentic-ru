@@ -54,8 +54,11 @@ pub struct AdmissionContext {
 pub enum AdmissionDecision {
     Allow,
     Reject,
+    /// The hook completed without granting or rejecting permission. Never resend.
+    Unresolved,
 }
-/// A pending future stays pending; only an explicit result admits or rejects a retry.
+/// Only `Allow` grants permission. `Unresolved` completes without a decision and stops
+/// recovery; a pending future stays pending until a decision, cancellation, or expiry.
 #[async_trait]
 pub trait Admission: Send + Sync {
     async fn decide(&self, context: AdmissionContext) -> AdmissionDecision;

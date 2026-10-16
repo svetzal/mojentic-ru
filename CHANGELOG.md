@@ -9,19 +9,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Rust prototype: native assistant reasoning history, opt-in broker retention,
-  explicit model reasoning profiles, and Enabled/XHigh effort controls.
+- Opt-in transient completion recovery for Ollama, oMLX and OpenAI ordinary,
+  structured and streaming requests. Immutable request replay, bounded jittered
+  backoff and Retry-After floors, asynchronous admission, cancellation and
+  recovery budgets, structured failure/history and per-attempt identities,
+  safe lifecycle observations and explicit private wire inspection.
+- Recovery gateways work with brokers and chat sessions without restarting tool
+  loops. Ollama recovery streaming reports provider progress and metrics while
+  retaining terminal evidence and refusing replay after semantic output.
+- Native assistant reasoning history, opt-in broker retention, explicit model
+  reasoning profiles, and Enabled/XHigh effort controls (the Rust prototype).
 
 ### Fixed
 
+- A completed admission hook without a decision now stops recovery without a
+  resend or tool execution. `AdmissionDecision::Unresolved` produces the distinct
+  `Outcome::AdmissionUnresolved` and `Transition::AdmissionUnresolved`, preserving
+  the initial failure/history and identity. Pending hooks still await explicit
+  permission, cancellation, or expiry.
 - Preserve named Ollama effort values rather than collapsing them to true.
 - Apply reasoning controls to structured Ollama requests as well as normal and
   streaming calls. Preserve native history through oMLX and Ollama tool rounds.
 
-### Compatibility
+### Breaking changes
 
-- New public message/config fields and enum variants require Rust literal/match
-  migrations. No release version or tag is assigned to this prototype.
+- Post-2.1.0 public message/config fields and reasoning enum variants require
+  literal and exhaustive-match migrations. `MojenticError::Recovery` adds a
+  structured error variant; recovery admission/outcome/lifecycle enums now also
+  distinguish completed unresolved admission from rejection.
+
+### Migration
+
+- Use message constructors or initialize `reasoning_content`; initialize new
+  completion config fields with `..Default::default()`. Select a reasoning
+  profile explicitly and opt into `preserve_reasoning` to retain native reasoning
+  during broker tool rounds. Enabled and XHigh are distinct effort controls.
+- Update exhaustive error and recovery enum matches. Return `Allow` only after
+  granting permission, `Reject` for rejection, or `Unresolved` for a completed
+  absence of decision; await a pending decision as before. Handle
+  `admission_unresolved` separately in serialized lifecycle/outcome consumers.
+- Wrap an existing gateway with `with_recovery(RecoveryPolicy)` to opt in; defaults
+  keep one attempt. See the recovery book page for reports, privacy and local
+  provider admission rules. No version bump or release is assigned by this change.
 
 ## [2.1.0] - 2026-09-30
 
