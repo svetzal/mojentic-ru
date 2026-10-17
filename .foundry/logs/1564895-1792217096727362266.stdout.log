@@ -1,0 +1,770 @@
+
+running 542 tests
+test agents::async_aggregator_agent::tests::test_both_events_trigger_processing ... ok
+test agents::async_aggregator_agent::tests::test_event_without_correlation_id_fails ... ok
+test agents::async_aggregator_agent::tests::test_new_aggregator ... ok
+test agents::async_aggregator_agent::tests::test_process_events_override ... ok
+test agents::async_aggregator_agent::tests::test_single_event_does_not_trigger ... ok
+test agents::async_aggregator_agent::tests::test_different_correlation_ids ... ok
+test agents::async_llm_agent::tests::test_add_tool ... ok
+test agents::async_llm_agent::tests::test_agent_with_custom_behaviour ... ok
+test agents::async_llm_agent::tests::test_generate_response ... ok
+test agents::async_llm_agent::tests::test_generate_response_with_correlation_id ... ok
+test agents::async_llm_agent::tests::test_new_agent_with_tools ... ok
+test agents::async_llm_agent::tests::test_new_agent ... ok
+test agents::base_agent::tests::test_agent_can_return_multiple_events ... ok
+test agents::base_agent::tests::test_agent_preserves_correlation_id ... ok
+test agents::async_llm_agent::tests::test_generate_object ... ok
+test agents::async_llm_agent::tests::test_receive_event_async_default ... ok
+test agents::base_async_agent::tests::test_echo_agent_returns_event ... ok
+test agents::base_agent::tests::test_simple_agent_returns_empty ... ok
+test agents::base_agent::tests::test_echo_agent_returns_event ... ok
+test agents::base_agent::tests::test_agent_without_correlation_id ... ok
+test agents::base_async_agent::tests::test_agent_preserves_correlation_id ... ok
+test agents::base_async_agent::tests::test_simple_agent_returns_empty ... ok
+test agents::async_aggregator_agent::tests::test_wait_for_events_timeout ... ok
+test agents::async_aggregator_agent::tests::test_wait_for_events ... ok
+test agents::iterative_problem_solver::tests::test_builder_with_tools ... ok
+test agents::iterative_problem_solver::tests::test_multiple_iterations_before_done ... ok
+test agents::iterative_problem_solver::tests::test_custom_system_prompt ... ok
+test agents::iterative_problem_solver::tests::test_builder_default_settings ... ok
+test agents::iterative_problem_solver::tests::test_builder_custom_max_iterations ... ok
+test agents::iterative_problem_solver::tests::test_fail_substring_detection ... ok
+test agents::simple_recursive_agent::tests::test_builder_custom_max_iterations ... ok
+test agents::simple_recursive_agent::tests::test_builder_custom_system_prompt ... ok
+test agents::simple_recursive_agent::tests::test_builder_default_settings ... ok
+test agents::simple_recursive_agent::tests::test_builder_with_tools ... ok
+test agents::iterative_problem_solver::tests::test_done_substring_detection ... ok
+test agents::iterative_problem_solver::tests::test_solve_case_insensitive_done ... ok
+test agents::simple_recursive_agent::tests::test_event_emitter_subscribe_and_emit ... ok
+test agents::simple_recursive_agent::tests::test_goal_state_creation ... ok
+test agents::simple_recursive_agent::tests::test_handler_panic_surfaces_as_error ... ok
+test agents::iterative_problem_solver::tests::test_solve_case_insensitive_fail ... ok
+test agents::iterative_problem_solver::tests::test_solve_fails_with_fail ... ok
+test agents::simple_recursive_agent::tests::test_event_emission_during_solve ... ok
+test agents::simple_recursive_agent::tests::test_event_emission_on_failure ... ok
+test agents::iterative_problem_solver::tests::test_solve_stops_at_max_iterations ... ok
+test agents::iterative_problem_solver::tests::test_solve_completes_with_done ... ok
+test agents::iterative_problem_solver::tests::test_step_method ... ok
+test agents::simple_recursive_agent::tests::test_solve_case_insensitive_done ... ok
+test async_dispatcher::tests::test_dispatch_assigns_correlation_id ... ok
+test async_dispatcher::tests::test_dispatch_event ... ok
+test async_dispatcher::tests::test_dispatcher_new ... ok
+test async_dispatcher::tests::test_dispatcher_with_batch_size ... ok
+test async_dispatcher::tests::test_multiple_agents_receive_event ... ok
+test agents::simple_recursive_agent::tests::test_solve_completes_with_done ... ok
+test async_dispatcher::tests::test_start_and_stop ... ok
+test async_dispatcher::tests::test_start_twice_fails ... ok
+test async_dispatcher::tests::test_queue_len ... ok
+test async_dispatcher::tests::test_terminate_event_stops_dispatcher ... ok
+test agents::simple_recursive_agent::tests::test_solve_case_insensitive_fail ... ok
+test async_dispatcher::tests::test_wait_for_empty_queue ... ok
+test context::shared_working_memory::tests::test_clone_memory ... ok
+test agents::simple_recursive_agent::tests::test_solve_word_boundary_done ... ok
+test context::shared_working_memory::tests::test_deep_merge_arrays ... ok
+test context::shared_working_memory::tests::test_deep_merge_empty_objects ... ok
+test context::shared_working_memory::tests::test_deep_merge_primitives ... ok
+test context::shared_working_memory::tests::test_deep_merge_mixed_types ... ok
+test context::shared_working_memory::tests::test_default ... ok
+test context::shared_working_memory::tests::test_get_working_memory ... ok
+test context::shared_working_memory::tests::test_merge_nested_objects ... ok
+test context::shared_working_memory::tests::test_merge_to_working_memory_replace_array ... ok
+test context::shared_working_memory::tests::test_merge_to_working_memory_replace_primitive ... ok
+test context::shared_working_memory::tests::test_merge_to_working_memory_simple ... ok
+test context::shared_working_memory::tests::test_merge_to_working_memory_deep ... ok
+test context::shared_working_memory::tests::test_multiple_merges ... ok
+test context::shared_working_memory::tests::test_new ... ok
+test error::tests::test_api_error_display ... ok
+test error::tests::test_config_error_display ... ok
+test error::tests::test_error_debug ... ok
+test context::shared_working_memory::tests::test_thread_safety ... ok
+test error::tests::test_handler_error_display ... ok
+test error::tests::test_gateway_error_display ... ok
+test error::tests::test_http_error_conversion ... ok
+test error::tests::test_io_error_conversion ... ok
+test error::tests::test_model_not_supported_display ... ok
+test error::tests::test_result_type ... ok
+test error::tests::test_serialization_error_conversion ... ok
+test error::tests::test_tool_error_display ... ok
+test event::tests::test_event_as_any ... ok
+test event::tests::test_event_clone_box ... ok
+test event::tests::test_event_correlation_id ... ok
+test event::tests::test_event_source ... ok
+test event::tests::test_terminate_event ... ok
+test error::tests::test_max_tool_iterations_exceeded_display ... ok
+test examples::react::decisioning_agent::tests::test_decisioning_agent_max_iterations ... ok
+test examples::react::decisioning_agent::tests::test_decisioning_agent_ignores_wrong_event_type ... ok
+test examples::react::decisioning_agent::tests::test_decisioning_agent_prompt_generation ... ok
+test examples::react::events::tests::test_event_clone_box ... ok
+test examples::react::events::tests::test_failure_occurred_event ... ok
+test examples::react::events::tests::test_finish_and_summarize_event ... ok
+test examples::react::events::tests::test_invoke_decisioning_event ... ok
+test examples::react::events::tests::test_invoke_thinking_event ... ok
+test examples::react::formatters::tests::test_format_available_tools_empty ... ok
+test examples::react::formatters::tests::test_format_available_tools_multiple ... ok
+test examples::react::formatters::tests::test_format_available_tools_with_tools ... ok
+test examples::react::formatters::tests::test_format_current_context_empty ... ok
+test examples::react::formatters::tests::test_format_current_context_with_history ... ok
+test examples::react::formatters::tests::test_format_current_context_with_plan ... ok
+test examples::react::models::tests::test_current_context_new ... ok
+test examples::react::models::tests::test_current_context_with_history ... ok
+test examples::react::models::tests::test_next_action_serialization ... ok
+test examples::react::models::tests::test_plan_default ... ok
+test examples::react::models::tests::test_plan_serialization ... ok
+test examples::react::models::tests::test_thought_action_observation ... ok
+test examples::react::decisioning_agent::tests::test_decisioning_agent_with_plan ... ok
+test examples::react::summarization_agent::tests::test_summarization_agent_ignores_wrong_event_type ... ok
+test agents::simple_recursive_agent::tests::test_solve_fails_with_fail ... ok
+test async_dispatcher::tests::test_wait_for_empty_queue_timeout ... ok
+test examples::react::summarization_agent::tests::test_summarization_agent_with_plan ... ok
+test async_dispatcher::tests::test_wait_for_empty_queue_waits_for_in_flight_handlers ... ok
+test examples::react::tool_call_agent::tests::test_tool_call_agent_default ... ok
+test examples::react::tool_call_agent::tests::test_tool_call_agent_ignores_wrong_event_type ... ok
+test examples::react::summarization_agent::tests::test_summarization_agent_prompt_generation ... ok
+test examples::react::tool_call_agent::tests::test_tool_call_agent_successful_execution ... ok
+test llm::broker::tests::generate_response_traces_reported_evidence_unchanged ... ok
+test llm::broker::tests::generate_response_traces_unknown_usage_as_none ... ok
+test llm::broker::tests::generate_object_traces_reported_evidence_unchanged ... ok
+test llm::broker::tests::native_response_leaves_tool_dispatch_to_caller ... ok
+test llm::broker::tests::stream_events::an_unsupported_gateway_yields_one_error_without_a_trace ... ok
+test llm::broker::tests::stream_events::a_gateway_stream_without_terminal_event_ends_incomplete ... ok
+test llm::broker::tests::stream_events::content_then_completed_is_forwarded_and_traced_with_evidence ... ok
+test llm::broker::tests::stream_events::incomplete_completion_is_traced_with_its_evidence ... ok
+test llm::broker::tests::stream_events::incomplete_stream_is_traced_with_its_partial_evidence ... ok
+test llm::broker::tests::stream_events::nothing_follows_the_terminal_event ... ok
+test llm::broker::tests::stream_events::stopping_early_traces_the_call_but_no_response ... ok
+test llm::broker::tests::stream_events::the_event_stream_can_move_across_threads ... ok
+test llm::broker::tests::stream_events::tool_iterations_are_forced_to_zero ... ok
+test examples::react::thinking_agent::tests::test_thinking_agent_with_existing_plan ... ok
+test llm::broker::tests::test_broker_new ... ok
+test llm::broker::tests::test_broker_with_max_tool_iterations ... ok
+test llm::broker::tests::test_generate_empty_response_content ... ok
+test llm::broker::tests::test_broker_new_string_conversion ... ok
+test llm::broker::tests::test_generate_object ... ok
+test llm::broker::tests::test_generate_object_with_config ... ok
+test llm::broker::tests::test_generate_simple_response ... ok
+test llm::broker::tests::test_generate_stream_basic ... ok
+test llm::broker::tests::test_generate_max_tool_iterations_exceeded ... ok
+test llm::broker::tests::test_generate_stream_max_tool_iterations_exceeded ... ok
+test llm::broker::tests::test_generate_stream_with_tool_calls ... ok
+test llm::broker::tests::test_generate_stream_without_tools ... ok
+test llm::broker::tests::test_generate_with_custom_config ... ok
+test llm::broker::tests::test_generate_with_tool_call ... ok
+test llm::broker::tests::test_generate_with_tool_call_no_tools_provided ... ok
+test llm::broker::tests::test_multiple_messages ... ok
+test llm::broker::tests::test_tracer_integration ... ok
+test llm::broker::tests::test_tracer_with_tool_calls ... ok
+test llm::broker::tests::unlimited_execution_can_continue_past_default_rounds ... ok
+test examples::react::thinking_agent::tests::test_thinking_agent_ignores_wrong_event_type ... ok
+test examples::react::thinking_agent::tests::test_thinking_agent_prompt_generation ... ok
+test llm::broker::tests::stream_events::dropping_the_broker_stream_cancels_the_provider_request ... ok
+test agents::simple_recursive_agent::tests::test_solve_word_boundary_fail ... ok
+test llm::chat_session::tests::test_builder_custom_system_prompt ... ok
+test llm::chat_session::tests::test_context_window_preserves_system_prompt ... ok
+test llm::chat_session::tests::test_builder_custom_max_context ... ok
+test agents::simple_recursive_agent::tests::test_solve_stops_at_max_iterations ... ok
+test llm::chat_session::tests::test_context_window_trimming ... ok
+test llm::chat_session::tests::test_builder_custom_temperature ... ok
+test llm::chat_session::tests::test_builder_with_tools ... ok
+test llm::chat_session::tests::test_insert_message_calculates_token_length ... ok
+test llm::chat_session::tests::test_messages_accessor ... ok
+test llm::chat_session::tests::test_send_stream_records_assembled_response ... ok
+test llm::chat_session::tests::test_send_stream_grows_message_history ... ok
+test llm::chat_session::tests::test_message_with_no_content_has_zero_tokens ... ok
+test llm::chat_session::tests::test_sized_message_creation ... ok
+test llm::chat_session::tests::test_send_adds_messages_to_history ... ok
+test llm::gateway::tests::test_completion_config_clone ... ok
+test llm::gateway::tests::test_completion_config_custom ... ok
+test llm::gateway::tests::test_completion_config_default ... ok
+test llm::gateway::tests::test_completion_config_with_all_sampling_params ... ok
+test llm::gateway::tests::test_completion_config_with_reasoning_effort ... ok
+test llm::gateway::tests::test_reasoning_effort_deserialization ... ok
+test llm::gateway::tests::test_reasoning_effort_serialization ... ok
+test llm::gateway::tests::test_response_format_json_no_schema ... ok
+test llm::gateway::tests::test_response_format_json_with_schema ... ok
+test llm::gateway::tests::test_response_format_text ... ok
+test llm::chat_session::tests::test_send_multiple_turns ... ok
+test llm::gateways::ollama::tests::complete_carries_reported_evidence_unchanged ... ok
+test llm::gateways::ollama::tests::complete_leaves_unreported_usage_unknown ... ok
+test llm::gateways::ollama::tests::complete_json_response_carries_object_and_evidence ... ok
+test agents::simple_recursive_agent::tests::test_solve_multiple_iterations_before_done ... ok
+test llm::gateways::ollama::tests::stream_events::completes_over_http_with_durations ... ok
+test llm::gateways::ollama::tests::stream_events::dropping_the_stream_cancels_the_request ... ok
+test llm::chat_session::tests::test_new_session_has_system_message ... ok
+test llm::gateways::ollama::tests::stream_events::http_error_status_is_reported_with_body ... ok
+test llm::gateways::ollama::tests::stream_events::end_of_stream_without_done_is_incomplete_stream ... ok
+test llm::gateways::ollama::tests::stream_events::request_streams_without_tools_and_honours_config ... ok
+test llm::gateways::ollama::tests::streaming_request_forwards_json_object_format ... ok
+test llm::gateways::ollama::tests::test_adapt_messages_empty_content ... ok
+test llm::gateways::ollama::tests::test_adapt_messages_to_ollama_simple ... ok
+test llm::gateways::ollama::tests::test_adapt_messages_tool_role ... ok
+test llm::gateways::ollama::tests::test_adapt_messages_with_images ... ok
+test llm::gateways::ollama::tests::test_adapt_messages_with_tool_calls ... ok
+test llm::gateways::ollama::tests::test_add_response_format_json_no_schema ... ok
+test llm::gateways::ollama::tests::test_add_response_format_json_with_schema ... ok
+test llm::gateways::ollama::tests::test_add_response_format_none ... ok
+test llm::gateways::ollama::tests::streaming_request_without_format_leaves_body_unchanged ... ok
+test llm::gateways::ollama::tests::test_add_response_format_text ... ok
+test llm::gateways::ollama::tests::streaming_request_forwards_json_schema_format ... ok
+test llm::gateways::ollama::tests::streaming_request_omits_format_for_text ... ok
+test llm::chat_session::tests::test_send_stream_respects_context_capacity ... ok
+test llm::gateways::ollama::tests::test_complete_json ... ok
+test llm::gateways::ollama::tests::test_complete_stream_disables_thinking ... ok
+test llm::chat_session::tests::test_send_stream_records_user_message ... ok
+test llm::gateways::ollama::tests::test_calculate_embeddings ... ok
+test llm::gateways::ollama::tests::test_complete_simple ... ok
+test llm::gateways::ollama::tests::test_extract_ollama_options_basic ... ok
+test llm::gateways::ollama::tests::test_calculate_embeddings_custom_model ... ok
+test llm::gateways::ollama::tests::test_extract_ollama_options_output_limit ... ok
+test llm::gateways::ollama::tests::test_extract_ollama_options_unset_output_limit ... ok
+test llm::gateways::ollama::tests::test_complete_error ... ok
+test llm::gateways::ollama::tests::test_extract_ollama_options_with_top_k ... ok
+test llm::gateways::ollama::tests::test_extract_ollama_options_zero_max_tokens ... ok
+test llm::gateways::ollama::tests::test_extract_ollama_options_with_all_sampling_params ... ok
+test llm::gateways::ollama::tests::test_extract_ollama_options_with_top_p ... ok
+test llm::gateways::ollama::tests::test_complete_stream_surfaces_thinking_chunks ... ok
+test llm::gateways::ollama::tests::test_complete_with_reasoning_effort ... ok
+test llm::gateways::ollama::tests::test_complete_with_tools ... ok
+test llm::chat_session::tests::test_total_tokens ... ok
+test llm::gateways::ollama::tests::test_ollama_config_custom ... ok
+test llm::gateways::ollama::tests::test_ollama_config_default ... ok
+test llm::gateways::ollama::tests::test_ollama_config_from_env ... ok
+test llm::gateways::ollama::tests::test_gateway_with_host ... ok
+test llm::gateways::ollama_stream_events::tests::a_terminal_frame_cannot_borrow_an_earlier_stop_reason ... ok
+test llm::gateways::ollama_stream_events::tests::content_in_the_final_frame_precedes_the_terminal_event ... ok
+test llm::gateways::ollama_stream_events::tests::content_then_done_with_stop_completes_with_evidence ... ok
+test llm::gateways::ollama_stream_events::tests::done_with_length_is_incomplete_completion_with_evidence ... ok
+test llm::gateways::ollama_stream_events::tests::done_without_reason_is_incomplete_completion ... ok
+test llm::gateways::ollama_stream_events::tests::error_frame_is_provider_error ... ok
+test llm::gateways::ollama_stream_events::tests::frames_without_evidence_preserve_previously_reported_values ... ok
+test llm::gateways::ollama_stream_events::tests::malformed_frames_are_invalid_stream_events ... ok
+test llm::gateways::ollama_stream_events::tests::partial_evidence_holds_the_model_seen_before_the_end ... ok
+test llm::gateways::ollama_stream_events::tests::tool_call_frame_is_unexpected ... ok
+test llm::gateways::omlx::tests::a_keepalive_line_has_exactly_the_keepalive_model ... ok
+test llm::gateways::ollama::tests::test_gateway_default ... ok
+test llm::gateways::omlx::tests::debug_output_hides_the_api_key ... ok
+test llm::gateways::ollama::tests::test_gateway_with_config ... ok
+test llm::gateways::ollama::tests::test_get_available_models ... ok
+test llm::gateways::ollama::tests::test_gateway_new ... ok
+test llm::gateways::omlx::tests::blank_model_actions_fail_before_a_request ... ok
+test llm::gateways::omlx::tests::only_json_formats_request_structured_output ... ok
+test llm::gateways::omlx::tests::the_event_parser_ignores_keepalive_evidence ... ok
+test llm::gateways::omlx::tests::timeout_env_is_milliseconds_with_a_ten_minute_default ... ok
+test llm::gateways::omlx::tests::reasoning_comes_before_content_in_one_delta ... ok
+test llm::chat_session::tests::test_send_stream_yields_content_chunks ... ok
+test llm::gateways::ollama::tests::test_pull_model_success ... ok
+test llm::gateways::openai::tests::complete_leaves_unreported_usage_unknown ... ok
+test llm::gateways::openai::tests::complete_json_response_carries_object_and_evidence ... ok
+test llm::gateways::ollama::tests::test_pull_model_failure ... ok
+test llm::gateways::openai::tests::complete_carries_reported_evidence_unchanged ... ok
+test llm::gateways::openai::tests::legacy_stream_accumulates_tool_call_fragments_until_the_finish_reason ... ok
+test llm::gateways::omlx::tests::legacy_stream_keeps_a_character_split_across_network_chunks ... ok
+test llm::gateways::openai::tests::legacy_stream_yields_non_empty_content_and_skips_unreadable_frames ... ok
+test llm::gateways::openai::tests::legacy_stream_reports_http_error_status ... ok
+test llm::gateways::omlx::tests::event_stream_is_not_cut_off_by_the_whole_response_timeout ... ok
+test llm::gateways::openai::tests::stream_events::dropping_the_stream_cancels_the_request ... ok
+test llm::gateways::omlx::tests::legacy_stream_outlives_the_timeout_and_cancels_on_drop ... ok
+test llm::gateways::openai::tests::legacy_stream_keeps_a_character_split_across_network_chunks ... ok
+test llm::gateways::openai::tests::stream_events::completes_over_http_with_usage ... ok
+test llm::gateways::openai::tests::legacy_stream_yields_pending_tool_calls_at_done ... ok
+test llm::gateways::openai::tests::non_streaming_request_forwards_configured_format ... ok
+test llm::gateways::openai::tests::stream_events::http_error_status_is_reported_with_body ... ok
+test llm::gateways::openai::tests::streaming_request_forwards_json_object_format ... ok
+test llm::gateways::openai::tests::streaming_request_without_format_leaves_body_unchanged ... ok
+test llm::gateways::openai::tests::stream_events::end_of_stream_without_done_is_incomplete_stream ... ok
+test llm::gateways::openai::tests::streaming_request_forwards_text_format ... ok
+test llm::gateways::openai::tests::test_adapt_parameters_chat_model ... ok
+test llm::gateways::openai::tests::stream_events::request_streams_without_tools_and_asks_for_usage ... ok
+test llm::gateways::openai::tests::streaming_request_forwards_json_schema_format ... ok
+test llm::gateways::openai::tests::test_adapt_parameters_reasoning_model ... ok
+test llm::gateways::openai::tests::test_complete_json ... ok
+test llm::gateways::openai::tests::test_complete_error ... ok
+test llm::gateways::openai::tests::test_complete_success ... ok
+test llm::gateways::openai::tests::test_complete_with_tool_calls ... ok
+test llm::gateways::openai::tests::test_gateway_default ... ok
+test llm::gateways::openai::tests::test_gateway_new ... ok
+test llm::gateways::openai::tests::test_gateway_with_api_key ... ok
+test llm::gateways::openai::tests::test_openai_config_default ... ok
+test llm::gateways::openai::tests::test_openai_config_from_env ... ok
+test llm::gateways::openai::tests::test_gateway_with_api_key_and_base_url ... ok
+test llm::gateways::openai::tests::test_weighted_average_embeddings_empty ... ok
+test llm::gateways::openai::tests::test_get_available_models ... ok
+test llm::gateways::openai::tests::unsupported_new_reasoning_controls_fail_instead_of_disappearing ... ok
+test llm::gateways::openai_legacy_stream::tests::a_complete_tool_call_in_one_delta_is_yielded_at_the_finish_reason ... ok
+test llm::gateways::openai_legacy_stream::tests::lines_without_data_carry_nothing ... ok
+test llm::gateways::openai_legacy_stream::tests::test_build_complete_tool_calls ... ok
+test llm::gateways::openai_legacy_stream::tests::test_build_complete_tool_calls_missing_name ... ok
+test llm::gateways::openai::tests::test_weighted_average_embeddings_multiple ... ok
+test llm::gateways::openai_legacy_stream::tests::the_body_stream_decodes_a_character_split_across_chunks ... ok
+test llm::gateways::openai::tests::test_weighted_average_embeddings_single ... ok
+test llm::gateways::openai_messages_adapter::tests::test_adapt_assistant_with_tool_calls ... ok
+test llm::gateways::openai_messages_adapter::tests::test_adapt_system_message ... ok
+test llm::gateways::openai_messages_adapter::tests::test_adapt_tool_message ... ok
+test llm::gateways::openai_messages_adapter::tests::test_adapt_assistant_message ... ok
+test llm::gateways::openai_messages_adapter::tests::test_adapt_user_message_preserves_remote_and_data_images ... ok
+test llm::gateways::openai_messages_adapter::tests::test_adapt_user_message ... ok
+test llm::gateways::openai_messages_adapter::tests::test_convert_tool_calls ... ok
+test llm::gateways::openai_messages_adapter::tests::test_adapt_user_message_with_images ... ok
+test llm::gateways::openai_messages_adapter::tests::test_get_image_type_gif ... ok
+test llm::gateways::openai_messages_adapter::tests::test_get_image_type_jpg ... ok
+test llm::gateways::openai_messages_adapter::tests::test_convert_tool_calls_empty_args ... ok
+test llm::gateways::openai_messages_adapter::tests::test_get_image_type_unknown ... ok
+test llm::gateways::openai_messages_adapter::tests::test_get_image_type_png ... ok
+test llm::gateways::openai_messages_adapter::tests::test_get_image_type_webp ... ok
+test llm::gateways::openai_model_registry::tests::test_audio_preview_no_tools_no_streaming ... ok
+test llm::gateways::openai_model_registry::tests::test_chat_only_model_endpoint_flags ... ok
+test llm::gateways::openai_model_registry::tests::test_chatgpt_4o_latest_no_tools ... ok
+test llm::gateways::openai_model_registry::tests::test_both_endpoint_model_flags ... ok
+test llm::gateways::openai_model_registry::tests::test_default_capabilities_include_endpoint_flags ... ok
+test llm::gateways::openai_model_registry::tests::test_completions_only_model_flags ... ok
+test llm::gateways::openai_model_registry::tests::test_embedding_model_endpoint_flags ... ok
+test llm::gateways::openai_model_registry::tests::test_codex_mini_latest_responses_only ... ok
+test llm::gateways::openai_model_registry::tests::test_get_known_model_capabilities ... ok
+test llm::gateways::openai_model_registry::tests::test_deprecated_models_removed ... ok
+test llm::gateways::openai_model_registry::tests::test_get_reasoning_model_capabilities ... ok
+test llm::gateways::openai_model_registry::tests::test_embedding_models ... ok
+test llm::gateways::openai_model_registry::tests::test_get_registered_models ... ok
+test llm::gateways::openai_model_registry::tests::test_get_token_limit_param_chat ... ok
+test llm::gateways::openai_model_registry::tests::test_get_token_limit_param_reasoning ... ok
+test llm::gateways::openai_model_registry::tests::test_get_unknown_model_default ... ok
+test llm::gateways::openai_model_registry::tests::test_global_registry ... ok
+test llm::gateways::openai_model_registry::tests::test_get_unknown_model_pattern_matching ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt35_instruct_no_tools ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt51_all_temperatures ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt41_nano_dated_has_tools ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt41_nano_base_no_tools ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt51_both_chat_and_completions ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt51_pattern_matching ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt53_pattern_matching ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt52_pattern_matching ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt54_base_capabilities ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt52_all_temperatures ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt54_dated_capabilities ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt54_mini_capabilities ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt54_nano_dated_capabilities ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt54_pattern_matching ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt54_nano_capabilities ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt54_mini_dated_capabilities ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt55_base_capabilities ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt55_dated_capabilities ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt54_uses_completion_token_param ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt55_pro_capabilities ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt55_pro_dated_capabilities ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt5_chat_latest_is_chat_type ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt55_pattern_matching ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt5_mini_base_no_tools ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt5_mini_dated_has_tools ... ok
+test llm::gateways::openai_model_registry::tests::test_is_reasoning_model ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt5_search_api_no_tools_no_temperature ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt5_pro_exists ... ok
+test llm::gateways::openai_model_registry::tests::test_legacy_completions_model_flags ... ok
+test llm::gateways::openai_model_registry::tests::test_model_type_enum ... ok
+test llm::gateways::openai_model_registry::tests::test_o1_supports_tools_and_streaming ... ok
+test llm::gateways::openai_model_registry::tests::test_model_capabilities_default ... ok
+test llm::gateways::openai_model_registry::tests::test_o4_mini_dated_supports_tools ... ok
+test llm::gateways::openai_model_registry::tests::test_o3_mini_supports_tools_and_streaming ... ok
+test llm::gateways::openai_model_registry::tests::test_o3_supports_tools_and_streaming_and_temperature ... ok
+test llm::gateways::openai_model_registry::tests::test_register_model ... ok
+test llm::gateways::openai_model_registry::tests::test_register_pattern ... ok
+test llm::gateways::openai_model_registry::tests::test_o4_mini_no_tools_but_supports_streaming ... ok
+test llm::gateways::openai_model_registry::tests::test_registry_new ... ok
+test llm::gateways::openai_model_registry::tests::test_responses_only_model_flags ... ok
+test llm::gateways::openai_model_registry::tests::test_supports_temperature_restricted ... ok
+test llm::gateways::openai_model_registry::tests::test_search_preview_no_tools_no_temperature ... ok
+test llm::gateways::openai_model_registry::tests::test_supports_temperature_none_allowed ... ok
+test llm::gateways::openai_model_registry::tests::test_supports_temperature_unrestricted ... ok
+test llm::gateways::openai_stream_events::tests::comments_and_other_fields_are_ignored ... ok
+test llm::gateways::openai_stream_events::tests::done_without_finish_reason_is_incomplete_completion ... ok
+test llm::gateways::openai_stream_events::tests::done_after_length_is_incomplete_completion_with_evidence ... ok
+test llm::gateways::openai_stream_events::tests::content_then_stop_then_done_completes_with_evidence ... ok
+test llm::gateways::openai_stream_events::tests::malformed_frames_are_invalid_stream_events ... ok
+test llm::gateways::openai_stream_events::tests::error_frame_is_provider_error ... ok
+test llm::gateways::openai_stream_events::tests::partial_evidence_holds_what_arrived_before_the_end ... ok
+test llm::gateways::openai_stream_events::tests::tool_call_delta_is_unexpected ... ok
+test llm::gateways::openai::tests::test_chunk_text_short ... ok
+test llm::gateways::openai::tests::test_calculate_embeddings_custom_model ... ok
+test llm::gateways::openai::tests::test_calculate_embeddings ... ok
+test llm::gateways::tokenizer_gateway::tests::test_decode_basic ... ok
+test llm::gateways::tokenizer_gateway::tests::test_count_tokens ... ok
+test llm::gateways::tokenizer_gateway::tests::test_count_tokens_matches_encode ... ok
+test llm::gateways::tokenizer_gateway::tests::test_different_encodings ... ok
+test llm::gateways::tokenizer_gateway::tests::test_decode_empty ... ok
+test llm::gateways::openai::tests::test_chunk_text_long ... ok
+test llm::gateways::tokenizer_gateway::tests::test_encode_consistent ... ok
+test llm::models::tests::test_assistant_message ... ok
+test llm::models::tests::test_llm_message_default_role ... ok
+test llm::models::tests::test_llm_message_deserialization ... ok
+test llm::models::tests::test_llm_message_serialization ... ok
+test llm::models::tests::test_llm_tool_call_serialization ... ok
+test llm::models::tests::test_llm_tool_call_without_id ... ok
+test llm::models::tests::test_message_role_deserialization ... ok
+test llm::models::tests::test_message_role_serialization ... ok
+test llm::models::tests::test_message_with_images ... ok
+test llm::models::tests::test_system_message ... ok
+test llm::models::tests::test_user_message ... ok
+test llm::reasoning::tests::boolean_model_profile_rejects_named_effort_and_native_history ... ok
+test llm::reasoning::tests::qwen_accepts_exact_controls_without_inventing_a_default ... ok
+test llm::stream_events::tests::http_provider_error_keeps_a_non_json_body_as_text ... ok
+test llm::stream_events::tests::http_provider_error_keeps_status_and_error_field ... ok
+test llm::stream_events::tests::incomplete_completion_names_its_finish_reason ... ok
+test llm::stream_events::tests::line_buffer_returns_only_complete_lines ... ok
+test llm::stream_events::tests::line_buffer_keeps_utf8_sequences_split_across_chunks ... ok
+test llm::tools::ask_user_tool::tests::test_default_implementation ... ok
+test llm::stream_events::tests::only_content_is_non_terminal ... ok
+test llm::tools::ask_user_tool::tests::test_descriptor ... ok
+test llm::tools::ask_user_tool::tests::test_missing_argument ... ok
+test llm::tools::ask_user_tool::tests::test_tool_matches ... ok
+test llm::tools::current_datetime_tool::tests::test_descriptor ... ok
+test llm::tools::current_datetime_tool::tests::test_format_with_day_name ... ok
+test llm::tools::current_datetime_tool::tests::test_format_with_month_name ... ok
+test llm::tools::current_datetime_tool::tests::test_run_with_custom_format ... ok
+test llm::tools::current_datetime_tool::tests::test_run_with_default_format ... ok
+test llm::tools::current_datetime_tool::tests::test_timestamp_is_reasonable ... ok
+test llm::tools::current_datetime_tool::tests::test_timezone_is_present ... ok
+test llm::tools::current_datetime_tool::tests::test_tool_matches ... ok
+test llm::tools::ephemeral_task_manager::complete_task::tests::test_complete_task_run ... ok
+test llm::tools::ephemeral_task_manager::complete_task::tests::test_descriptor ... ok
+test llm::tools::ephemeral_task_manager::insert_task_after::tests::test_descriptor ... ok
+test llm::tools::ephemeral_task_manager::insert_task_after::tests::test_insert_task_after_run ... ok
+test llm::tools::ephemeral_task_manager::list_tasks::tests::test_descriptor ... ok
+test llm::tools::ephemeral_task_manager::list_tasks::tests::test_list_tasks_empty ... ok
+test llm::tools::ephemeral_task_manager::list_tasks::tests::test_list_tasks_with_items ... ok
+test llm::tools::ephemeral_task_manager::prepend_task::tests::test_descriptor ... ok
+test llm::tools::ephemeral_task_manager::start_task::tests::test_descriptor ... ok
+test llm::tools::ephemeral_task_manager::prepend_task::tests::test_prepend_task_run ... ok
+test llm::tools::ephemeral_task_manager::task::tests::test_task_creation ... ok
+test llm::tools::ephemeral_task_manager::start_task::tests::test_start_task_run ... ok
+test llm::tools::ephemeral_task_manager::task::tests::test_task_status_str ... ok
+test llm::tools::ephemeral_task_manager::task_list::tests::test_append_task ... ok
+test llm::tools::ephemeral_task_manager::task_list::tests::test_clear_tasks ... ok
+test llm::tools::ephemeral_task_manager::task_list::tests::test_complete_task ... ok
+test llm::tools::ephemeral_task_manager::task_list::tests::test_insert_task_after ... ok
+test llm::tools::ephemeral_task_manager::task_list::tests::test_insert_task_after_nonexistent ... ok
+test llm::tools::ephemeral_task_manager::task_list::tests::test_maintain_task_ids ... ok
+test llm::tools::ephemeral_task_manager::task_list::tests::test_complete_non_in_progress_task ... ok
+test llm::tools::ephemeral_task_manager::task_list::tests::test_new_task_list ... ok
+test llm::tools::ephemeral_task_manager::task_list::tests::test_prepend_task ... ok
+test llm::tools::ephemeral_task_manager::task_list::tests::test_start_non_pending_task ... ok
+test llm::tools::ephemeral_task_manager::task_list::tests::test_start_task ... ok
+test llm::tools::ephemeral_task_manager::tests::test_all_tools_returns_seven_tools ... ok
+test llm::tools::file_manager::tests::test_ls ... ok
+test llm::tools::file_manager::tests::test_filesystem_gateway_new ... ok
+test llm::tools::file_manager::tests::test_resolve_path_security ... ok
+test llm::tools::runner::tests::parallel_preserves_output_order ... ok
+test llm::tools::file_manager::tests::test_read_write ... ok
+test llm::tools::runner::tests::pre_cancelled_batch_skips_dispatch ... ok
+test llm::tools::runner::tests::serial_preserves_input_order ... ok
+test llm::tools::simple_date_tool::tests::test_descriptor ... ok
+test llm::tools::runner::tests::unknown_tools_return_not_found ... ok
+test llm::tools::simple_date_tool::tests::test_extract_days_offset ... ok
+test llm::tools::simple_date_tool::tests::test_missing_argument ... ok
+test llm::tools::simple_date_tool::tests::test_resolve_days_from_now ... ok
+test llm::tools::simple_date_tool::tests::test_resolve_days_ago ... ok
+test llm::tools::simple_date_tool::tests::test_resolve_today ... ok
+test llm::tools::tell_user_tool::tests::test_default_implementation ... ok
+test llm::tools::simple_date_tool::tests::test_resolve_tomorrow ... ok
+test llm::tools::tell_user_tool::tests::test_descriptor ... ok
+test llm::tools::tell_user_tool::tests::test_multiline_message ... ok
+test llm::tools::tell_user_tool::tests::test_run_without_message ... ok
+test llm::tools::tell_user_tool::tests::test_run_with_message ... ok
+test llm::tools::tell_user_tool::tests::test_tool_matches ... ok
+test llm::tools::tool::tests::test_tool_descriptor_deserialization ... ok
+test llm::tools::tool::tests::test_tool_descriptor_serialization ... ok
+test llm::tools::tool::tests::test_tool_matches ... ok
+test llm::tools::tool::tests::test_function_descriptor_clone ... ok
+test llm::tools::tool_wrapper::tests::test_tool_wrapper_descriptor ... ok
+test llm::tools::tool::tests::test_tool_run ... ok
+test llm::tools::tool_wrapper::tests::test_tool_wrapper_execution ... ok
+test llm::tools::tool_wrapper::tests::test_tool_wrapper_missing_input ... ok
+test llm::tools::tool_wrapper::tests::test_tool_wrapper_matches ... ok
+test llm::tools::web_search_tool::tests::test_clean_text ... ok
+test llm::tools::tool_wrapper::tests::test_tool_wrapper_with_tools ... ok
+test llm::tools::web_search_tool::tests::test_decode_url ... ok
+test llm::tools::web_search_tool::tests::test_descriptor ... ok
+test llm::tools::web_search_tool::tests::test_clone_box ... ok
+test llm::gateways::openai::tests::test_calculate_embeddings_weights_by_token_count ... ok
+test llm::gateways::tokenizer_gateway::tests::test_encode_basic ... ok
+test llm::tools::web_search_tool::tests::test_max_results_limit ... ok
+test llm::tools::web_search_tool::tests::test_parse_empty_html ... ok
+test llm::tools::web_search_tool::tests::test_perform_search_http_error ... ok
+test llm::tools::web_search_tool::tests::test_perform_search_success ... ok
+test llm::tools::web_search_tool::tests::test_parse_results ... ok
+test llm::tools::web_search_tool::tests::test_parse_malformed_html ... ok
+test llm::tools::web_search_tool::tests::test_search_result_serialization ... ok
+test realtime::codec::tests::round_trip_pcm16 ... ok
+test realtime::codec::tests::round_trip_pcm16_bytes ... ok
+test realtime::schemas::tests::passes_through_known_events ... ok
+test realtime::schemas::tests::passes_through_unknown_types ... ok
+test realtime::schemas::tests::unknown_marker_for_typeless ... ok
+test realtime::session::tests::build_session_update_includes_voice ... ok
+test realtime::session::tests::build_session_update_text_only ... ok
+test router::tests::test_add_multiple_routes_same_type ... ok
+test router::tests::test_add_route ... ok
+test router::tests::test_add_routes_different_types ... ok
+test router::tests::test_get_agents_different_type ... ok
+test router::tests::test_get_agents_no_routes ... ok
+test router::tests::test_router_default ... ok
+test router::tests::test_router_new ... ok
+test tracer::event_store::tests::test_callback_triggered ... ok
+test tracer::event_store::tests::test_clear ... ok
+test tracer::event_store::tests::test_len_and_is_empty ... ok
+test tracer::event_store::tests::test_multiple_events ... ok
+test tracer::event_store::tests::test_store_event ... ok
+test tracer::null_tracer::tests::test_null_tracer_clear ... ok
+test tracer::null_tracer::tests::test_null_tracer_enable_disable ... ok
+test tracer::null_tracer::tests::test_null_tracer_is_disabled ... ok
+test tracer::null_tracer::tests::test_null_tracer_len ... ok
+test tracer::null_tracer::tests::test_null_tracer_query_methods ... ok
+test tracer::null_tracer::tests::test_null_tracer_record_methods ... ok
+test tracer::tracer_events::tests::built_in_events_downcast_through_as_any ... ok
+test tracer::tracer_events::tests::llm_response_event_deserializes_records_without_evidence ... ok
+test tracer::tracer_events::tests::llm_response_event_serializes_evidence_as_flat_fields ... ok
+test tracer::tracer_events::tests::llm_response_event_serializes_unknown_evidence_as_null ... ok
+test tracer::tracer_events::tests::llm_response_summary_shows_reported_evidence ... ok
+test tracer::tracer_events::tests::test_agent_interaction_event ... ok
+test tracer::tracer_events::tests::test_llm_call_event ... ok
+test tracer::tracer_events::tests::test_llm_response_event ... ok
+test tracer::tracer_events::tests::test_tool_call_event ... ok
+test tracer::tracer_system::tests::record_llm_response_with_evidence_keeps_evidence_unchanged ... ok
+test llm::gateways::tokenizer_gateway::tests::test_unicode_handling ... ok
+test tracer::tracer_system::tests::test_clear ... ok
+test tracer::tracer_system::tests::test_disabled_tracer_doesnt_record ... ok
+test tracer::tracer_system::tests::test_enable_disable ... ok
+test tracer::tracer_system::tests::test_multiple_events ... ok
+test tracer::tracer_system::tests::test_new_tracer_system ... ok
+test tracer::tracer_system::tests::test_record_agent_interaction ... ok
+test tracer::tracer_system::tests::test_record_llm_call ... ok
+test tracer::tracer_system::tests::test_record_llm_response ... ok
+test tracer::tracer_system::tests::test_record_tool_call ... ok
+test llm::tools::web_search_tool::tests::test_run_empty_query ... ok
+test llm::tools::web_search_tool::tests::test_run_missing_query ... ok
+test llm::tools::web_search_tool::tests::test_tool_matches ... ok
+test llm::gateways::tokenizer_gateway::tests::test_encode_empty ... ok
+test llm::gateways::tokenizer_gateway::tests::test_long_text ... ok
+test llm::gateways::tokenizer_gateway::tests::test_round_trip ... ok
+
+test result: ok. 542 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.93s
+
+
+running 9 tests
+test section1_contract_reuses_coordinating_captures ... ok
+test section1_effective_precedence_and_clamping ... ok
+test section1_existing_third_party_gateway_is_source_compatible ... ok
+test section1_request_observer_rejects_ignored_post_failure - should panic ... ok
+test section1_configured_authenticated_boundary ... ok
+test section1_transport_failure_direct_and_wrapped ... ok
+test section1_lookup_preserves_subsequent_completion_payload ... ok
+test section1_registry_exact_lookup_is_request_free ... ok
+test section1_http_contract_exact_outcomes_direct_and_wrapped ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.20s
+
+
+running 50 tests
+test configuration::reads_host_key_and_millisecond_timeout_from_the_environment ... ok
+test configuration::an_empty_key_or_unreadable_timeout_falls_back_to_the_default ... ok
+test configuration::defaults_to_localhost_8000_without_a_key_and_a_ten_minute_timeout ... ok
+test configuration::a_trailing_slash_on_the_host_is_ignored ... ok
+test configuration::sends_no_authorization_header_without_a_key ... ok
+test embeddings::a_chat_model_is_a_provider_error ... ok
+test configuration::new_uses_the_environment_host_and_key_under_v1 ... ok
+test embeddings::a_missing_or_empty_model_is_rejected_before_any_request ... ok
+test legacy_streaming::a_streamed_tool_call_yields_one_complete_tool_call ... ok
+test legacy_streaming::keepalive_frames_are_dropped ... ok
+test embeddings::sends_one_request_with_the_whole_text ... ok
+test legacy_streaming::an_error_status_is_a_gateway_error_with_the_body ... ok
+test legacy_streaming::sends_tools_and_a_stream_flag_without_usage_options ... ok
+test models::encodes_the_model_id_as_one_path_segment ... ok
+test models::loads_and_unloads_a_model ... ok
+test legacy_streaming::reasoning_deltas_become_thinking_chunks ... ok
+test configuration::explicit_values_take_precedence_over_the_environment ... ok
+test models::unloading_a_model_that_is_not_loaded_is_a_provider_error ... ok
+test models::lists_model_ids_sorted ... ok
+test models::lists_the_captured_models_from_a_real_json_response ... ok
+test request_body::disabled_reasoning_effort_turns_thinking_off ... ok
+test request_body::disabled_reasoning_effort_turns_thinking_off_when_streaming ... ok
+test request_body::forwards_every_setting_without_per_model_adaptation ... ok
+test explicit_blank_keys_send_no_authorization_header ... ok
+test request_body::sends_explicit_zero_output_limit ... ok
+test request_body::omits_unset_optional_settings ... ok
+test request_body::sends_tools_for_any_model_name ... ok
+test response_mapping::an_error_status_is_a_gateway_error_with_status_and_body ... ok
+test response_mapping::a_response_without_reasoning_content_has_no_thinking ... ok
+test request_body::forwards_each_configured_response_format ... ok
+test request_body::forwards_low_medium_and_high_reasoning_effort_as_strings ... ok
+test stream_events::a_keepalive_only_stream_is_incomplete_with_no_provider_model ... ok
+test stream_events::a_tool_call_stream_is_unexpected_tool_calls ... ok
+test stream_events::a_length_stream_is_an_incomplete_completion ... ok
+test response_mapping::truncation_during_thinking_keeps_the_fields_as_reported ... ok
+test response_mapping::reasoning_content_becomes_thinking_and_usage_is_kept_whole ... ok
+test stream_events::a_thinking_stream_completes_with_content_only ... ok
+test stream_events::requests_a_stream_with_usage_and_no_tools ... ok
+test stream_events::the_broker_streams_events_through_the_gateway ... ok
+test stream_events::an_error_status_is_a_provider_error_with_the_body ... ok
+test structured_output::a_configured_json_format_records_the_warning_on_complete ... ok
+test structured_output::a_text_request_does_not_record_a_warning ... ok
+test structured_output::complete_json_returns_the_object ... ok
+test structured_output::records_the_warning_header_in_metadata ... ok
+test structured_output::a_configured_json_schema_format_records_the_warning_on_complete ... ok
+test structured_output::a_request_without_a_format_does_not_record_a_warning ... ok
+test structured_output::joins_several_warning_headers ... ok
+test tools::round_trips_a_tool_result_through_the_broker ... ok
+test tools::parses_a_tool_call_and_its_reasoning ... ok
+test structured_output::sends_a_json_schema_response_format_and_parses_the_object ... ok
+
+test result: ok. 50 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.62s
+
+
+running 4 tests
+test omlx_preserves_split_stream_tool_call_id_in_follow_up ... ok
+test test_openai_tool_call_round_trip ... ok
+test openai_preserves_split_stream_tool_call_id_in_follow_up ... ok
+test test_openai_tool_call_max_iterations_exceeded ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+
+
+running 3 tests
+test qwen_profile_rejects_high_before_http ... ok
+test broker_retains_exact_reasoning_at_tool_boundaries_when_opted_in ... ok
+test effort_is_faithful_for_ordinary_streaming_and_structured_requests ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.91s
+
+
+running 66 tests
+test absolute_deadline_refuses_retry_without_timing_out_initial_request ... ok
+test budgets_retry_after_and_exact_exponential_delays ... ok
+test bounded_errors_privacy_and_disabled ... ok
+test cancellation_active_ordinary_retains_headers_raw_and_no_resend ... ok
+test cancellation_before_dispatch_has_no_phantom_wire_attempt ... ok
+test admission_pending_budget_http_matrix ... ok
+test cancellation_pending_admission_and_backoff ... ok
+test body_capture_failure_retains_observed_semantics_without_delivery_all_adapters ... ok
+test admission_absent_local_remote_http_matrix ... ok
+test cancellation_terminal_only_body_all_adapters_never_succeeds ... ok
+test admission_unresolved_http_matrix ... ok
+test capture_failure_is_terminal_accounted_and_preserves_original_cause ... ok
+test cancellation_retains_received_semantics_and_closes_when_consumer_pauses ... ok
+test capability_contract_public_adapters_v1 ... ok
+test keepalive_only_recovers_raw_without_semantic_progress ... ok
+test native_reasoning_streamed_tool_turn_is_retained_and_tool_runs_once ... ok
+test immutable_reasoning_tools_schema_and_sampling_all_adapters ... ok
+test local_ambiguity_requires_admission_rejection_preserves_failure ... ok
+test pending_is_not_permission_then_explicit_allow_dispatches ... ok
+test partial_http200_body_and_malformed_protocol_never_replayed ... ok
+test native_history_tool_schema_combination_is_frozen_all_adapters ... ok
+test predispatch_capture_failure_has_zero_wire_attempts ... ok
+test cancellation_active_body_all_adapters_has_one_ordered_terminal_lifecycle ... ok
+test public_503_success_all_adapters ... ok
+test public_broker_recovery_never_reexecutes_tool ... ok
+test provider_response_category_codes_and_causes_all_adapters ... ok
+test recovery_budget_and_provider_timeout_do_not_cut_off_admitted_generation ... ok
+test recovery_metadata_absent_counters_are_not_fabricated ... ok
+test recovery_metadata_frame_accounting_after_503_and_keepalive_failure ... ok
+test recovery_metadata_frozen_ollama_matches_original_and_compatibility ... ok
+test permanent_and_bounded_errors_all_adapters ... ok
+test admission_explicit_decisions_http_matrix ... ok
+test recovery_metadata_paused_keepalive_cancellation_has_no_semantic_delivery ... ok
+test recovery_metadata_public_red_green ... ok
+test partial_reasoning_content_and_tools_all_adapters_never_replay ... ok
+test recovery_metadata_terminal_progress_cancellation_never_completes ... ok
+test recovery_preserves_omlx_structured_warning_evidence_without_logging_it ... ok
+test recovery_rejected_terminal_capture_retains_evidence_without_delivery ... ok
+test recovery_rejected_terminal_same_frame_semantics_are_observed_only ... ok
+test public_broker_and_session_preserve_structured_failure_and_history ... ok
+test recovery_metadata_unsupported_adapters_emit_no_ollama_telemetry ... ok
+test recovery_rejected_terminal_telemetry_compatibility_red_green ... ok
+test recovery_rejected_terminal_telemetry_raw_and_compatibility ... ok
+test recovery_rejected_terminal_metadata_cancellation_wins ... ok
+test recovery_terminal_invalid_fields_do_not_fabricate_telemetry ... ok
+test review_explicit_pending_admission_all_adapters ... ok
+test no_newline_semantic_or_truncated_frames_never_replay ... ok
+test retry_after_floors_dates_invalid_and_refusals ... ok
+test review_raw_broker_stream_events_remain_single_send_legacy ... ok
+test rfc850_century_is_resolved_before_weekday_and_floor_validation ... ok
+test review_keepalive_and_partial_http200_matrix ... ok
+test streaming_503_success_preserves_payload_and_accounting_all_adapters ... ok
+test session_interruption_never_commits_partial_assistant_or_executes_tools ... ok
+test review_pending_and_backoff_cancel_matrix ... ok
+test review_completed_tool_not_reexecuted_after_followup_failure ... ok
+test typed_errors_v1_optional_fields_and_legacy_length ... ok
+test admission_unresolved_broker_session_http_matrix ... ok
+test unsupported_reasoning_rejected_before_send_and_capabilities_truthful ... ok
+test uuid_shaped_credential_or_prompt_echo_is_omitted_from_safe_metadata ... ok
+test typed_errors_v1_session_length_proof ... ok
+test truncated_permanent_http_bodies_never_retry_all_public_completion_apis ... ok
+test typed_errors_v1_invalid_policy_prevents_all_entrypoints ... ok
+test review_retry_after_numeric_date_ceiling_budget_matrix ... ok
+test review_broker_session_failure_evidence_matrix ... ok
+test recovery_status_selection_v1 ... ok
+test typed_errors_v1_boundaries ... ok
+
+test result: ok. 66 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 44.46s
+
+
+running 12 tests
+test dropped_openai_reasoning_warns_at_http_boundary ... ok
+test openai_model_restrictions_preserve_selected_output_limits ... ok
+test artifact_error_and_optional_response_fields_through_broker ... ok
+test trace_temperature_reads_old_numeric_and_new_absent_fields ... ok
+test native_reasoning_mappings_keep_request_fidelity ... ok
+test unset_controls_cross_http_boundary ... ok
+test session_default_and_temperature_builder_preserve_absence_and_zero ... ok
+test artifact_cases_through_broker_all_http_entrypoints ... ok
+test artifact_cases_recovery_replays_bytes_and_real_attempt_identities ... ok
+test artifact_cases_through_session_send_and_stream ... ok
+test artifact_tool_continuations_preserve_session_controls_and_history ... ok
+test artifact_cases_recovery_through_broker_and_session ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 41.98s
+
+
+running 44 tests
+test src/agents/async_aggregator_agent.rs - agents::async_aggregator_agent::AsyncAggregatorAgent (line 29) ... ignored
+test src/agents/async_llm_agent.rs - agents::async_llm_agent::AsyncLlmAgent (line 23) ... ignored
+test src/agents/iterative_problem_solver.rs - agents::iterative_problem_solver::IterativeProblemSolver (line 20) ... ignored
+test src/agents/iterative_problem_solver.rs - agents::iterative_problem_solver::IterativeProblemSolver::builder (line 77) ... ignored
+test src/agents/iterative_problem_solver.rs - agents::iterative_problem_solver::IterativeProblemSolver::new (line 59) ... ignored
+test src/agents/iterative_problem_solver.rs - agents::iterative_problem_solver::IterativeProblemSolver::solve (line 110) ... ignored
+test src/agents/simple_recursive_agent.rs - agents::simple_recursive_agent (line 27) ... ignored
+test src/agents/simple_recursive_agent.rs - agents::simple_recursive_agent::EventEmitter::subscribe (line 231) ... ignored
+test src/agents/simple_recursive_agent.rs - agents::simple_recursive_agent::SimpleRecursiveAgent::builder (line 331) ... ignored
+test src/agents/simple_recursive_agent.rs - agents::simple_recursive_agent::SimpleRecursiveAgent::new (line 311) ... ignored
+test src/agents/simple_recursive_agent.rs - agents::simple_recursive_agent::SimpleRecursiveAgent::solve (line 363) ... ignored
+test src/async_dispatcher.rs - async_dispatcher::AsyncDispatcher (line 25) ... ignored
+test src/llm/broker.rs - llm::broker::LlmBroker::generate_stream (line 431) ... ignored
+test src/llm/broker.rs - llm::broker::LlmBroker::generate_stream_events (line 675) - compile ... ok
+test src/llm/chat_session.rs - llm::chat_session::ChatSession (line 55) ... ignored
+test src/llm/chat_session.rs - llm::chat_session::ChatSession::builder (line 111) ... ignored
+test src/llm/chat_session.rs - llm::chat_session::ChatSession::new (line 90) ... ignored
+test src/llm/chat_session.rs - llm::chat_session::ChatSession::send (line 142) ... ignored
+test src/llm/chat_session.rs - llm::chat_session::ChatSession::send_stream (line 186) ... ignored
+test src/agents/base_async_agent.rs - agents::base_async_agent::BaseAsyncAgent (line 18) ... ok
+test src/agents/base_agent.rs - agents::base_agent::BaseAgent (line 30) ... ok
+test src/llm/gateways/omlx.rs - llm::gateways::omlx::OmlxConfig (line 70) - compile ... ok
+test src/llm/gateways/omlx.rs - llm::gateways::omlx::OmlxGateway (line 154) - compile ... ok
+test src/event.rs - event (line 8) ... ok
+test src/context/shared_working_memory.rs - context::shared_working_memory::SharedWorkingMemory::get_working_memory (line 82) ... ok
+test src/context/shared_working_memory.rs - context::shared_working_memory::SharedWorkingMemory::new (line 61) ... ok
+test src/context/shared_working_memory.rs - context::shared_working_memory (line 9) ... ok
+test src/context/shared_working_memory.rs - context::shared_working_memory::SharedWorkingMemory::merge_to_working_memory (line 106) ... ok
+test src/llm/recovery/adapter.rs - llm::recovery::adapter::RecoveryGateway (line 32) - compile ... ok
+test src/llm/tools/current_datetime_tool.rs - llm::tools::current_datetime_tool::CurrentDatetimeTool (line 15) ... ignored
+test src/llm/tools/ephemeral_task_manager/mod.rs - llm::tools::ephemeral_task_manager::all_tools (line 30) ... ignored
+test src/llm/tools/simple_date_tool.rs - llm::tools::simple_date_tool::SimpleDateTool (line 15) ... ignored
+test src/llm/gateway.rs - llm::gateway::CompletionConfig (line 40) ... ok
+test src/llm/tools/web_search_tool.rs - llm::tools::web_search_tool::WebSearchTool (line 32) ... ignored
+test src/router.rs - router::Router (line 20) ... ignored
+test src/tracer/mod.rs - tracer (line 25) ... ignored
+test src/tracer/tracer_events.rs - tracer::tracer_events::TracerEvent::as_any (line 55) ... ok
+test src/llm/tools/ask_user_tool.rs - llm::tools::ask_user_tool::AskUserTool (line 16) ... ok
+test src/llm/gateways/tokenizer_gateway.rs - llm::gateways::tokenizer_gateway::TokenizerGateway::decode (line 99) ... ok
+test src/llm/gateways/tokenizer_gateway.rs - llm::gateways::tokenizer_gateway::TokenizerGateway::count_tokens (line 130) ... ok
+test src/llm/gateways/tokenizer_gateway.rs - llm::gateways::tokenizer_gateway::TokenizerGateway (line 19) ... ok
+test src/llm/tools/tell_user_tool.rs - llm::tools::tell_user_tool::TellUserTool (line 15) ... ok
+test src/llm/gateways/tokenizer_gateway.rs - llm::gateways::tokenizer_gateway::TokenizerGateway::encode (line 75) ... ok
+test src/llm/gateways/tokenizer_gateway.rs - llm::gateways::tokenizer_gateway::TokenizerGateway::new (line 48) ... ok
+
+test result: ok. 20 passed; 0 failed; 24 ignored; 0 measured; 0 filtered out; finished in 3.81s
+
