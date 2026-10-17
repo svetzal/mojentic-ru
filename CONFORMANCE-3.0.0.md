@@ -1,10 +1,96 @@
 # Rust 3.0.0 scoped conformance
 
-## Current correction: model-metadata section 1
+## Current correction: cycle 8 OpenAI request observation
+
+Baseline: `552cf7738ebcfbe1f721ea10ab00511ece5282e4` plus the uncommitted
+working-tree correction to `tests/model_metadata.rs` and verification records
+in worktree `mojentic-3-0-ru-c8-3f29a7`.
+Verifier SHA-256: `1cc51637a0638015d77f35078759c35a700aca22108f0fb2b67209460adcc056`.
+This identity is the tested executable source; documentation result updates
+follow verification. Tracked runtime source is byte-identical to the baseline.
+Initiative brief SHA-256 was verified:
+`ea6a0efa56bfb3cd74b5ce728f80cc33c6fbd853114bec94b8aabe79f5d28e6e`.
+
+Reused contract: **model-metadata-section1-v1**,
+`tests/contracts/model_metadata_section1_v1.json`, unchanged SHA-256
+`617c0df913416e8cbfa5873256d427857c1f998103b9b04a4e2b3a456d07ac07`.
+The mapping and proof method are in
+[the verification record](tests/contracts/MODEL-METADATA-SECTION1.md#cycle-8-openai-request-observation-correction).
+Every registry case executes both the real direct OpenAI and recovery-wrapped
+public lookup, asserts exact results and observes zero HTTP requests across all
+methods and paths. The local TCP observer does not filter on HTTP method or
+path. A permanent negative control rejects a real POST despite its ignored
+HTTP failure. A temporary POST in the real OpenAI metadata implementation
+caused the targeted registry verifier to fail on the observed request (exit
+101); restoring that file byte-for-byte passed all nine metadata tests (exit 0).
+No unreachable-host success is used to infer absence of requests.
+
+Rust 2021, formatting, stable toolchain selection, Tokio, public API, runtime
+behavior, feature flags, dependencies, version and the 56% coverage floor are
+preserved. No MSRV or workspace resolver is declared; adding an MSRV remains a
+separate recommendation. Cargo.lock was absent and ignored at baseline and is
+only generated locally for execution. No advisory policy, Git ref, sibling
+repository or other campaign gap was changed. The absent
+`../RELEASE-3.0.0.md` remains a coordination limitation; the supplied brief was
+read and hash-verified. Stacey's binding coverage reconciliation is preserved:
+renewed passing evidence permits progress, and no further reproduction of the
+historical unexplained failure is requested.
+
+### Cycle 8 verification results
+
+Commands use `/home/svetzal/.cargo/bin` on PATH,
+`CARGO_HOME=/tmp/mojentic-c2-cargo` and
+`CARGO_TARGET_DIR=/tmp/mojentic-ru-c8-target`; output is captured with
+`foundry capture`. One `.hone-gates.json` was discovered in this repository.
+All seven discovered gates and the four additional applicable CI/repository
+checks passed (exit 0); the targeted metadata verifier also passed.
+
+| Command | Exit | Result |
+| --- | --- | --- |
+| `cargo test --all-features --test model_metadata` | 0 | Nine passed, including ignored-POST negative control |
+| `cargo fmt --check` | 0 | Passed |
+| `cargo clippy --all-targets --all-features -- -D warnings` | 0 | Passed |
+| `cargo test --verbose --all-features` | 0 | 706 passed, including nine metadata tests and 20 doctests; 24 existing ignored doctests |
+| `cargo build --verbose --all-features` | 0 | Passed |
+| `cargo tarpaulin --all-features --fail-under 56` | 0 | 70.70%, 3410/4823 lines; metadata negative control passed under instrumentation |
+| `cargo deny check` | 0 | Advisories, bans, licenses and sources passed; existing duplicate-version warnings |
+| `cargo audit` | 0 | 267 locked dependencies scanned; no vulnerabilities reported |
+| `cargo test` | 0 | 706 passed; 24 existing ignored doctests |
+| `cargo doc --no-deps --all-features` | 0 | Passed with two existing rustdoc warnings |
+| `mdbook build book` | 0 | HTML emitted; existing `truncate-long-entries` configuration diagnostic |
+| `cargo fetch` | 0 | CI setup dependency fetch passed |
+
+Rustdoc warnings remain the unresolved `connect` link in
+`src/realtime/broker.rs` and unclosed `dyn` tag in `src/examples/react/events.rs`.
+Installed mdBook reports `Failed to deserialize output.html` for the existing
+search configuration and still writes HTML with exit 0. These checks are not
+claimed warning-free. Heading-only `examples.md` and `use_cases.md` generated
+by mdBook were removed after the check. No gate, advisory policy or dependency
+was changed. Behavioral proof JSON, actual rejection/correction exits (101/0),
+complete logs and unchanged runtime/contract identities were validated.
+
+Suggested commit message (not executed):
+`test: observe all OpenAI registry lookup requests`.
+
+### Paired verification remains unfinished
+
+Rust implementation/local consumer verifier: baseline and working-tree identity
+above; `cargo test --all-features --test model_metadata` passed (nine tests).
+External OpenAI/Ollama/oMLX provider identities, commands and results for this
+same executable v1 hash: **missing**. Microgentic consumer verification of the
+same set/hash, tested commit, command and result: **missing**. The initiative's
+recorded microgentic `e71b387e` / Mojentic pin `4ca1ed2` was not inspected or
+verified here. Initiative coordination must arrange both sides' required-gate
+verification; fixtures and independently authored mocks are not paired proof.
+No cross-repository compatibility, release readiness or publication is claimed.
+All six-port publication and consumer migration holds remain. Only mojentic-ru
+is changed, and changes remain uncommitted for Foundry.
+
+## Historical correction: model-metadata section 1
 
 Tested Rust baseline: `50387e33ba46e5b67737f70b6918bd6581b1b96b` plus this
-uncommitted working-tree correction. This section is the current scoped record;
-all earlier corrections recorded below retain historical identities and results.
+uncommitted working-tree correction at that time. This section retains its
+historical identities and results; the cycle 8 record above is current.
 The initiative brief SHA-256 was verified as
 `ea6a0efa56bfb3cd74b5ce728f80cc33c6fbd853114bec94b8aabe79f5d28e6e`.
 The coordinating repository was clean for the relevant inputs at

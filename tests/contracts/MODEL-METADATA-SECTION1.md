@@ -46,3 +46,41 @@ local conformance only. The initiative must supply this artifact and verifier
 semantics to both sides and record their tested commits and required-gate
 results; missing paired verification remains unfinished work. No external
 repository was changed, and publication and consumer-migration holds remain.
+
+## Cycle 8: OpenAI request observation correction
+
+Tested baseline: `552cf7738ebcfbe1f721ea10ab00511ece5282e4` plus the
+uncommitted `tests/model_metadata.rs` correction in worktree
+`mojentic-3-0-ru-c8-3f29a7`. Verifier SHA-256:
+`1cc51637a0638015d77f35078759c35a700aca22108f0fb2b67209460adcc056`.
+The v1 artifact and hash above are unchanged; no fixture or runtime change is
+needed. All seven `.hone-gates.json` commands and the four additional applicable
+CI/repository checks passed (exit 0), including 706 all-feature tests and 70.70%
+coverage against the unchanged 56% floor. See `CONFORMANCE-3.0.0.md` for exact
+commands, results and existing documentation diagnostics.
+
+`section1_registry_exact_lookup_is_request_free` invokes the real public
+`OpenAIGateway` and `RecoveryGateway` operations for each of the four v1 registry
+cases: two exact known names, an unknown variant and an unknown name. It asserts
+exact metadata (including optional fields) or `None` for each operation. Each
+case/adapter pair has its own local TCP observer. The observer accepts any
+connection, records its request line without filtering method or path, returns
+HTTP 503, drains pending connections on shutdown and asserts no requests.
+Lookup success at an unreachable host is no longer used as request evidence.
+
+`section1_request_observer_rejects_ignored_post_failure` sends an actual POST to
+`/ignored-failure?probe=1`, deliberately discards the HTTP failure, then requires
+the same zero-request assertion to panic with that exact request line. This
+negative control runs in the ordinary test, CI and coverage gates. Before the
+full suite, a temporary mutation of the real OpenAI metadata implementation
+sent that failing POST and ignored its error: the registry verifier rejected it
+(exit 101). Restoring the implementation byte-for-byte made
+`cargo test --all-features --test model_metadata` pass (exit 0, nine tests).
+This proves observation of a request through the real gateway boundary rather
+than a manually changed count. The temporary mutation is not part of the change.
+
+This is Rust-side local conformance only. External provider and microgentic
+consumer commits, commands and results for this identical v1 hash remain
+missing; initiative coordination must arrange paired verification in their
+required gates. Existing provider captures and local doubles do not close that
+gap. All publication and consumer migration holds remain.

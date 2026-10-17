@@ -128,13 +128,62 @@ async fn section1_http_contract_exact_outcomes_direct_and_wrapped() {
     }
 }
 
+// Observe the TCP boundary rather than enumerating HTTP methods in mockito.
+// Every accepted connection is read and answered, regardless of method or path.
+struct RequestObserver {
+    url: String,
+    stop: tokio::sync::oneshot::Sender<()>,
+    task: tokio::task::JoinHandle<Vec<String>>,
+}
+
+impl RequestObserver {
+    async fn start() -> Self {
+        use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.expect("bind observer");
+        let url = format!("http://{}", listener.local_addr().expect("observer address"));
+        let (stop, mut stopped) = tokio::sync::oneshot::channel();
+        let task = tokio::spawn(async move {
+            let mut requests = Vec::new();
+            loop {
+                tokio::select! {
+                    // Drain queued connections before honoring shutdown.
+                    biased;
+                    accepted = listener.accept() => {
+                        let (stream, _) = accepted.expect("accept observed connection");
+                        let mut stream = BufReader::new(stream);
+                        let mut line = String::new();
+                        tokio::time::timeout(Duration::from_secs(2), stream.read_line(&mut line))
+                            .await.expect("request line timeout").expect("read request line");
+                        requests.push(line.trim_end().to_owned());
+                        // A failure response detects callers that ignore HTTP errors too.
+                        stream.get_mut().write_all(
+                            b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                        ).await.expect("write failure response");
+                    }
+                    _ = &mut stopped => break,
+                }
+            }
+            requests
+        });
+        Self { url, stop, task }
+    }
+
+    async fn assert_request_free(self) {
+        self.stop.send(()).expect("stop observer");
+        let requests = self.task.await.expect("observer task");
+        assert!(requests.is_empty(), "unexpected outbound HTTP requests: {requests:?}");
+    }
+}
+
 #[tokio::test]
 async fn section1_registry_exact_lookup_is_request_free() {
-    for wrapped in [false, true] {
-        let mut server = mockito::Server::new_async().await;
-        let no_request = server.mock("GET", mockito::Matcher::Any).expect(0).create_async().await;
-        let gateway = gateway("openai", &server.url(), wrapped);
-        for case in contract()["registry"].as_array().expect("registry") {
+    let artifact = contract();
+    assert_eq!(artifact["version"], "model-metadata-section1-v1");
+    for case in artifact["registry"].as_array().expect("registry") {
+        for wrapped in [false, true] {
+            let observer = RequestObserver::start().await;
+            let gateway = gateway("openai", &observer.url, wrapped);
             let result = gateway
                 .get_model_context_window(case["model"].as_str().expect("model"))
                 .await
@@ -144,16 +193,27 @@ async fn section1_registry_exact_lookup_is_request_free() {
                 field: "registry".into(),
                 model_num_ctx: None,
             });
-            assert_eq!(result, expected, "{case}");
+            assert_eq!(result, expected, "{case} wrapped={wrapped}");
+            observer.assert_request_free().await;
         }
-        no_request.assert_async().await;
-        // An unreachable host also proves lookup needs no successful HTTP exchange.
-        assert!(self::gateway("openai", "http://127.0.0.1:0", wrapped)
-            .get_model_context_window("gpt-4o")
-            .await
-            .expect("offline registry")
-            .is_some());
     }
+}
+
+#[tokio::test]
+#[should_panic(
+    expected = "unexpected outbound HTTP requests: [\"POST /ignored-failure?probe=1 HTTP/1.1\"]"
+)]
+async fn section1_request_observer_rejects_ignored_post_failure() {
+    let observer = RequestObserver::start().await;
+    // Exercise real HTTP I/O, then deliberately discard the HTTP failure.
+    let _ = reqwest::Client::new()
+        .post(format!("{}/ignored-failure?probe=1", observer.url))
+        .timeout(Duration::from_secs(2))
+        .send()
+        .await
+        .expect("observer response")
+        .error_for_status();
+    observer.assert_request_free().await;
 }
 
 #[test]
