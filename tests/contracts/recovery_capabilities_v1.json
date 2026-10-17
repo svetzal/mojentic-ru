@@ -1,0 +1,170 @@
+{
+  "contract": "recovery-capabilities-v1",
+  "cases": [
+    {
+      "provider": "openai",
+      "capability": "local_request_cancellation",
+      "evidence": {
+        "value": "supported",
+        "endpoint": "POST https://api.openai.com/v1/chat/completions",
+        "documentation": "https://developers.openai.com/api/reference/resources/chat/subresources/completions/streaming-events",
+        "inspected_on": "2026-10-16",
+        "basis": "Chat Completions streaming documents interrupted or cancelled streams and potentially missing final usage; this is local stream cancellation only."
+      }
+    },
+    {
+      "provider": "openai",
+      "capability": "remote_request_cancellation",
+      "evidence": {
+        "value": "unsupported",
+        "endpoint": "POST https://api.openai.com/v1/chat/completions",
+        "documentation": "https://developers.openai.com/api/reference/resources/chat/subresources/completions",
+        "inspected_on": "2026-10-16",
+        "basis": "The Chat Completions operation inventory has no remote cancel operation. Deleting a stored completion is not cancellation of inference."
+      }
+    },
+    {
+      "provider": "openai",
+      "capability": "request_status",
+      "evidence": {
+        "value": "unsupported",
+        "endpoint": "POST https://api.openai.com/v1/chat/completions",
+        "documentation": "https://developers.openai.com/api/reference/resources/chat/subresources/completions",
+        "inspected_on": "2026-10-16",
+        "basis": "Retrieval requires store=true and a completion ID; it retrieves a stored result, not the status of an in-flight or ambiguously accepted POST."
+      }
+    },
+    {
+      "provider": "openai",
+      "capability": "idempotency",
+      "evidence": {
+        "value": "unsupported",
+        "endpoint": "POST https://api.openai.com/v1/chat/completions",
+        "documentation": "https://developers.openai.com/api/reference/resources/chat/subresources/completions",
+        "inspected_on": "2026-10-16",
+        "basis": "The documented Chat Completions request parameters describe no idempotency facility for replaying this POST."
+      }
+    },
+    {
+      "provider": "openai",
+      "capability": "exact_attempt_termination",
+      "evidence": {
+        "value": "unknown",
+        "endpoint": "POST https://api.openai.com/v1/chat/completions",
+        "documentation": "https://developers.openai.com/api/reference/resources/chat/subresources/completions",
+        "inspected_on": "2026-10-16",
+        "basis": "The documentation does not prove termination of one exact wire attempt; local stream closure is insufficient."
+      }
+    },
+    {
+      "provider": "ollama",
+      "capability": "local_request_cancellation",
+      "evidence": {
+        "value": "supported",
+        "endpoint": "POST http://localhost:11434/api/chat",
+        "documentation": "https://github.com/ollama/ollama-js#abort",
+        "inspected_on": "2026-10-16",
+        "basis": "The provider SDK documents chat streaming and abort of streamed generations, raising AbortError locally; it does not attest to exact remote termination."
+      }
+    },
+    {
+      "provider": "ollama",
+      "capability": "remote_request_cancellation",
+      "evidence": {
+        "value": "unsupported",
+        "endpoint": "POST http://localhost:11434/api/chat",
+        "documentation": "https://docs.ollama.com/api/chat",
+        "inspected_on": "2026-10-16",
+        "basis": "The chat endpoint documents generation, with no remote request cancellation facility. keep_alive controls model residency, not one request."
+      }
+    },
+    {
+      "provider": "ollama",
+      "capability": "request_status",
+      "evidence": {
+        "value": "unsupported",
+        "endpoint": "POST http://localhost:11434/api/chat",
+        "documentation": "https://docs.ollama.com/api/chat",
+        "inspected_on": "2026-10-16",
+        "basis": "The chat request and response document no in-flight request status facility; done reports completion in the current response only."
+      }
+    },
+    {
+      "provider": "ollama",
+      "capability": "idempotency",
+      "evidence": {
+        "value": "unsupported",
+        "endpoint": "POST http://localhost:11434/api/chat",
+        "documentation": "https://docs.ollama.com/api/chat",
+        "inspected_on": "2026-10-16",
+        "basis": "The chat request documents no idempotency key or deduplicated resend facility."
+      }
+    },
+    {
+      "provider": "ollama",
+      "capability": "exact_attempt_termination",
+      "evidence": {
+        "value": "unknown",
+        "endpoint": "POST http://localhost:11434/api/chat",
+        "documentation": "https://docs.ollama.com/api/chat",
+        "inspected_on": "2026-10-16",
+        "basis": "The chat documentation does not prove termination of one exact wire attempt; SDK abort is not that evidence."
+      }
+    },
+    {
+      "provider": "omlx",
+      "capability": "local_request_cancellation",
+      "evidence": {
+        "value": "unknown",
+        "endpoint": "POST http://localhost:8000/v1/chat/completions",
+        "documentation": "https://github.com/jundot/omlx/blob/53ab0e66d75fe46e3cfa7ed7a7762d3bbcf21e9c/README.md#api-compatibility",
+        "inspected_on": "2026-10-16",
+        "basis": "The API endpoint inventory documents streaming chat completion but does not describe local request cancellation; OpenAI protocol compatibility alone is ambiguous."
+      }
+    },
+    {
+      "provider": "omlx",
+      "capability": "remote_request_cancellation",
+      "evidence": {
+        "value": "unsupported",
+        "endpoint": "POST http://localhost:8000/v1/chat/completions",
+        "documentation": "https://github.com/jundot/omlx/blob/53ab0e66d75fe46e3cfa7ed7a7762d3bbcf21e9c/README.md#api-compatibility",
+        "inspected_on": "2026-10-16",
+        "basis": "The documented API endpoint inventory has no remote cancellation operation for chat completions; admin model management is not per-request cancellation."
+      }
+    },
+    {
+      "provider": "omlx",
+      "capability": "request_status",
+      "evidence": {
+        "value": "unsupported",
+        "endpoint": "POST http://localhost:8000/v1/chat/completions",
+        "documentation": "https://github.com/jundot/omlx/blob/53ab0e66d75fe46e3cfa7ed7a7762d3bbcf21e9c/README.md#api-compatibility",
+        "inspected_on": "2026-10-16",
+        "basis": "The documented API endpoint inventory has no chat request status operation; model listing and usage analytics are not in-flight request status."
+      }
+    },
+    {
+      "provider": "omlx",
+      "capability": "idempotency",
+      "evidence": {
+        "value": "unknown",
+        "endpoint": "POST http://localhost:8000/v1/chat/completions",
+        "documentation": "https://github.com/jundot/omlx/blob/53ab0e66d75fe46e3cfa7ed7a7762d3bbcf21e9c/README.md#api-compatibility",
+        "inspected_on": "2026-10-16",
+        "basis": "The endpoint inventory does not specify chat request headers or deduplication semantics, so idempotency is ambiguous."
+      }
+    },
+    {
+      "provider": "omlx",
+      "capability": "exact_attempt_termination",
+      "evidence": {
+        "value": "unknown",
+        "endpoint": "POST http://localhost:8000/v1/chat/completions",
+        "documentation": "https://github.com/jundot/omlx/blob/53ab0e66d75fe46e3cfa7ed7a7762d3bbcf21e9c/README.md#api-compatibility",
+        "inspected_on": "2026-10-16",
+        "basis": "The streaming endpoint documentation does not prove termination of one exact wire attempt."
+      }
+    }
+  ]
+}

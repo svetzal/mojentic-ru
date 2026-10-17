@@ -171,3 +171,65 @@ permission. Continue awaiting when the decision is still pending. Cancellation
 and budget expiry continue to terminate pending hooks, and absent-hook local
 safety checks and remote retry rules are unchanged. The scoped verification map
 and consumer coordination gap are in `CONFORMANCE-3.0.0.md`.
+
+## Endpoint capability declarations
+
+`gateway.capabilities()` reports five `Support` values for the adapter's exact
+completion endpoint. `gateway.capability_evidence()` returns the corresponding
+`CapabilityEvidenceSet`: every field contains `value`, `endpoint`,
+`documentation`, `inspected_on`, and `basis`. Canonical URLs identify provider
+endpoints; a configured proxy or custom host may offer different guarantees.
+These declarations do not change requests, retry eligibility, cancellation or
+admission policy, and do not issue status/cancel calls or idempotency headers.
+
+| Adapter / endpoint | Local cancellation | Remote cancellation | Request status | Idempotency | Exact-attempt termination |
+| --- | --- | --- | --- | --- | --- |
+| Ollama `POST /api/chat` | Supported | Unsupported | Unsupported | Unsupported | Unknown |
+| oMLX `POST /v1/chat/completions` | Unknown | Unsupported | Unsupported | Unknown | Unknown |
+| OpenAI `POST /v1/chat/completions` | Supported | Unsupported | Unsupported | Unsupported | Unknown |
+
+The shared `recovery-capabilities-v1` declarations retain their original
+2026-10-16 inspection date and were rechecked against provider documentation on
+2026-10-17. [Ollama's SDK abort documentation](https://github.com/ollama/ollama-js#abort)
+explains local streaming abort; the [chat API](https://docs.ollama.com/api/chat)
+has no remote cancellation, active-request status or deduplicated resend facility.
+[OpenAI's streaming documentation](https://developers.openai.com/api/reference/resources/chat/subresources/completions/streaming-events)
+describes interrupted/cancelled streams, while its
+[Chat Completions operations](https://developers.openai.com/api/reference/resources/chat/subresources/completions)
+provide no remote cancel or idempotent replay facility for this POST. Stored
+completion retrieval is not an active-request status facility. The pinned
+[oMLX endpoint inventory](https://github.com/jundot/omlx/blob/53ab0e66d75fe46e3cfa7ed7a7762d3bbcf21e9c/README.md#api-compatibility)
+does not document local cancellation or deduplication semantics sufficiently;
+OpenAI compatibility alone does not establish them. Its inventory has no chat
+request cancel or status operation. Unsupported declarations describe these
+inspected endpoint documents; they do not assert a product-wide impossibility.
+
+Local HTTP cancellation never proves that one exact remote attempt terminated.
+All three adapters therefore retain `Unknown` for exact-attempt termination.
+Local ambiguous retries still need explicit admission under the existing rules.
+The `anthropic` feature flag does not provide a recovery adapter.
+
+```rust,no_run
+use mojentic::llm::{gateways::OllamaGateway, recovery::{RecoveryPolicy, Support}};
+# fn example() -> Result<(), Box<dyn std::error::Error>> {
+let gateway = OllamaGateway::new().with_recovery(RecoveryPolicy::default())?;
+let capabilities = gateway.capabilities();
+assert_eq!(capabilities.local_request_cancellation, Support::Supported);
+assert_eq!(capabilities.exact_attempt_termination, Support::Unknown);
+let evidence = gateway.capability_evidence();
+println!("{}: {} ({})", evidence.idempotency.endpoint,
+         evidence.idempotency.documentation, evidence.idempotency.inspected_on);
+# Ok(())
+# }
+```
+
+For migration, replace the serialized `request_cancel` key with
+`remote_request_cancellation`. The Rust `request_cancel` field remains a legacy
+alias for remote cancellation and is omitted from serialization. Add
+`remote_request_cancellation`, `local_request_cancellation` and
+`exact_attempt_termination` to capability literals. Provider declarations come
+from the adapter, not `Capabilities::default()`, which is unbound and carries no
+provider evidence. Ollama/OpenAI idempotency changes from `Unknown` to
+`Unsupported`; oMLX remains `Unknown`. Consumers must verify the versioned
+executable set in their own gates before claiming boundary compatibility; see
+`CONFORMANCE-3.0.0.md` for the coordination gap.

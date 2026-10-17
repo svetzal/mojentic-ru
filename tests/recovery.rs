@@ -802,7 +802,7 @@ async fn partial_http200_body_and_malformed_protocol_never_replayed() {
 }
 #[tokio::test]
 async fn immutable_reasoning_tools_schema_and_sampling_all_adapters() {
-    async fn check<G: RecoveryProvider>(inner: G, server: &HttpFixture) {
+    async fn check<G: RecoveryProvider>(inner: G, server: &HttpFixture, reasoning_field: &str) {
         let capture = Arc::new(Capture::default());
         let gateway = RecoveryGateway::new(inner, policy(2, &capture)).expect("gateway");
         let mut message = LlmMessage::assistant("prior");
@@ -829,16 +829,7 @@ async fn immutable_reasoning_tools_schema_and_sampling_all_adapters() {
         assert_eq!(bodies.len(), 2);
         assert_eq!(bodies[0], bodies[1]);
         let body: Value = serde_json::from_slice(&bodies[0]).expect("json");
-        assert_eq!(
-            body["messages"][0][if gateway.capabilities().request_status == Support::Unsupported
-                && body["options"].is_object()
-            {
-                "thinking"
-            } else {
-                "reasoning_content"
-            }],
-            "native prior reasoning"
-        );
+        assert_eq!(body["messages"][0][reasoning_field], "native prior reasoning");
         assert_eq!(result.report.history.len(), 1);
     }
     let server = fixture(vec![
@@ -846,13 +837,13 @@ async fn immutable_reasoning_tools_schema_and_sampling_all_adapters() {
         (200, response(Provider::Ollama, "{\"ok\":true}").to_string(), false, false),
     ])
     .await;
-    check(OllamaGateway::with_host(&server.url), &server).await;
+    check(OllamaGateway::with_host(&server.url), &server, "thinking").await;
     let server = fixture(vec![
         (503, "fail".into(), false, false),
         (200, response(Provider::Omlx, "{\"ok\":true}").to_string(), false, false),
     ])
     .await;
-    check(omlx(&server.url), &server).await;
+    check(omlx(&server.url), &server, "reasoning_content").await;
     // OpenAI deliberately rejects native reasoning replay: preserve its prototype capability boundary.
     let server = fixture(vec![
         (503, "fail".into(), false, false),
@@ -1564,9 +1555,9 @@ async fn unsupported_reasoning_rejected_before_send_and_capabilities_truthful() 
     assert!(error.failure.identity.is_none());
     assert!(error.history.is_empty());
     let capabilities = gateway.capabilities();
-    assert_eq!(capabilities.request_cancel, Support::Unsupported);
+    assert_eq!(capabilities.remote_request_cancellation, Support::Unsupported);
     assert_eq!(capabilities.request_status, Support::Unsupported);
-    assert_eq!(capabilities.idempotency, Support::Unknown);
+    assert_eq!(capabilities.idempotency, Support::Unsupported);
     mock.assert_async().await;
 }
 
@@ -4006,4 +3997,76 @@ async fn admission_absent_local_remote_http_matrix() {
             adapter_case!(check, provider, &server.url, &server, operation);
         }
     }
+}
+
+/// Executes the shared declarations against real public adapters, without a mock provider.
+#[test]
+fn capability_contract_public_adapters_v1() {
+    fn check<G: RecoveryProvider>(gateway: RecoveryGateway<G>, provider: &str) {
+        let contract: Value =
+            serde_json::from_str(include_str!("contracts/recovery_capabilities_v1.json"))
+                .expect("versioned reference contract");
+        assert_eq!(contract["contract"], "recovery-capabilities-v1");
+        let keys = [
+            "local_request_cancellation",
+            "remote_request_cancellation",
+            "request_status",
+            "idempotency",
+            "exact_attempt_termination",
+        ];
+        let cases = contract["cases"].as_array().expect("contract cases");
+        let mut expected_evidence = serde_json::Map::new();
+        let mut expected_values = serde_json::Map::new();
+        for key in keys {
+            let entries: Vec<_> = cases
+                .iter()
+                .filter(|entry| entry["provider"] == provider && entry["capability"] == key)
+                .collect();
+            assert_eq!(entries.len(), 1, "one contract case for {provider}/{key}");
+            let evidence = entries[0]["evidence"].clone();
+            assert!(matches!(
+                evidence["value"].as_str(),
+                Some("supported" | "unsupported" | "unknown")
+            ));
+            assert!(evidence["documentation"].as_str().expect("citation").starts_with("https://"));
+            assert!(!evidence["basis"].as_str().expect("basis").is_empty());
+            assert!(chrono::NaiveDate::parse_from_str(
+                evidence["inspected_on"].as_str().expect("date"),
+                "%Y-%m-%d"
+            )
+            .is_ok());
+            expected_values.insert(key.into(), evidence["value"].clone());
+            expected_evidence.insert(key.into(), evidence);
+        }
+        assert_eq!(
+            serde_json::to_value(gateway.capabilities()).expect("values"),
+            Value::Object(expected_values),
+            "{provider} values"
+        );
+        assert_eq!(
+            serde_json::to_value(gateway.capability_evidence()).expect("evidence"),
+            Value::Object(expected_evidence),
+            "{provider} exact endpoint evidence"
+        );
+        assert_eq!(gateway.capabilities().exact_attempt_termination, Support::Unknown);
+        assert_eq!(
+            gateway.capabilities().request_cancel,
+            gateway.capabilities().remote_request_cancellation
+        );
+    }
+    // OpenAI and Ollama have identical values, but different endpoint evidence.
+    check(
+        OpenAIGateway::with_api_key("contract-test")
+            .with_recovery(RecoveryPolicy::default())
+            .expect("openai"),
+        "openai",
+    );
+    check(
+        OllamaGateway::new().with_recovery(RecoveryPolicy::default()).expect("ollama"),
+        "ollama",
+    );
+    check(
+        OmlxGateway::new().with_recovery(RecoveryPolicy::default()).expect("omlx"),
+        "omlx",
+    );
 }

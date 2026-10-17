@@ -108,20 +108,35 @@ terminal, preserve their causes, and cannot trigger a resend.
 
 ## Provider capabilities
 
-| Completion adapter | Exact active request cancel/status | Idempotency | Remote termination proof on failure |
-| --- | --- | --- | --- |
-| Ollama `/api/chat` | Unsupported by adapter | Unknown, no fabricated header | Never asserted |
-| oMLX `/v1/chat/completions` | Unsupported by adapter | Unknown, no fabricated header | Never asserted |
-| OpenAI `/chat/completions` | Unsupported by adapter | Unknown, no fabricated header | Never asserted |
+October 12 amendment item 3 is advanced by `recovery-capabilities-v1` in
+`tests/contracts/recovery_capabilities_v1.json`, SHA-256
+`40e8da683ce4bfcfebf9892ca51a53a701488d463977f021922cd6317203aa76`.
+`capability_contract_public_adapters_v1` verifies all five exact values and
+complete endpoint-specific evidence through the actual Ollama, oMLX and OpenAI
+public recovery adapters. The set is copied byte-for-byte from Elixir's reference,
+not an independently authored mock. Original inspection: 2026-10-16;
+provider documentation rechecked: 2026-10-17.
 
-Current provider sources inspected October 10, 2026:
-[Ollama chat API](https://docs.ollama.com/api/chat),
-[oMLX documentation](https://github.com/jundot/omlx), and
-[OpenAI chat completions API](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create).
-The table describes implemented adapter facilities, not an assertion that all
-upstream products lack cancellation/status/idempotency. Stored completion
-retrieval or model-level management does not establish exact active request
-termination. Embeddings and realtime voice are outside this contract.
+| Adapter | Local cancellation | Remote cancellation | Request status | Idempotency | Exact-attempt termination |
+| --- | --- | --- | --- | --- | --- |
+| Ollama | Supported | Unsupported | Unsupported | Unsupported | Unknown |
+| oMLX | Unknown | Unsupported | Unsupported | Unknown | Unknown |
+| OpenAI | Supported | Unsupported | Unsupported | Unsupported | Unknown |
+
+Values are derived from the same production evidence returned by
+`capability_evidence()`, selected by the inner adapter's typed provider.
+Every declaration includes a canonical endpoint, provider documentation URL,
+inspection date and basis. The recovery book page links those sources and
+explains endpoint limitations. No Anthropic recovery adapter exists.
+Local cancellation, stored-result retrieval and model management do not prove
+exact remote termination. Embeddings/realtime remain outside this contract.
+A deliberate wrong-provider selection failed exact evidence verification even
+though OpenAI/Ollama values are identical; restoring provider selection passed.
+`immutable_reasoning_tools_schema_and_sampling_all_adapters` retains byte-identical
+retry payload and native reasoning assertions using explicit provider field
+names, without consulting capability defaults. Requests, retry, cancellation and
+admission logic are unchanged. See CONFORMANCE-3.0.0.md for current source identity,
+gate evidence and the missing paired consumer verification.
 
 ## Executed public HTTP assertions
 

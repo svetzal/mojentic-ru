@@ -55,18 +55,33 @@ pub enum Support {
     Unsupported,
     Unknown,
 }
+/// Endpoint facilities declared by a recovery adapter, not permission to retry.
+/// Inspect `RecoveryGateway::capability_evidence` for documentation and limitations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub struct Capabilities {
+    /// Legacy alias for `remote_request_cancellation`; omitted from serialization.
+    #[serde(skip)]
     pub request_cancel: Support,
+    /// Local cancellation; this never proves remote termination.
+    pub local_request_cancellation: Support,
+    /// Cancellation of an active remote request.
+    pub remote_request_cancellation: Support,
+    /// Status of an in-flight or ambiguously accepted request.
     pub request_status: Support,
+    /// Deduplicated replay of this endpoint's request.
     pub idempotency: Support,
+    /// Proof that one exact wire attempt stopped remotely.
+    pub exact_attempt_termination: Support,
 }
 impl Default for Capabilities {
     fn default() -> Self {
         Self {
             request_cancel: Support::Unsupported,
+            local_request_cancellation: Support::Unknown,
+            remote_request_cancellation: Support::Unsupported,
             request_status: Support::Unsupported,
             idempotency: Support::Unknown,
+            exact_attempt_termination: Support::Unknown,
         }
     }
 }

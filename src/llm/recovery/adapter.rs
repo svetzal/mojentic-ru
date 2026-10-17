@@ -60,8 +60,14 @@ impl<G: RecoveryProvider> RecoveryGateway<G> {
             client,
         })
     }
+    /// Endpoint-specific facilities, with no change to retry or admission policy.
     pub fn capabilities(&self) -> Capabilities {
-        Capabilities::default()
+        self.capability_evidence().values()
+    }
+    /// Provider documentation, inspection dates and limitations for each facility.
+    /// Local cancellation is never evidence of exact remote attempt termination.
+    pub fn capability_evidence(&self) -> CapabilityEvidenceSet {
+        CapabilityEvidenceSet::for_provider(self.inner.recovery_provider())
     }
     /// Full metadata for an ordinary completion. No tool is executed by this method.
     pub async fn complete_with_recovery(

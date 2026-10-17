@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Recovery adapters expose five endpoint-specific capability values and
+  `capability_evidence()` with provider citations, inspection dates and limits.
+  Exact-attempt termination remains unknown for all three adapters.
 - Opt-in transient completion recovery for Ollama, oMLX and OpenAI ordinary,
   structured and streaming requests. Immutable request replay, bounded jittered
   backoff and Retry-After floors, asynchronous admission, cancellation and
@@ -33,6 +36,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking changes
 
+- Recovery capability serialization replaces `request_cancel` with
+  `remote_request_cancellation`, and adds `local_request_cancellation` and
+  `exact_attempt_termination`. Rust retains `request_cancel` as a legacy remote
+  cancellation alias; capability struct literals need the new fields.
+  Serialized capabilities use the five explicit contract names. Ollama/OpenAI
+  idempotency is now `Unsupported` from inspected endpoint documentation; oMLX idempotency remains `Unknown`.
 - Post-2.1.0 public message/config fields and reasoning enum variants require
   literal and exhaustive-match migrations. `MojenticError::Recovery` adds a
   structured error variant; recovery admission/outcome/lifecycle enums now also
@@ -40,6 +49,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Migration
 
+- Migrate serialized `request_cancel` key reads to `remote_request_cancellation`;
+  existing Rust field reads remain supported as a remote cancellation alias;
+  use `local_request_cancellation` for local stream cancellation and inspect
+  `capability_evidence()` for each declaration's endpoint, citation, date and
+  basis. Add the three new fields to capability literals or use
+  `..Default::default()` for unbound declarations. Obtain provider-specific
+  values from the actual recovery adapter. Local cancellation does not prove
+  remote termination or authorize replay; retry/admission behavior is unchanged.
 - Use message constructors or initialize `reasoning_content`; initialize new
   completion config fields with `..Default::default()`. Select a reasoning
   profile explicitly and opt into `preserve_reasoning` to retain native reasoning
