@@ -25,6 +25,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Recovery-enabled ordinary and structured length-terminated responses now fail
+  with `CompletionDecodeError::Length` before parsing truncated JSON or tools.
+  Streaming length failures retain the same concrete cause through the gateway,
+  broker and session; incomplete tools never execute and length never replays.
+- Decoding failures expose their concrete `CompletionDecodeError` or original
+  `serde_json::Error` through `Failure::inspect_cause()`. Capture callbacks retain
+  their original error type. Safe summaries still omit private causes and bodies.
+
 - A completed admission hook without a decision now stops recovery without a
   resend or tool execution. `AdmissionDecision::Unresolved` produces the distinct
   `Outcome::AdmissionUnresolved` and `Transition::AdmissionUnresolved`, preserving
@@ -35,6 +43,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   streaming calls. Preserve native history through oMLX and Ollama tool rounds.
 
 ### Breaking changes
+
+- Invalid recovery category/status selections now fail during `with_recovery`
+  or `RecoveryGateway::new`, before any entrypoint can dispatch HTTP, with
+  `MojenticError::InvalidRecoveryPolicy(RecoveryPolicyError)`. Select HTTP error
+  statuses (400–599) and supported Transport/Http/ClientTimeout categories.
+  Explicit permanent-status selections remain valid but cannot authorize retry.
+  `NonZeroU32`/`Duration` already exclude zero attempts and negative/nonfinite delays.
+- Migration: include `InvalidRecoveryPolicy` in exhaustive `MojenticError` matches.
+  Recovery callers must handle length termination as failure instead of consuming
+  an incomplete ordinary/structured reply. Match `CompletionDecodeError::Length`
+  by downcasting `error.failure.inspect_cause()`; inspect `RecoveryError.history`
+  for the same original cause. Downcast serde errors directly from
+  `inspect_cause()` rather than walking the former private wrapper's `source()`.
+  Legacy gateways without recovery retain their
+  previous length behavior. Raw event-stream APIs remain legacy single-send paths.
 
 - Recovery capability serialization replaces `request_cancel` with
   `remote_request_cancellation`, and adds `local_request_cancellation` and

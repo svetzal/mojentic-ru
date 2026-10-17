@@ -1,5 +1,45 @@
 # Rust completion recovery conformance
 
+## Current correction: October 12 amendment item 8
+
+Source baseline: `3bf99ad21759c87ae27d8130b2d7de6c5557a7d5` plus the uncommitted
+Foundry correction. This section supersedes historical item-8 assumptions below;
+it does not recertify unrelated initiative decisions. The authoritative root
+contract at mojentic-unify revision `4b08dcd1d87f520a4c70928c33a2bc84c228093d`
+has SHA-256 `a53a3a4eb118fa4687dd703d6ce918dd40dd6cb4eda796abc6c429a6e932e7a3`.
+The local October 9 copy predates that amendment. The supplied initiative brief
+was read and its SHA-256 verified as
+`ea6a0efa56bfb3cd74b5ce728f80cc33c6fbd853114bec94b8aabe79f5d28e6e`.
+
+| Item 8 behavior | Executable evidence in tests/recovery.rs |
+| --- | --- |
+| Invalid policies cannot construct any recovery entrypoint or dispatch HTTP | `typed_errors_v1_invalid_policy_prevents_all_entrypoints`, all three public `with_recovery` adapters; concrete enum and error-source downcast |
+| Concrete length cause crosses actual HTTP, gateway, broker and session | `typed_errors_v1_session_length_proof`, `typed_errors_v1_boundaries` |
+| Structured truncated JSON retains length, ordinary completed tool calls do not execute, stream tool fragments do not execute | Same versioned boundary matrix, all maintained adapters |
+| Original capture errors survive request/header/body failures; original serde and structural failures remain inspectable | Same matrix; direct downcasts to `ContractCaptureError`, `serde_json::Error` and `CompletionDecodeError` |
+| Exactly one terminal failure, retained cause identity/history, user turn retained, zero resends/admissions/tool execution, private summaries | Same matrix, ordinary/structured/streaming gateway and broker; ordinary/streaming session |
+| Existing optional response fields and legacy length success remain supported | `typed_errors_v1_optional_fields_and_legacy_length` |
+
+Policy validation rejects non-error HTTP statuses and unsupported retry categories.
+Rust's existing NonZeroU32/Duration types already enforce positive attempt limits
+and nonnegative finite delays. Base delays above ceilings, zero budgets and
+permanent-status selection remain valid; the latter cannot authorize retries.
+The wrapper owns an immutable validated policy, so construction protects every
+recovery entrypoint, including legacy delegated streams on that wrapper.
+Length failures preserve received progress without treating it as delivered output.
+Default telemetry/privacy, admission, request fidelity, reasoning and capability
+semantics are preserved. `recovery-capabilities-v1` is unchanged.
+
+The proof first observed ChatSession accepting `partial-secret` as a successful
+reply despite `finish_reason: length` (exit 101). The corrected same HTTP/session
+probe rejects it, retains the user turn, never replays, and downcasts the cause to
+`CompletionDecodeError::Length` (exit 0). Full current gate and contract identities
+are recorded in CONFORMANCE-3.0.0.md. Paired external verification remains missing;
+no compatibility or coordinated release readiness is claimed.
+
+## Historical recovery implementation record
+
+
 This worktree implements the approved `TRANSIENT-RECOVERY-2026-10.md` contract
 from baseline `484f4dd`, preserving native reasoning prototype `67791b7`.
 Foundry owns finalization: no finalized correction commit, tag, release, or harness

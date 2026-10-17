@@ -233,3 +233,55 @@ provider evidence. Ollama/OpenAI idempotency changes from `Unknown` to
 `Unsupported`; oMLX remains `Unknown`. Consumers must verify the versioned
 executable set in their own gates before claiming boundary compatibility; see
 `CONFORMANCE-3.0.0.md` for the coordination gap.
+
+## Policy and typed terminal errors
+
+`with_recovery` and `RecoveryGateway::new` validate the policy before creating
+any ordinary, structured, streaming, broker or session recovery entrypoint.
+An invalid selection returns `MojenticError::InvalidRecoveryPolicy` with a
+concrete `RecoveryPolicyError::InvalidStatus` or `UnsupportedCategory`.
+Use HTTP error statuses (400–599) and Transport, Http or ClientTimeout categories.
+Explicitly selecting 400/401/403 remains valid but never makes them retryable.
+Protocol, provider-response and cancellation categories have no supported retry
+policy. Attempt limits and delays use `NonZeroU32` and `Duration`, so zero attempts,
+negative delays and nonfinite delays cannot be constructed. Zero budgets remain
+valid; base delays above the ceiling are clamped as before.
+
+Length termination means the answer and any tool calls are incomplete. Recovery
+returns a protocol failure for ordinary, structured and streaming requests,
+without retry or tool execution. In structured output, the length cause takes
+precedence over parsing truncated JSON. Received semantic observations and wire
+bytes remain available; they do not imply successful delivery. A failed session
+retains the user's turn without committing an incomplete assistant turn.
+
+```rust
+use mojentic::llm::recovery::{CompletionDecodeError, RecoveryError};
+
+fn reached_output_limit(error: &RecoveryError) -> bool {
+    matches!(
+        error.failure.inspect_cause()
+            .and_then(|cause| cause.downcast_ref::<CompletionDecodeError>()),
+        Some(CompletionDecodeError::Length)
+    )
+}
+```
+
+Structural decoding failures expose `CompletionDecodeError::InvalidFrame`;
+JSON failures expose the original `serde_json::Error` directly from
+`inspect_cause()`, without the former private wrapper's `source()` hop.
+A wire capture callback's
+error can be downcast to the callback's own concrete type. Inspect causes explicitly:
+they may contain sensitive information, and are omitted from normal error
+formatting, serialization and lifecycle events. The final failure and its retained
+history entry refer to the same cause. Broker and session calls preserve these
+through `MojenticError::Recovery`; stream failures emit one terminal error.
+
+This changes recovery-enabled length handling and adds an error variant for
+exhaustive matches. Gateways without recovery and the raw legacy event-stream
+APIs retain their earlier behavior. No alternate supported typed-errors contract
+version predates `typed-errors-v1`; existing successful optional-field behavior
+is covered alongside legacy length behavior. Local executable cases live in
+`tests/contracts/typed_errors_v1.json` and run via
+`cargo test --all-features --test recovery typed_errors_v1`. Scripted HTTP fixtures
+verify Rust's boundary behavior; paired external consumer/provider verification
+is still required and tracked in `CONFORMANCE-3.0.0.md`.

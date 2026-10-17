@@ -124,3 +124,37 @@ impl Default for RecoveryPolicy {
 pub struct RecoveryCall {
     pub cancellation: CancellationToken,
 }
+
+/// Invalid recovery options, rejected before a wrapper can dispatch a request.
+/// Positive attempt counts and nonnegative finite delays are enforced by Rust's
+/// `NonZeroU32` and `Duration` types. Base delays above the ceiling are valid.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum RecoveryPolicyError {
+    /// Only HTTP error statuses can be selected for recovery.
+    #[error("retryable status must be an HTTP error status: {status}")]
+    InvalidStatus { status: u16 },
+    /// No provider policy proves replay safe for this category.
+    #[error("unsupported retryable category: {category:?}")]
+    UnsupportedCategory { category: Category },
+}
+impl RecoveryPolicy {
+    /// Validate options before creating a recovery gateway.
+    ///
+    /// # Errors
+    /// Returns a concrete policy error for non-error HTTP statuses or categories
+    /// without a supported recovery policy. Permanent statuses remain ineligible
+    /// even when explicitly selected.
+    pub fn validate(&self) -> Result<(), RecoveryPolicyError> {
+        for &status in &self.retryable_statuses {
+            if !(400..=599).contains(&status) {
+                return Err(RecoveryPolicyError::InvalidStatus { status });
+            }
+        }
+        for &category in &self.retryable_categories {
+            if !matches!(category, Category::Transport | Category::Http | Category::ClientTimeout) {
+                return Err(RecoveryPolicyError::UnsupportedCategory { category });
+            }
+        }
+        Ok(())
+    }
+}

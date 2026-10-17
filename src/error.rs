@@ -8,6 +8,9 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum MojenticError {
+    /// Recovery options rejected before any request can be dispatched.
+    #[error("{0}")]
+    InvalidRecoveryPolicy(#[from] crate::llm::recovery::RecoveryPolicyError),
     /// Structured opt-in completion recovery failure.
     #[error("{0}")]
     Recovery(Box<crate::llm::recovery::RecoveryError>),

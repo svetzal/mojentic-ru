@@ -328,3 +328,15 @@ pub struct LifecycleEvent {
     pub failure: Option<Failure>,
     pub delay: Option<Duration>,
 }
+
+/// Concrete decoding/termination causes available through `Failure::inspect_cause`.
+/// Raw provider payloads remain private; serde errors retain their original type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+pub enum CompletionDecodeError {
+    /// The provider reached its output limit; incomplete tools must not execute.
+    #[error("completion reached its output length limit")]
+    Length,
+    /// A structurally invalid response or unsafe terminal proof.
+    #[error("invalid completion: {reason}")]
+    InvalidFrame { reason: &'static str },
+}

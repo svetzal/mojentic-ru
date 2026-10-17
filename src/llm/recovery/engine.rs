@@ -39,7 +39,7 @@ pub enum RecoveryStreamEvent {
 #[derive(Debug)]
 pub(crate) struct PrivateEvidence {
     pub bytes: Vec<u8>,
-    original: Option<std::sync::Arc<dyn std::error::Error + Send + Sync>>,
+    original: Option<Box<dyn std::error::Error + Send + Sync>>,
 }
 impl PrivateEvidence {
     pub fn new(bytes: Vec<u8>) -> Self {
@@ -51,7 +51,7 @@ impl PrivateEvidence {
     pub fn from_error(error: impl std::error::Error + Send + Sync + 'static) -> Self {
         Self {
             bytes: error.to_string().into_bytes(),
-            original: Some(std::sync::Arc::new(error)),
+            original: Some(Box::new(error)),
         }
     }
 }
@@ -463,7 +463,7 @@ impl<'a> Attempt<'a> {
             history: self.history.clone(),
         }
     }
-    fn decode_failure(&mut self, cause: PrivateEvidence) {
+    fn decode_failure(&mut self, mut cause: PrivateEvidence) {
         let body = serde_json::from_slice::<serde_json::Value>(&cause.bytes).ok();
         let category = if body.as_ref().is_some_and(|body| !body["error"].is_null()) {
             Category::ProviderResponse
@@ -472,7 +472,14 @@ impl<'a> Attempt<'a> {
         };
         self.current.provider_code =
             body.and_then(|body| body["error"]["code"].as_str().and_then(ValidatedMetadata::code));
-        self.failure(category, cause);
+        if let Some(original) = cause.original.take() {
+            self.current.set_response_bytes(&self.raw);
+            self.current.category = category;
+            self.current = self.current.clone().with_boxed_cause(original);
+            self.classify();
+        } else {
+            self.failure(category, cause);
+        }
     }
     fn http_failure(&mut self, bytes: Vec<u8>) {
         self.current.provider_code = serde_json::from_slice::<serde_json::Value>(&bytes)
@@ -569,12 +576,11 @@ async fn body(
                 if state.operation != Operation::Streaming
                     && state.current.http_status.is_some_and(|s| (200..300).contains(&s))
                 {
-                    if let Ok(response) = super::frames::decode(state.provider, &collected, false) {
-                        super::frames::response_progress(
-                            &response,
-                            &mut state.current.progress.observed,
-                        );
-                    }
+                    super::frames::observe_response(
+                        state.provider,
+                        &collected,
+                        &mut state.current.progress.observed,
+                    );
                 }
                 // Capture failure still retains semantic evidence already received.
                 state.wire(|id| WireEvent::Body {

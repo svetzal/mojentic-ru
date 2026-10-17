@@ -1,5 +1,121 @@
 # Rust 3.0.0 scoped conformance
 
+## Current correction: typed errors (amendment item 8)
+
+This correction starts at `3bf99ad21759c87ae27d8130b2d7de6c5557a7d5` and remains
+uncommitted for Foundry finalization. The capability correction below is a
+historical record, not the current source identity or current gate results.
+Only item 8 is advanced here. Publication holds and all other unverified
+initiative decisions remain in force. Stacey's renewed-passing-evidence coverage
+reconciliation remains binding: the historical unexplained failure is low
+severity and no further reproduction is requested.
+
+Executable contract: **typed-errors-v1**, Rust artifact
+`tests/contracts/typed_errors_v1.json`, SHA-256
+`48d957ccdabc9fa606d9e1fa32f7969c7f0c61259b6072c832eb0778e3450aee`.
+The verifier is `tests/recovery.rs`, reusing the existing loopback HTTP fixture,
+public gateway wrappers, broker and session. It runs in both the required test
+and unchanged tarpaulin gates. The artifact supplies provider response bodies,
+invalid policy selections and capture stages. This Rust-specific executable set
+is distinct from the Elixir set of the same logical name; matching names do not
+establish shared executable verification.
+
+Verification command: `cargo test --all-features --test recovery typed_errors_v1`.
+The matrix covers all three maintained adapters, three operations through gateway
+and broker, and the session's two exposed operations: length, capture at three
+stages, original JSON errors and typed invalid frames. Additional cases reject
+invalid construction before HTTP; exercise optional fields; and preserve legacy
+non-recovery length success. This Rust correction introduces v1;
+no wire protocol version is changed. The detailed mapping is in RECOVERY-CONFORMANCE.md.
+
+Rust provider/consumer boundary wiring is exercised locally against these exact
+scripted cases. These fixtures have **not** been verified against external provider
+implementations and must not be treated as doubles derived from jointly verified
+contracts. OpenAI/Ollama/oMLX provider commits, verification commands and results:
+**unavailable / not run**. External Rust consumer commit, command and results against
+this exact artifact and verifier: **unavailable / not run**. microgentic remains
+initiative work; its reported `e71b387` and retained pin `4ca1ed2` were not tested
+here. Elixir's typed-errors-v1 cases were inspected as reference only, not rerun.
+Missing paired verification is unfinished work for initiative coordination in
+separately authorized repositories. No sibling checkout was changed, and no
+cross-repository compatibility, consumer migration or release readiness is claimed.
+
+Rust 2021, implicit single-package resolver, Tokio, dependency manifest, default
+features, stable CI toolchain, formatting edition, coverage engine and 56% floor
+are unchanged. No declared MSRV or toolchain pin exists; declaring an MSRV remains
+a separate policy recommendation. Cargo.lock was absent at entry and is generated
+only as an ignored verification artifact. No version/ref/publication changes were
+made. The verified initiative brief and authoritative contract hashes are recorded
+in RECOVERY-CONFORMANCE.md.
+
+The tested Rust implementation is the baseline above plus this uncommitted source
+bundle, SHA-256 `cd7d3c365cac50dda6a44eecc493bd5587e91731080f4b825f467eca48cbb69c`:
+
+```sh
+cat src/error.rs src/llm/recovery/{adapter,engine,frames,policy,types}.rs tests/recovery.rs tests/contracts/typed_errors_v1.json | sha256sum
+```
+
+The complete executable set (fixture followed by verifier) has SHA-256
+`8eaeff4048e2d2ecabd50354b9895abe966ba4f4499e74abc61b7c873578c57d`:
+
+```sh
+cat tests/contracts/typed_errors_v1.json tests/recovery.rs | sha256sum
+```
+
+Verification uses Rust/Cargo 1.99.0, cargo-tarpaulin 0.37.2, the existing writable
+Cargo cache, and the generated ignored Cargo.lock SHA-256
+`390c599335be1aed77a5ff897c5f053631e31611d89ac66e2b06cd056e29034d`.
+The unchanged capability artifact retains SHA-256
+`40e8da683ce4bfcfebf9892ca51a53a701488d463977f021922cd6317203aa76`.
+
+### Final verification for item 8
+
+All seven discovered `.hone-gates.json` gates and the additional default-feature
+and applicable CI documentation checks exited 0 on the source bundle above.
+Verbose builds/tests and full diagnostics were captured through `foundry capture`.
+The standalone versioned verifier also exited 0 on that same final source.
+
+| Exact command | Exit | Result |
+| --- | --- | --- |
+| `cargo fmt --check` | 0 | Passed |
+| `cargo clippy --all-targets --all-features -- -D warnings` | 0 | Passed; zero Clippy warnings |
+| `cargo test --verbose --all-features` | 0 | 683 passed, including 19 doctests; 24 pre-existing ignored doctests |
+| `cargo build --verbose --all-features` | 0 | Passed |
+| `cargo tarpaulin --all-features --fail-under 56` | 0 | 69.96%, 3331/4761 lines; unchanged 56% floor |
+| `cargo deny check` | 0 | Advisories, bans, licenses and sources passed; existing duplicate-version warnings |
+| `cargo audit` | 0 | Passed; no vulnerabilities reported |
+| `cargo test` | 0 | 683 passed; 24 pre-existing ignored doctests |
+| `cargo doc --no-deps --all-features` | 0 | Passed with two existing warnings (connect link and dyn HTML tag) |
+| `mdbook build book` | 0 | Exit 0 and HTML emitted; existing truncate-long-entries configuration diagnostic |
+| `cargo test --all-features --test recovery typed_errors_v1` | 0 | 4 tests passed; includes the 144-case boundary matrix, 24 invalid policies, optional fields, legacy length and session proof |
+| `cargo test --all-features --test recovery` | 0 | All 65 recovery tests passed |
+
+The proof-first session probe exited 101 on the original implementation because
+it accepted a length-terminated reply as success. The final corrected probe exits
+0 and asserts the concrete length cause, exact received body, retained history,
+observed but undelivered content, user-turn retention and one HTTP request.
+
+The initial full test run exposed three assertions for the former private wrapper
+and string length cause. They were migrated to direct serde downcasts and the
+concrete length variant, retaining their decoder details, telemetry, history and
+follow-up tool assertions. The subsequent complete gate sweep passed. No gate,
+assertion scope, timeout, dependency, advisory policy or coverage floor was weakened.
+This does not diagnose or reproduce the unrelated historical coverage failure.
+
+Documentation checks are not warning-free: rustdoc retains its existing unresolved
+`connect` link and unclosed `dyn` tag, and mdBook reports its existing unsupported
+`truncate-long-entries` search configuration before writing HTML and exiting 0.
+Generated mdBook placeholder source pages were removed after checking. These
+existing diagnostics remain outside this correction.
+
+Paired external verification remains unavailable as recorded above. The local
+passes establish Rust regression evidence only; all publication and consumer
+migration holds remain in force.
+
+
+## Historical item 3 correction record
+
+
 This increment implements October 12 recovery amendment item 3, **Capabilities**,
 for existing Ollama, oMLX and OpenAI recovery adapters, preserving completed item 2.
 It is not whole-initiative certification. Package version remains 2.1.0. Publication

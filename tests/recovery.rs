@@ -2647,11 +2647,8 @@ async fn review_broker_session_failure_evidence_matrix() {
             }
             "protocol" => {
                 assert_eq!(error.failure.category, Category::Protocol);
-                let original = cause
-                    .source()
-                    .expect("original decoder error")
-                    .downcast_ref::<serde_json::Error>()
-                    .expect("serde error retained");
+                let original =
+                    cause.downcast_ref::<serde_json::Error>().expect("serde error retained");
                 let expected =
                     serde_json::from_str::<Value>(body).expect_err("synthetic invalid JSON");
                 assert_eq!(original.to_string(), expected.to_string());
@@ -2871,11 +2868,7 @@ async fn review_completed_tool_not_reexecuted_after_followup_failure() {
         assert_eq!(error.failure.inspect_response_bytes(), b"synthetic-secret not JSON");
         assert_fixture_headers(&error.failure, "synthetic-secret not JSON", false);
         let cause = error.failure.inspect_cause().expect("original cause");
-        let decoder = cause
-            .source()
-            .expect("decoder retained")
-            .downcast_ref::<serde_json::Error>()
-            .expect("serde cause");
+        let decoder = cause.downcast_ref::<serde_json::Error>().expect("serde cause");
         assert_eq!(
             decoder.to_string(),
             serde_json::from_str::<Value>("synthetic-secret not JSON")
@@ -3452,8 +3445,12 @@ async fn recovery_rejected_terminal_telemetry_raw_and_compatibility() {
         assert_eq!(error.failure.progress.raw_bytes, body.len() as u64);
         assert_eq!(error.history.len(), 1);
         assert_eq!(
-            error.failure.inspect_cause().expect("original cause").to_string(),
-            "incomplete stream finish"
+            error
+                .failure
+                .inspect_cause()
+                .expect("original cause")
+                .downcast_ref::<CompletionDecodeError>(),
+            Some(&CompletionDecodeError::Length)
         );
         assert_eq!(capture.requests.lock().expect("requests").len(), 1);
         let chunks: Vec<_> = gateway.complete_stream("qwen3", &[], None, &config).collect().await;
@@ -4069,4 +4066,426 @@ fn capability_contract_public_adapters_v1() {
         OmlxGateway::new().with_recovery(RecoveryPolicy::default()).expect("omlx"),
         "omlx",
     );
+}
+
+#[tokio::test]
+async fn typed_errors_v1_session_length_proof() {
+    let body =
+        json!({"choices":[{"message":{"content":"partial-secret"},"finish_reason":"length"}]})
+            .to_string();
+    let server = fixture(vec![(200, body.clone(), false, false)]).await;
+    let capture = Arc::new(Capture::default());
+    let gateway = OpenAIGateway::with_api_key_and_base_url("synthetic-secret", &server.url)
+        .with_recovery(policy(3, &capture))
+        .expect("gateway");
+    let broker = LlmBroker::new("fixture-model", Arc::new(gateway), None);
+    let mut session = mojentic::llm::ChatSession::builder(broker).build();
+    let initial = session.messages().len();
+    let error = session.send("question").await.expect_err("length must terminate recovery");
+    let mojentic::MojenticError::Recovery(error) = error else {
+        panic!("typed recovery failure")
+    };
+    assert_eq!(error.failure.category, Category::Protocol);
+    assert_eq!(error.failure.progress.observed.content_bytes, "partial-secret".len() as u64);
+    assert_eq!(error.failure.progress.delivered, SemanticProgress::default());
+    assert!(!error.failure.classification.eligible);
+    assert_eq!(
+        error
+            .failure
+            .inspect_cause()
+            .expect("typed cause")
+            .downcast_ref::<CompletionDecodeError>(),
+        Some(&CompletionDecodeError::Length)
+    );
+    assert_eq!(error.failure.inspect_response_bytes(), body.as_bytes());
+    assert_eq!(error.history.len(), 1);
+    assert_eq!(session.messages().len(), initial + 1);
+    assert_eq!(server.sends.load(Ordering::SeqCst), 1);
+}
+
+fn typed_errors_contract() -> Value {
+    let contract: Value = serde_json::from_str(include_str!("contracts/typed_errors_v1.json"))
+        .expect("executable contract");
+    assert_eq!(contract["version"], "typed-errors-v1");
+    assert_eq!(contract["port"], "rust");
+    contract
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("capture-secret at {0}")]
+struct ContractCaptureError(&'static str);
+struct ContractCapture {
+    stage: &'static str,
+    capture: Arc<Capture>,
+}
+impl WireObserver for ContractCapture {
+    fn observe(
+        &self,
+        event: WireEvent<'_>,
+    ) -> std::result::Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        let stage = match &event {
+            WireEvent::Request { .. } => "request",
+            WireEvent::Headers { .. } => "headers",
+            WireEvent::Body { .. } => "body",
+        };
+        WireObserver::observe(&*self.capture, event)?;
+        if stage == self.stage {
+            Err(Box::new(ContractCaptureError(self.stage)))
+        } else {
+            Ok(())
+        }
+    }
+}
+
+#[tokio::test]
+async fn typed_errors_v1_boundaries() {
+    async fn check<G: RecoveryProvider + 'static>(
+        inner: G,
+        provider: Provider,
+        server: &HttpFixture,
+        operation: Operation,
+        boundary: &str,
+        scenario: &str,
+        body: &str,
+    ) {
+        let capture = Arc::new(Capture::default());
+        let mut p = policy(3, &capture);
+        let stage = match scenario {
+            "request" => Some("request"),
+            "headers" => Some("headers"),
+            "body" => Some("body"),
+            _ => None,
+        };
+        if let Some(stage) = stage {
+            p.wire_observer = Some(Arc::new(ContractCapture {
+                stage,
+                capture: capture.clone(),
+            }));
+        }
+        let gateway = RecoveryGateway::new(inner, p).expect("valid policy");
+        let count = Arc::new(AtomicUsize::new(0));
+        let tools: Vec<Box<dyn LlmTool>> = vec![Box::new(CountTool(count.clone()))];
+        let messages = [LlmMessage::user("question")];
+        let config = CompletionConfig::default();
+        let call = RecoveryCall::default();
+        let error = if boundary == "gateway" {
+            let error = match operation {
+                Operation::Ordinary => gateway
+                    .complete_with_recovery("qwen3", &messages, Some(&tools), &config, &call)
+                    .await
+                    .err()
+                    .expect("terminal error"),
+                Operation::Structured => gateway
+                    .complete_json_with_recovery(
+                        "qwen3",
+                        &messages,
+                        json!({"type":"object"}),
+                        &config,
+                        &call,
+                    )
+                    .await
+                    .err()
+                    .expect("terminal error"),
+                Operation::Streaming => {
+                    let events: Vec<_> = gateway
+                        .complete_stream_with_recovery(
+                            "qwen3",
+                            &messages,
+                            Some(&tools),
+                            &config,
+                            &call,
+                        )
+                        .collect()
+                        .await;
+                    let mut errors = vec![];
+                    for event in events {
+                        match event {
+                            RecoveryStreamEvent::Failed(error) => errors.push(error),
+                            RecoveryStreamEvent::Completed(_) => panic!("incomplete completion"),
+                            _ => {}
+                        }
+                    }
+                    assert_eq!(errors.len(), 1);
+                    errors.pop().expect("terminal error")
+                }
+            };
+            mojentic::MojenticError::Recovery(Box::new(error))
+        } else {
+            let broker = LlmBroker::new("qwen3", Arc::new(gateway), None);
+            if boundary == "session" {
+                let mut session = mojentic::llm::ChatSession::builder(broker).tools(tools).build();
+                let initial = session.messages().len();
+                let error = if operation == Operation::Streaming {
+                    let chunks: Vec<_> = session.send_stream("question").collect().await;
+                    let mut errors: Vec<_> =
+                        chunks.into_iter().filter_map(std::result::Result::err).collect();
+                    assert_eq!(errors.len(), 1);
+                    errors.pop().expect("terminal error")
+                } else {
+                    session.send("question").await.expect_err("terminal error")
+                };
+                assert_eq!(session.messages().len(), initial + 1);
+                assert_eq!(
+                    session.messages().last().expect("retained user").role(),
+                    mojentic::llm::MessageRole::User
+                );
+                error
+            } else {
+                match operation {
+                    Operation::Ordinary => broker
+                        .generate(&messages, Some(&tools), None, None)
+                        .await
+                        .expect_err("terminal error"),
+                    Operation::Structured => broker
+                        .generate_object::<Value>(&messages, None, None)
+                        .await
+                        .expect_err("terminal error"),
+                    Operation::Streaming => {
+                        let chunks: Vec<_> = broker
+                            .generate_stream(&messages, Some(&tools), None, None)
+                            .collect()
+                            .await;
+                        let mut errors: Vec<_> =
+                            chunks.into_iter().filter_map(std::result::Result::err).collect();
+                        assert_eq!(errors.len(), 1);
+                        errors.pop().expect("terminal error")
+                    }
+                }
+            }
+        };
+        let mojentic::MojenticError::Recovery(error) = error else {
+            panic!("recovery error preserved")
+        };
+        assert_eq!(error.failure.provider, provider);
+        assert_eq!(error.failure.operation, operation);
+        assert!(!error.failure.classification.eligible);
+        assert_eq!(count.load(Ordering::SeqCst), 0, "no incomplete tools");
+        let sent = usize::from(scenario != "request");
+        assert_eq!(server.sends.load(Ordering::SeqCst), sent, "no resend");
+        assert_eq!(error.history.len(), sent);
+        if sent == 1 {
+            assert_single_failure(&error, &capture, provider);
+            let requests = server.bodies.lock().expect("request bodies");
+            assert_eq!(requests[0], capture.requests.lock().expect("wire requests")[0].1);
+            assert!(String::from_utf8_lossy(&requests[0]).contains("question"));
+        } else {
+            assert!(error.failure.identity.is_none());
+        }
+        let cause = error.failure.inspect_cause().expect("original typed cause");
+        if let Some(stage) = stage {
+            assert_eq!(error.outcome, Outcome::ObserverFailed);
+            assert_eq!(
+                cause.downcast_ref::<ContractCaptureError>().expect("original capture error").0,
+                stage
+            );
+        } else if scenario == "length" {
+            assert_eq!(
+                cause.downcast_ref::<CompletionDecodeError>(),
+                Some(&CompletionDecodeError::Length)
+            );
+        } else if scenario == "invalid_frame" {
+            assert_eq!(
+                cause.downcast_ref::<CompletionDecodeError>(),
+                Some(&CompletionDecodeError::InvalidFrame {
+                    reason: "invalid text field"
+                })
+            );
+        } else {
+            assert!(cause.downcast_ref::<serde_json::Error>().is_some(), "original serde error");
+        }
+        if stage.is_none() || stage == Some("body") {
+            assert_eq!(error.failure.inspect_response_bytes(), body.as_bytes());
+        }
+        assert!(!transitions(&capture).iter().any(|t| matches!(
+            t,
+            Transition::AdmissionPending | Transition::RetryStarted | Transition::AttemptSucceeded
+        )));
+        for safe in [
+            format!("{error:?}"),
+            error.to_string(),
+            serde_json::to_string(&error).expect("safe serialization"),
+            serde_json::to_string(&*capture.events.lock().expect("events"))
+                .expect("safe lifecycle"),
+        ] {
+            for secret in [
+                "partial-secret",
+                "capture-secret",
+                "synthetic-secret",
+                "question",
+            ] {
+                assert!(!safe.contains(secret), "private evidence leaked");
+            }
+        }
+    }
+    let contract = typed_errors_contract();
+    for provider in ADAPTERS {
+        let key = match provider {
+            Provider::Ollama => "ollama",
+            Provider::Omlx => "omlx",
+            Provider::OpenAi => "openai",
+        };
+        for operation in OPERATIONS {
+            let op = match operation {
+                Operation::Ordinary => "ordinary",
+                Operation::Structured => "structured",
+                Operation::Streaming => "streaming",
+            };
+            for boundary in ["gateway", "broker", "session"] {
+                if boundary == "session" && operation == Operation::Structured {
+                    continue;
+                }
+                let mut scenarios = vec!["length", "decode", "invalid_frame"];
+                scenarios.extend(
+                    contract["capture_stages"]
+                        .as_array()
+                        .expect("capture stages")
+                        .iter()
+                        .map(|stage| stage.as_str().expect("stage")),
+                );
+                for scenario in scenarios {
+                    let kind = if matches!(scenario, "request" | "headers" | "body") {
+                        "capture"
+                    } else {
+                        scenario
+                    };
+                    let body =
+                        contract["providers"][key][kind][op].as_str().expect("versioned response");
+                    let server = fixture(vec![(200, body.into(), false, false)]).await;
+                    adapter_case!(
+                        check,
+                        provider,
+                        &server.url,
+                        &server,
+                        operation,
+                        boundary,
+                        scenario,
+                        body
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[tokio::test]
+async fn typed_errors_v1_invalid_policy_prevents_all_entrypoints() {
+    let contract = typed_errors_contract();
+    for provider in ADAPTERS {
+        let server = fixture(vec![]).await;
+        let mut cases = vec![];
+        for status in contract["invalid_statuses"].as_array().expect("statuses") {
+            let status = u16::try_from(status.as_u64().expect("status")).expect("u16");
+            cases.push((
+                RecoveryPolicy {
+                    retryable_statuses: [status].into_iter().collect(),
+                    ..Default::default()
+                },
+                RecoveryPolicyError::InvalidStatus { status },
+            ));
+        }
+        for category in contract["unsupported_categories"].as_array().expect("categories") {
+            let category = match category.as_str().expect("category") {
+                "protocol" => Category::Protocol,
+                "provider_response" => Category::ProviderResponse,
+                "cancellation" => Category::Cancellation,
+                _ => panic!("unknown contract category"),
+            };
+            cases.push((
+                RecoveryPolicy {
+                    retryable_categories: [category].into_iter().collect(),
+                    ..Default::default()
+                },
+                RecoveryPolicyError::UnsupportedCategory { category },
+            ));
+        }
+        for (policy, expected) in cases {
+            assert_eq!(policy.validate(), Err(expected));
+            let error = match provider {
+                Provider::Ollama => {
+                    OllamaGateway::with_host(&server.url).with_recovery(policy).err()
+                }
+                Provider::Omlx => omlx(&server.url).with_recovery(policy).err(),
+                Provider::OpenAi => {
+                    OpenAIGateway::with_api_key_and_base_url("synthetic-secret", &server.url)
+                        .with_recovery(policy)
+                        .err()
+                }
+            }
+            .expect("cannot construct any recovery entrypoint with invalid policy");
+            assert!(
+                matches!(&error, mojentic::MojenticError::InvalidRecoveryPolicy(actual) if *actual == expected)
+            );
+            assert_eq!(
+                std::error::Error::source(&error)
+                    .expect("policy source")
+                    .downcast_ref::<RecoveryPolicyError>(),
+                Some(&expected)
+            );
+            assert_eq!(server.sends.load(Ordering::SeqCst), 0);
+        }
+    }
+    // Existing delay clamping, zero budgets and permanent-status selection stay valid.
+    RecoveryPolicy {
+        base_delay: Duration::MAX,
+        delay_ceiling: Duration::ZERO,
+        budget: Some(Duration::ZERO),
+        retryable_statuses: [400, 401, 403, 429, 500, 599].into_iter().collect(),
+        ..Default::default()
+    }
+    .validate()
+    .expect("representable limits are valid");
+}
+
+#[tokio::test]
+async fn typed_errors_v1_optional_fields_and_legacy_length() {
+    async fn check<G: RecoveryProvider>(inner: G, _: Provider, body: &str, legacy: bool) {
+        let response = if legacy {
+            inner
+                .complete("qwen3", &[], None, &CompletionConfig::default())
+                .await
+                .expect("legacy length response")
+        } else {
+            let gateway = RecoveryGateway::new(inner, RecoveryPolicy::default()).expect("gateway");
+            gateway
+                .complete_with_recovery(
+                    "qwen3",
+                    &[],
+                    None,
+                    &CompletionConfig::default(),
+                    &RecoveryCall::default(),
+                )
+                .await
+                .unwrap_or_else(|error| panic!("optional fields may be absent: {error}"))
+                .value
+        };
+        let value: Value = serde_json::from_str(body).expect("response fixture");
+        if legacy {
+            assert_eq!(response.evidence.finish_reason.as_deref(), Some("length"));
+        } else {
+            assert_eq!(response.content.as_deref(), Some("{}"));
+            assert!(response.thinking.is_none());
+            assert!(response.tool_calls.is_empty());
+            assert!(value.is_object());
+        }
+    }
+    let contract = typed_errors_contract();
+    for provider in ADAPTERS {
+        let key = match provider {
+            Provider::Ollama => "ollama",
+            Provider::Omlx => "omlx",
+            Provider::OpenAi => "openai",
+        };
+        for legacy in [false, true] {
+            let body = if legacy {
+                &contract["providers"][key]["length"]["ordinary"]
+            } else {
+                &contract["providers"][key]["optional_success"]
+            }
+            .as_str()
+            .expect("response");
+            let server = fixture(vec![(200, body.into(), false, false)]).await;
+            adapter_case!(check, provider, &server.url, body, legacy);
+            assert_eq!(server.sends.load(Ordering::SeqCst), 1);
+        }
+    }
 }

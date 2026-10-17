@@ -1,0 +1,92 @@
+{
+  "version": "typed-errors-v1",
+  "port": "rust",
+  "invalid_statuses": [
+    0,
+    200,
+    399,
+    600,
+    65535
+  ],
+  "unsupported_categories": [
+    "protocol",
+    "provider_response",
+    "cancellation"
+  ],
+  "capture_stages": [
+    "request",
+    "headers",
+    "body"
+  ],
+  "providers": {
+    "ollama": {
+      "length": {
+        "ordinary": "{\"message\": {\"content\": \"partial-secret\", \"tool_calls\": [{\"id\": \"call_1\", \"function\": {\"name\": \"count\", \"arguments\": {}}}]}, \"done\": true, \"done_reason\": \"length\"}",
+        "structured": "{\"message\": {\"content\": \"{\"}, \"done\": true, \"done_reason\": \"length\"}",
+        "streaming": "{\"message\": {\"content\": \"partial-secret\", \"tool_calls\": [{\"id\": \"call_1\", \"function\": {\"name\": \"count\", \"arguments\": {}}}]}, \"done\": true, \"done_reason\": \"length\"}\n"
+      },
+      "capture": {
+        "ordinary": "{\"message\": {\"content\": \"{}\"}, \"done\": true, \"done_reason\": \"stop\"}",
+        "structured": "{\"message\": {\"content\": \"{}\"}, \"done\": true, \"done_reason\": \"stop\"}",
+        "streaming": "{\"message\": {\"content\": \"{}\"}, \"done\": true, \"done_reason\": \"stop\"}\n"
+      },
+      "decode": {
+        "ordinary": "{\n",
+        "structured": "{\n",
+        "streaming": "{\n"
+      },
+      "invalid_frame": {
+        "ordinary": "{\"message\": {\"content\": 7}}",
+        "structured": "{\"message\": {\"content\": 7}}",
+        "streaming": "{\"message\": {\"content\": 7}, \"done\": true, \"done_reason\": \"stop\"}\n"
+      },
+      "optional_success": "{\"message\": {\"content\": \"{}\"}}"
+    },
+    "omlx": {
+      "length": {
+        "ordinary": "{\"choices\": [{\"message\": {\"content\": \"partial-secret\", \"tool_calls\": [{\"id\": \"call_1\", \"function\": {\"name\": \"count\", \"arguments\": \"{}\"}}]}, \"finish_reason\": \"length\"}]}",
+        "structured": "{\"choices\": [{\"message\": {\"content\": \"{\"}, \"finish_reason\": \"length\"}]}",
+        "streaming": "data: {\"choices\": [{\"delta\": {\"content\": \"partial-secret\", \"tool_calls\": [{\"index\": 0, \"id\": \"call_1\", \"function\": {\"name\": \"count\", \"arguments\": \"{\"}}]}, \"finish_reason\": \"length\"}]}\n\ndata: [DONE]\n\n"
+      },
+      "capture": {
+        "ordinary": "{\"choices\": [{\"message\": {\"content\": \"{}\"}, \"finish_reason\": \"stop\"}]}",
+        "structured": "{\"choices\": [{\"message\": {\"content\": \"{}\"}, \"finish_reason\": \"stop\"}]}",
+        "streaming": "data: {\"choices\": [{\"delta\": {\"content\": \"{}\"}, \"finish_reason\": \"stop\"}]}\n\ndata: [DONE]\n\n"
+      },
+      "decode": {
+        "ordinary": "{\n",
+        "structured": "{\n",
+        "streaming": "data: {\n\n"
+      },
+      "invalid_frame": {
+        "ordinary": "{\"choices\": [{\"message\": {\"content\": 7}}]}",
+        "structured": "{\"choices\": [{\"message\": {\"content\": 7}}]}",
+        "streaming": "data: {\"choices\": [{\"delta\": {\"content\": 7}, \"finish_reason\": \"stop\"}]}\n\n"
+      },
+      "optional_success": "{\"choices\": [{\"message\": {\"content\": \"{}\"}}]}"
+    },
+    "openai": {
+      "length": {
+        "ordinary": "{\"choices\": [{\"message\": {\"content\": \"partial-secret\", \"tool_calls\": [{\"id\": \"call_1\", \"function\": {\"name\": \"count\", \"arguments\": \"{}\"}}]}, \"finish_reason\": \"length\"}]}",
+        "structured": "{\"choices\": [{\"message\": {\"content\": \"{\"}, \"finish_reason\": \"length\"}]}",
+        "streaming": "data: {\"choices\": [{\"delta\": {\"content\": \"partial-secret\", \"tool_calls\": [{\"index\": 0, \"id\": \"call_1\", \"function\": {\"name\": \"count\", \"arguments\": \"{\"}}]}, \"finish_reason\": \"length\"}]}\n\ndata: [DONE]\n\n"
+      },
+      "capture": {
+        "ordinary": "{\"choices\": [{\"message\": {\"content\": \"{}\"}, \"finish_reason\": \"stop\"}]}",
+        "structured": "{\"choices\": [{\"message\": {\"content\": \"{}\"}, \"finish_reason\": \"stop\"}]}",
+        "streaming": "data: {\"choices\": [{\"delta\": {\"content\": \"{}\"}, \"finish_reason\": \"stop\"}]}\n\ndata: [DONE]\n\n"
+      },
+      "decode": {
+        "ordinary": "{\n",
+        "structured": "{\n",
+        "streaming": "data: {\n\n"
+      },
+      "invalid_frame": {
+        "ordinary": "{\"choices\": [{\"message\": {\"content\": 7}}]}",
+        "structured": "{\"choices\": [{\"message\": {\"content\": 7}}]}",
+        "streaming": "data: {\"choices\": [{\"delta\": {\"content\": 7}, \"finish_reason\": \"stop\"}]}\n\n"
+      },
+      "optional_success": "{\"choices\": [{\"message\": {\"content\": \"{}\"}}]}"
+    }
+  }
+}

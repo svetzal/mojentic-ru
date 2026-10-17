@@ -9,8 +9,8 @@ use crate::llm::{
 };
 use serde_json::Value;
 use std::collections::BTreeMap;
-fn invalid(text: &str) -> PrivateEvidence {
-    PrivateEvidence::new(text.as_bytes().to_vec())
+fn invalid(text: &'static str) -> PrivateEvidence {
+    PrivateEvidence::from_error(CompletionDecodeError::InvalidFrame { reason: text })
 }
 fn text(value: &Value) -> Result<Option<String>, PrivateEvidence> {
     match value {
@@ -62,6 +62,21 @@ pub(super) fn decode(
     bytes: &[u8],
     structured: bool,
 ) -> Result<LlmGatewayResponse<Value>, PrivateEvidence> {
+    decode_response(provider, bytes, structured, true)
+}
+/// Account for already received semantics before capture or terminal validation.
+/// Length failure must not erase observations or turn them into delivered output.
+pub(super) fn observe_response(provider: Provider, bytes: &[u8], progress: &mut SemanticProgress) {
+    if let Ok(response) = decode_response(provider, bytes, false, false) {
+        response_progress(&response, progress);
+    }
+}
+fn decode_response(
+    provider: Provider,
+    bytes: &[u8],
+    structured: bool,
+    check_finish: bool,
+) -> Result<LlmGatewayResponse<Value>, PrivateEvidence> {
     let body: Value = serde_json::from_slice(bytes).map_err(PrivateEvidence::from_error)?;
     if !body["error"].is_null() {
         return Err(PrivateEvidence::new(bytes.to_vec()));
@@ -73,6 +88,15 @@ pub(super) fn decode(
     };
     if !message.is_object() {
         return Err(invalid("missing completion message"));
+    }
+    // Terminal length takes precedence over truncated content, JSON and tools.
+    let finish = if provider == Provider::Ollama {
+        &body["done_reason"]
+    } else {
+        &body["choices"][0]["finish_reason"]
+    };
+    if check_finish && finish == "length" {
+        return Err(PrivateEvidence::from_error(CompletionDecodeError::Length));
     }
     let content = text(&message["content"])?;
     let thinking = text(
@@ -345,11 +369,17 @@ impl Frames {
                         },
                     );
                 }
+                if self.finish.as_deref() == Some("length") {
+                    return Err(PrivateEvidence::from_error(CompletionDecodeError::Length));
+                }
                 if self.finish.as_deref() != Some("stop") {
                     return Err(invalid("incomplete stream finish"));
                 }
                 self.terminal = true;
             }
+        }
+        if self.finish.as_deref() == Some("length") {
+            return Err(PrivateEvidence::from_error(CompletionDecodeError::Length));
         }
         if self.terminal || self.finish.as_deref() == Some("tool_calls") {
             progress.completed_tool_calls = self.build_tools()?.len() as u64;

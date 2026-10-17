@@ -50,6 +50,7 @@ pub struct RecoveryGateway<G> {
 }
 impl<G: RecoveryProvider> RecoveryGateway<G> {
     pub fn new(inner: G, policy: RecoveryPolicy) -> Result<Self> {
+        policy.validate()?;
         let client = reqwest::Client::builder()
             .retry(reqwest::retry::never())
             .redirect(reqwest::redirect::Policy::none())
