@@ -285,3 +285,19 @@ is covered alongside legacy length behavior. Local executable cases live in
 `cargo test --all-features --test recovery typed_errors_v1`. Scripted HTTP fixtures
 verify Rust's boundary behavior; paired external consumer/provider verification
 is still required and tracked in `CONFORMANCE-3.0.0.md`.
+
+
+HTTP 500 and 502 are retryable under the default policy when no semantic output
+has been observed or delivered. Both the HTTP status and `Category::Http` must be
+selected. Removing either from `retryable_statuses` or `retryable_categories`
+makes that failure ineligible (`Reason::Permanent`) and prevents resend, even if
+admission would allow it. Eligibility still does not bypass admission or budgets.
+
+The local `recovery-status-selection-v1` executable set verifies those paired
+choices through actual loopback HTTP adapters and public broker/session APIs:
+`cargo test --all-features --test recovery recovery_status_selection_v1`.
+It checks successful output, typed failures, immutable wire payloads, attempt
+identity and safe lifecycle fields. Existing partial reasoning, content and tool
+interruption cases continue to prohibit replay. Provider/consumer verification
+against the same executable set is still missing; the conformance record tracks
+that initiative coordination gap separately from local boundary tests.

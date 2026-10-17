@@ -1,6 +1,40 @@
 # Rust completion recovery conformance
 
-## Current correction: October 12 amendment item 8
+## Current correction: October 12 amendment item 9 public-boundary evidence
+
+Baseline `17ad0cb1a6b5895f5dbe9f758189d61b266bb336` plus uncommitted tests
+and documentation. No runtime fix was necessary. The executable set is
+**recovery-status-selection-v1**, artifact
+`tests/contracts/recovery_status_selection_v1.json`, SHA-256
+`8250dd928817d3634eb239f90dbeee908398f8fcbba8623ba2913278fba19b30`.
+Run `cargo test --all-features --test recovery recovery_status_selection_v1`.
+It also runs in the required all-feature tests and tarpaulin coverage gate.
+
+| Binding behavior | Executable evidence in tests/recovery.rs |
+| --- | --- |
+| HTTP 500/502 recover through maintained Ollama, oMLX and OpenAI adapters | `recovery_status_selection_v1`: actual HTTP, gateway/broker ordinary, structured and streaming, session ordinary and streaming |
+| Only status or category selection changes eligibility and resend | Same matrix: default vs exclude_status vs exclude_category, identical initial HTTP payloads, Transient/eligible vs Permanent/ineligible, successful output vs typed failure |
+| Safe fields explain the decision | Same matrix: phase, operation, category, status, acceptance, eligibility, reason, progress, identity, exact 10ms delay and lifecycle order |
+| Resend identity and request fidelity | Same matrix: wire-observer bytes equal server-received bytes, immutable replay, stable logical ID, distinct attempt IDs and exact 1/2 wire progression |
+| Preserve partial reasoning/content/tool interruption and session consistency | Existing `partial_reasoning_content_and_tools_all_adapters_never_replay`, `review_broker_session_failure_evidence_matrix`, `session_interruption_never_commits_partial_assistant_or_executes_tools` remain unchanged and run in full gates |
+| Preserve completed admission, capability and typed-error evidence | Existing `admission_unresolved_http_matrix`, `admission_unresolved_broker_session_http_matrix`, `capability_contract_public_adapters_v1` and `typed_errors_v1` cases remain unchanged |
+
+The proof first rejected expected recovery through OpenAI HTTP/ChatSession when
+502 was removed from the caller's status set (exit 101); default selection passed
+the same real boundary (exit 0). This was a policy-input mismatch, not a runtime
+defect. The full matrix generalizes both statuses and both exclusion dimensions.
+The new local set is version 1; it does not change provider protocols or replace
+existing v1 artifacts. Optional success fields are omitted in this matrix; existing
+optional-field and error regressions remain supported and exercised.
+
+See [CONFORMANCE-3.0.0.md](CONFORMANCE-3.0.0.md) for tested source/set hashes,
+commands/results, preserved coverage reconciliation, verified brief provenance and
+external provider/consumer verification gaps. External implementations have not
+executed this exact set; these loopback scripts are local boundary evidence only.
+Missing paired verification remains unfinished initiative work, with publication
+holds intact. Historical sections below do not certify untouched initiative scope.
+
+## Historical typed-error correction: October 12 amendment item 8
 
 Source baseline: `3bf99ad21759c87ae27d8130b2d7de6c5557a7d5` plus the uncommitted
 Foundry correction. This section supersedes historical item-8 assumptions below;

@@ -1,0 +1,11 @@
+{
+  "contract": "recovery-status-selection-v1",
+  "version": 1,
+  "statuses": [500, 502],
+  "selections": ["default", "exclude_status", "exclude_category"],
+  "boundaries": ["gateway", "broker", "session"],
+  "operations": ["ordinary", "structured", "streaming"],
+  "error_body": "synthetic-secret failure",
+  "success_content": "done",
+  "structured_content": "{}"
+}

@@ -4489,3 +4489,263 @@ async fn typed_errors_v1_optional_fields_and_legacy_length() {
         }
     }
 }
+
+// recovery-status-selection-v1: the same HTTP conversation with only policy changed.
+async fn status_selection_case<G: RecoveryProvider + 'static>(
+    inner: G,
+    provider: Provider,
+    server: &HttpFixture,
+    boundary: &str,
+    operation: Operation,
+    status: u16,
+    selection: &str,
+) -> Vec<u8> {
+    let capture = Arc::new(Capture::default());
+    let clock = Arc::new(Clock::default());
+    let mut p = policy(2, &capture);
+    p.base_delay = Duration::from_millis(20);
+    p.timing = clock.clone();
+    match selection {
+        "exclude_status" => {
+            p.retryable_statuses.remove(&status);
+        }
+        "exclude_category" => {
+            p.retryable_categories.remove(&Category::Http);
+        }
+        "default" => {}
+        _ => panic!("unknown contract selection"),
+    }
+    let eligible = selection == "default";
+    let gateway = RecoveryGateway::new(inner, p).expect("policy");
+    let result = if boundary == "gateway" {
+        reviewed_operation(&gateway, operation, &RecoveryCall::default())
+            .await
+            .map(|_| ())
+            .map_err(|e| mojentic::MojenticError::Recovery(Box::new(e)))
+    } else {
+        let broker = LlmBroker::new("qwen3", Arc::new(gateway), None);
+        let messages = [LlmMessage::user("question")];
+        if boundary == "session" {
+            let mut session = mojentic::llm::ChatSession::new(broker);
+            let initial = session.messages().len();
+            let result = if operation == Operation::Streaming {
+                let chunks: Vec<_> = session.send_stream("question").collect().await;
+                chunks.into_iter().collect::<Result<Vec<_>>>().map(|v| v.concat())
+            } else {
+                session.send("question").await
+            };
+            assert_eq!(session.messages().len(), initial + if result.is_ok() { 2 } else { 1 });
+            result.map(|text| assert_eq!(text, "done"))
+        } else if operation == Operation::Streaming {
+            let chunks: Vec<_> =
+                broker.generate_stream(&messages, None, None, None).collect().await;
+            chunks
+                .into_iter()
+                .collect::<Result<Vec<_>>>()
+                .map(|v| assert_eq!(v.concat(), "done"))
+        } else if operation == Operation::Structured {
+            broker
+                .generate_object::<Value>(&messages, None, None)
+                .await
+                .map(|v| assert_eq!(v, json!({})))
+        } else {
+            broker
+                .generate(&messages, None, None, None)
+                .await
+                .map(|v| assert_eq!(v, "done"))
+        }
+    };
+    if eligible {
+        result.expect("selected HTTP failure must recover through public API");
+    } else {
+        let mojentic::MojenticError::Recovery(error) =
+            result.expect_err("excluded failure must not resend")
+        else {
+            panic!("typed recovery failure")
+        };
+        assert_eq!(error.outcome, Outcome::Failed);
+        assert_single_failure(&error, &capture, provider);
+        assert_eq!(error.failure.http_status, Some(status));
+        assert!(!error.failure.classification.eligible);
+    }
+    let requests = capture.requests.lock().expect("requests");
+    let bodies = server.bodies.lock().expect("HTTP bodies");
+    let attempts = if eligible { 2 } else { 1 };
+    assert_eq!(server.sends.load(Ordering::SeqCst), attempts);
+    assert_eq!(requests.len(), attempts);
+    assert_eq!(bodies.len(), attempts);
+    for (index, ((id, encoded), received)) in requests.iter().zip(bodies.iter()).enumerate() {
+        assert_eq!(encoded, received, "observer agrees with actual HTTP request");
+        assert_eq!(encoded, &requests[0].1, "retry payload is byte-identical");
+        assert_eq!(id.logical_request_id, requests[0].0.logical_request_id);
+        assert_eq!(id.wire_attempt, index as u32 + 1);
+        if index > 0 {
+            assert_ne!(id.attempt_id, requests[0].0.attempt_id);
+        }
+    }
+    let payload: Value = serde_json::from_slice(&bodies[0]).expect("HTTP JSON request");
+    assert_eq!(payload["model"], "qwen3");
+    assert_eq!(payload["stream"], operation == Operation::Streaming);
+    assert!(payload["messages"]
+        .as_array()
+        .expect("messages")
+        .iter()
+        .any(|m| m["role"] == "user" && m["content"] == "question"));
+    let events = capture.events.lock().expect("events");
+    for (index, event) in events.iter().enumerate() {
+        let attempt = usize::from(index >= 5);
+        assert_eq!(event.identity.as_ref(), Some(&requests[attempt].0));
+        if event.failure.is_none() {
+            assert_eq!(event.delay, None);
+            assert_eq!(
+                event.phase,
+                if event.transition == Transition::AttemptSucceeded {
+                    Some(if operation == Operation::Streaming {
+                        Phase::Streaming
+                    } else {
+                        Phase::Decoding
+                    })
+                } else {
+                    None
+                }
+            );
+        }
+    }
+    for event in events.iter().filter(|e| e.failure.is_some()) {
+        let failure = event.failure.as_ref().expect("failure");
+        assert_eq!(event.identity.as_ref(), Some(&requests[0].0));
+        assert_eq!(event.phase, Some(Phase::Streaming));
+        assert_eq!(failure.phase, event.phase);
+        assert_eq!(failure.provider, provider);
+        assert_eq!(failure.operation, operation);
+        assert_eq!(failure.category, Category::Http);
+        assert_eq!(failure.http_status, Some(status));
+        assert_eq!(failure.acceptance, Acceptance::Unknown);
+        assert_eq!(failure.classification.eligible, eligible);
+        assert_eq!(
+            failure.classification.reason,
+            if eligible {
+                Reason::Transient
+            } else {
+                Reason::Permanent
+            }
+        );
+        assert_eq!(failure.inspect_response_bytes(), b"synthetic-secret failure");
+        assert_eq!(failure.identity, event.identity);
+        assert!(failure.progress.headers_received);
+        assert!(!failure.progress.observed.any());
+        assert!(!failure.progress.delivered.any());
+        assert_eq!(
+            event.delay,
+            if event.transition == Transition::DelayScheduled {
+                Some(Duration::from_millis(10))
+            } else {
+                None
+            }
+        );
+    }
+    assert_eq!(
+        events.iter().map(|e| e.transition).collect::<Vec<_>>(),
+        if eligible {
+            vec![
+                Transition::AttemptStarted,
+                Transition::AttemptFailed,
+                Transition::AdmissionPending,
+                Transition::AdmissionAllowed,
+                Transition::DelayScheduled,
+                Transition::RetryStarted,
+                Transition::AttemptStarted,
+                Transition::AttemptSucceeded,
+            ]
+        } else {
+            vec![Transition::AttemptStarted, Transition::AttemptFailed]
+        }
+    );
+    assert_eq!(
+        *clock.sleeps.lock().expect("sleeps"),
+        if eligible {
+            vec![Duration::from_millis(10)]
+        } else {
+            vec![]
+        }
+    );
+    assert!(!serde_json::to_string(&*events)
+        .expect("safe lifecycle")
+        .contains("synthetic-secret"));
+    bodies[0].clone()
+}
+
+#[tokio::test]
+async fn recovery_status_selection_v1() {
+    let contract: Value =
+        serde_json::from_str(include_str!("contracts/recovery_status_selection_v1.json"))
+            .expect("versioned executable cases");
+    assert_eq!(contract["contract"], "recovery-status-selection-v1");
+    assert_eq!(contract["version"], 1);
+    for provider in ADAPTERS {
+        for status in contract["statuses"].as_array().expect("statuses") {
+            let status = u16::try_from(status.as_u64().expect("HTTP status")).expect("u16");
+            for boundary in contract["boundaries"].as_array().expect("boundaries") {
+                let boundary = boundary.as_str().expect("boundary");
+                for operation in contract["operations"].as_array().expect("operations") {
+                    let operation = match operation.as_str().expect("operation") {
+                        "ordinary" => Operation::Ordinary,
+                        "structured" => Operation::Structured,
+                        "streaming" => Operation::Streaming,
+                        _ => panic!("unknown contract operation"),
+                    };
+                    if boundary == "session" && operation == Operation::Structured {
+                        continue;
+                    }
+                    let success = if operation == Operation::Streaming {
+                        final_stream(provider)
+                    } else {
+                        response(
+                            provider,
+                            contract[if operation == Operation::Structured {
+                                "structured_content"
+                            } else {
+                                "success_content"
+                            }]
+                            .as_str()
+                            .expect("success"),
+                        )
+                        .to_string()
+                    };
+                    let mut paired_payload = None;
+                    for selection in contract["selections"].as_array().expect("selections") {
+                        let selection = selection.as_str().expect("selection");
+                        let server = fixture(vec![
+                            (
+                                status,
+                                contract["error_body"].as_str().expect("error").into(),
+                                false,
+                                false,
+                            ),
+                            (200, success.clone(), false, false),
+                        ])
+                        .await;
+                        let payload = adapter_case!(
+                            status_selection_case,
+                            provider,
+                            &server.url,
+                            &server,
+                            boundary,
+                            operation,
+                            status,
+                            selection
+                        );
+                        if let Some(expected) = &paired_payload {
+                            assert_eq!(
+                                &payload, expected,
+                                "changing only policy preserves HTTP input"
+                            );
+                        } else {
+                            paired_payload = Some(payload);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

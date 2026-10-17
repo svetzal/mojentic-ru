@@ -1,6 +1,124 @@
 # Rust 3.0.0 scoped conformance
 
-## Current correction: typed errors (amendment item 8)
+## Current correction: public HTTP recovery evidence (amendment item 9)
+
+Tested baseline: `17ad0cb1a6b5895f5dbe9f758189d61b266bb336` plus the
+uncommitted evidence correction. This section supersedes current-source claims
+in the historical sections below. No production behavior changed. Completed
+admission, capability and typed-error work and the existing broker/session
+reasoning, content and tool-fragment interruption matrix are preserved.
+Publication holds and other unverified initiative decisions remain in force.
+Stacey's renewed-passing-evidence reconciliation and unchanged 56% coverage floor
+remain binding; the historical unexplained failure remains low severity and was
+not reproduced.
+
+Executable set **recovery-status-selection-v1** uses
+`tests/contracts/recovery_status_selection_v1.json` (version 1), SHA-256
+`8250dd928817d3634eb239f90dbeee908398f8fcbba8623ba2913278fba19b30`.
+`tests/recovery.rs::recovery_status_selection_v1` executes its cases using the
+existing loopback HTTP fixture, HTTP adapters and public entrypoints. There are
+144 conversations: three adapters, two statuses, three policy selections and
+eight entrypoint/operation pairs (gateway and broker ordinary/structured/streaming;
+session ordinary/streaming). The fixture supplies the status, response and policy
+selection matrix; it is an executable local specification, not a jointly verified
+external provider contract.
+
+```sh
+cargo test --all-features --test recovery recovery_status_selection_v1
+cat tests/contracts/recovery_status_selection_v1.json tests/recovery.rs | sha256sum
+```
+
+Both 500 and 502 recover under the default selections with explicit Allow
+admission and a deterministic clock (20ms base, 10ms selected delay). Each has
+paired refusals changing only the caller's status set or HTTP category selection. Assertions
+compare captured HTTP bodies with observer bytes, compare paired initial payloads,
+verify byte-identical resends, stable logical IDs, distinct attempt IDs and exact
+wire attempt 1/2 progression. Lifecycle failures assert phase, operation, category,
+HTTP status, eligibility, reason, acceptance, progress, identity and exact delay;
+successful broker/session calls assert delivered content or structured values.
+Session history commits an assistant turn only on success. Scripted successes
+omit optional provider metadata; existing optional-field, 503, permanent-error,
+admission and interruption regressions remain in the full required gates.
+No protocol version changes: this introduces local executable set v1; no earlier
+version of this set exists. Existing capability and typed-errors v1 artifacts are
+unchanged.
+
+Proof first used real OpenAI HTTP and ChatSession with 502 excluded: the expected
+successful reply was rejected with Category::Http, ineligible/Permanent (exit 101).
+Restoring default caller policy passed the same conversation (exit 0), including
+payload/identity/lifecycle assertions. This demonstrated a caller-input correction;
+it did not demonstrate a production defect or justify changing the retry engine.
+
+The targeted Rust verification command above exited 0 on the final executable
+source. Its fixture-followed-by-verifier SHA-256 is
+`cab2704f1535979af73fb6c7fbaaab413119ea3e2f129bfa13040833e7a4614e`.
+The source bundle (Cargo.toml, tracked src files in git order, verifier, artifact)
+has SHA-256 `3fe8ad0563301c6bd86f607c9906c6dbfd6563e1c430dce160114fb73f8c67d6`:
+
+```sh
+{ cat Cargo.toml; git ls-files src | xargs cat; cat tests/recovery.rs tests/contracts/recovery_status_selection_v1.json; } | sha256sum
+```
+
+The test verifier alone has SHA-256
+`fdfdfcbd34fea08f497512aeb326fd004016283c1153919eccb6c96abd23d520`.
+Full gate results follow below.
+
+External Ollama/oMLX/OpenAI implementation commits, provider verification commands
+and results against this exact set: **unavailable / not run**. External Rust
+consumer commit, verification command and result: **unavailable / not run**.
+The initiative's microgentic finding (`e71b387`, retained dependency `4ca1ed2`)
+was not verified here. Both sides must execute this same identifiable set in their
+required gates in separately authorized work; missing paired verification remains
+unfinished coordination work. Local scripted responses are not doubles derived
+from jointly verified contracts. No cross-repository compatibility or release
+readiness is claimed, and no sibling repository was modified.
+
+The initiative brief SHA-256 was verified as
+`ea6a0efa56bfb3cd74b5ce728f80cc33c6fbd853114bec94b8aabe79f5d28e6e`.
+The worktree's `../RELEASE-3.0.0.md` link is absent; the supplied verified brief
+and existing conformance contract provenance were used. Rust 2021, implicit
+single-package resolver, Tokio, stable CI toolchain, formatting, features,
+dependencies and runtime behavior are unchanged. Cargo.lock was absent at entry
+and generated only as an ignored gate artifact. MSRV is undeclared; declaring it
+remains a separate policy recommendation. Foundry owns finalization; there is no
+landed correction SHA yet. Verification uses Rust/Cargo 1.99.0,
+cargo-tarpaulin 0.37.2, cargo-audit 0.22.2 and cargo-deny 0.20.2. The generated,
+ignored Cargo.lock used for this sweep has SHA-256
+`390c599335be1aed77a5ff897c5f053631e31611d89ac66e2b06cd056e29034d`.
+
+### Final gate results for this evidence correction
+
+All commands ran in the writable task worktree against the source bundle above.
+Verbose tests/builds used `foundry capture`. The targeted executable set probe
+and all ten final gates/applicable CI checks exited 0:
+
+| Command | Exit | Result |
+| --- | --- | --- |
+| `cargo test --all-features --test recovery recovery_status_selection_v1` | 0 | All 144 scripted HTTP conversations passed |
+| `cargo fmt --check` | 0 | Passed |
+| `cargo clippy --all-targets --all-features -- -D warnings` | 0 | Passed |
+| `cargo test --verbose --all-features` | 0 | 684 tests passed, including 66 recovery tests and 19 doctests; 24 existing ignored doctests |
+| `cargo build --verbose --all-features` | 0 | Passed |
+| `cargo tarpaulin --all-features --fail-under 56` | 0 | 69.95%, 3331/4762 lines; unchanged 56% floor |
+| `cargo deny check` | 0 | Advisories, bans, licenses and sources passed; existing duplicate-version warnings |
+| `cargo audit` | 0 | No vulnerabilities reported; 267 dependencies scanned |
+| `cargo test` | 0 | Same 684 passing tests and 24 existing ignored doctests |
+| `cargo doc --no-deps --all-features` | 0 | Built; existing unresolved connect link and unclosed dyn tag warnings |
+| `mdbook build book` | 0 | HTML emitted; existing truncate-long-entries configuration diagnostic |
+
+The first sweep stopped at cargo-deny's read-only advisory-database lock (exit 1).
+Relocating CARGO_HOME initially exposed mise's attempt to install into a read-only
+location (exit 1). Security verification then used
+`CARGO_HOME=/tmp/mojentic-ru-item9-cargo` and `/home/svetzal/.cargo/bin` first on
+PATH, with writable advisory databases and the existing registry/git caches.
+The full gate sequence was rerun after that environment fix. No repository
+configuration, dependency, advisory suppression or gate was changed. Both coverage
+runs passed at 69.95%; no historical unexplained failure was reproduced.
+The rustdoc warnings and mdBook diagnostic predate this correction and remain
+outside its scope; documentation checks are not claimed warning-free. Generated
+mdBook placeholder source pages were removed after verification.
+
+## Historical typed-error correction (amendment item 8)
 
 This correction starts at `3bf99ad21759c87ae27d8130b2d7de6c5557a7d5` and remains
 uncommitted for Foundry finalization. The capability correction below is a

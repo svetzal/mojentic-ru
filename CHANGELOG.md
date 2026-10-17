@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Executable `recovery-status-selection-v1` evidence for HTTP 500/502 across
+  Ollama, oMLX and OpenAI gateway/broker/session entrypoints: paired caller status
+  and category selections, captured immutable HTTP payloads, attempt identities
+  and lifecycle decision fields. Runtime behavior is unchanged; external paired
+  provider/consumer verification remains initiative coordination work.
+
 - Recovery adapters expose five endpoint-specific capability values and
   `capability_evidence()` with provider citations, inspection dates and limits.
   Exact-attempt termination remains unknown for all three adapters.
