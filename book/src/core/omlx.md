@@ -73,8 +73,8 @@ The gateway sends these `CompletionConfig` fields to oMLX:
 
 | Field | Sent as |
 | ----- | ------- |
-| `temperature` | `temperature` |
-| `max_tokens` | `max_tokens`, always. Never `max_completion_tokens` |
+| `temperature` | `temperature`, only when set |
+| `max_tokens` | `max_tokens`, only when set. Never `max_completion_tokens` |
 | `top_p`, `top_k` | `top_p`, `top_k`, when set |
 | `reasoning_effort` | `reasoning_effort` or `enable_thinking`, when set. See below |
 | `response_format` | `response_format`, the same as the OpenAI gateway |

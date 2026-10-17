@@ -72,7 +72,7 @@ Use `CompletionConfig` to control generation parameters:
 use mojentic::llm::gateway::{CompletionConfig, ReasoningEffort};
 
 let config = CompletionConfig {
-    temperature: 0.3,
+    temperature: Some(0.3),
     reasoning_effort: Some(ReasoningEffort::High),
     ..Default::default()
 };
@@ -80,10 +80,9 @@ let config = CompletionConfig {
 
 ### Available Parameters
 
-- **temperature** (`f64`): Controls randomness. Default: 1.0
-- **num_ctx** (`u32`): Context window size in tokens. Default: 32768
-- **max_tokens** (`u32`): Maximum tokens to generate. Default: 16384
-- **num_predict** (`i32`): Tokens to predict (-1 = no limit). Default: -1
+- **temperature** (`Option<f32>`): Sampling temperature; default `None` uses provider settings.
+- **num_ctx** (`Option<usize>`): Ollama context size; default `None` uses model/server settings.
+- **max_tokens** (`Option<usize>`): The only output limit; default `None` sends no limit.
 - **reasoning_effort** (`Option<ReasoningEffort>`): Extended thinking level — `Low`, `Medium`, `High`, or `None`. Default: None
 
 ### Reasoning Effort
@@ -96,7 +95,7 @@ use mojentic::llm::gateway::{CompletionConfig, ReasoningEffort};
 // Deep reasoning for complex problems
 let config = CompletionConfig {
     reasoning_effort: Some(ReasoningEffort::High),
-    temperature: 0.1,
+    temperature: Some(0.1),
     ..Default::default()
 };
 

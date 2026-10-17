@@ -48,7 +48,7 @@ use std::collections::HashMap;
 tracer.record_llm_call(
     "llama3.2",                    // model
     vec![],                        // messages (simplified)
-    0.7,                           // temperature
+    Some(0.7),                     // caller-selected temperature; None uses provider settings
     None,                          // tools
     "my_broker",                   // source
     "correlation-123"              // correlation_id

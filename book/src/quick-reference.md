@@ -82,10 +82,9 @@ let person: Person = broker.generate_object(&messages, None).await?;
 ### Default config
 ```rust
 let config = CompletionConfig::default();
-// temperature: 1.0
-// num_ctx: 32768
-// max_tokens: 16384
-// num_predict: None
+// temperature: None
+// num_ctx: None
+// max_tokens: None
 // top_p: None
 // top_k: None
 // response_format: None
@@ -94,13 +93,13 @@ let config = CompletionConfig::default();
 ### Custom config
 ```rust
 let config = CompletionConfig {
-    temperature: 0.7,
-    num_ctx: 16384,
-    max_tokens: 8192,
-    num_predict: Some(1000),
+    temperature: Some(0.7),
+    num_ctx: Some(16384),
+    max_tokens: Some(8192),
     top_p: Some(0.9),
     top_k: Some(40),
     response_format: None,
+    ..Default::default()
 };
 
 let response = broker.generate(&messages, None, Some(config)).await?;
@@ -112,13 +111,13 @@ use mojentic::llm::gateway::ResponseFormat;
 
 // Request JSON without schema
 let config = CompletionConfig {
-    temperature: 0.7,
-    num_ctx: 16384,
-    max_tokens: 8192,
-    num_predict: None,
+    temperature: Some(0.7),
+    num_ctx: Some(16384),
+    max_tokens: Some(8192),
     top_p: None,
     top_k: None,
     response_format: Some(ResponseFormat::JsonObject { schema: None }),
+    ..Default::default()
 };
 
 // Request JSON with schema
@@ -131,15 +130,15 @@ let schema = serde_json::json!({
 });
 
 let config = CompletionConfig {
-    temperature: 0.7,
-    num_ctx: 16384,
-    max_tokens: 8192,
-    num_predict: None,
+    temperature: Some(0.7),
+    num_ctx: Some(16384),
+    max_tokens: Some(8192),
     top_p: None,
     top_k: None,
     response_format: Some(ResponseFormat::JsonObject {
         schema: Some(schema)
     }),
+    ..Default::default()
 };
 ```
 

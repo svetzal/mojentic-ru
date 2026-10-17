@@ -44,7 +44,7 @@ impl NullTracer {
         &self,
         _model: impl Into<String>,
         _messages: Vec<HashMap<String, serde_json::Value>>,
-        _temperature: f64,
+        _temperature: Option<f64>,
         _tools: Option<Vec<HashMap<String, serde_json::Value>>>,
         _source: impl Into<String>,
         _correlation_id: impl Into<String>,
@@ -184,7 +184,7 @@ mod tests {
         let tracer = NullTracer::new();
 
         // All record methods should be no-ops
-        tracer.record_llm_call("llama3.2", vec![], 0.7, None, "test", "corr-123");
+        tracer.record_llm_call("llama3.2", vec![], Some(0.7), None, "test", "corr-123");
 
         tracer.record_llm_response(
             "llama3.2",

@@ -32,13 +32,30 @@ pub enum ReasoningEffort {
     XHigh,
 }
 
-/// Configuration for LLM completion
+/// Configuration for LLM completion.
+///
+/// Provider controls default to `None`: the provider applies its own settings.
+/// To restore the former 2.1 defaults explicitly:
+///
+/// ```
+/// use mojentic::llm::gateway::CompletionConfig;
+/// let config = CompletionConfig {
+///     temperature: Some(1.0),
+///     num_ctx: Some(32768),
+///     max_tokens: Some(16384),
+///     ..Default::default()
+/// };
+/// assert_eq!(config.max_tokens, Some(16384));
+/// ```
 #[derive(Debug, Clone)]
 pub struct CompletionConfig {
-    pub temperature: f32,
-    pub num_ctx: usize,
-    pub max_tokens: usize,
-    pub num_predict: Option<i32>,
+    /// Sampling temperature. Unset delegates to provider settings.
+    pub temperature: Option<f32>,
+    /// Ollama context size. Other maintained providers omit this control.
+    pub num_ctx: Option<usize>,
+    /// Output limit: Ollama `options.num_predict`, OpenAI model-specific token
+    /// limit, or oMLX `max_tokens`. Unset sends no output limit.
+    pub max_tokens: Option<usize>,
     pub top_p: Option<f32>,
     pub top_k: Option<u32>,
     pub response_format: Option<ResponseFormat>,
@@ -76,10 +93,9 @@ impl CompletionConfig {
 impl Default for CompletionConfig {
     fn default() -> Self {
         Self {
-            temperature: 1.0,
-            num_ctx: 32768,
-            max_tokens: 16384,
-            num_predict: None,
+            temperature: None,
+            num_ctx: None,
+            max_tokens: None,
             top_p: None,
             top_k: None,
             response_format: None,
@@ -221,10 +237,9 @@ mod tests {
     fn test_completion_config_default() {
         let config = CompletionConfig::default();
 
-        assert_eq!(config.temperature, 1.0);
-        assert_eq!(config.num_ctx, 32768);
-        assert_eq!(config.max_tokens, 16384);
-        assert_eq!(config.num_predict, None);
+        assert_eq!(config.temperature, None);
+        assert_eq!(config.num_ctx, None);
+        assert_eq!(config.max_tokens, None);
         assert_eq!(config.top_p, None);
         assert_eq!(config.top_k, None);
         assert!(config.response_format.is_none());
@@ -235,10 +250,9 @@ mod tests {
     #[test]
     fn test_completion_config_custom() {
         let config = CompletionConfig {
-            temperature: 0.5,
-            num_ctx: 2048,
-            max_tokens: 1024,
-            num_predict: Some(100),
+            temperature: Some(0.5),
+            num_ctx: Some(2048),
+            max_tokens: Some(1024),
             top_p: Some(0.9),
             top_k: Some(40),
             response_format: Some(ResponseFormat::Text),
@@ -248,10 +262,9 @@ mod tests {
             max_tool_iterations: 10,
         };
 
-        assert_eq!(config.temperature, 0.5);
-        assert_eq!(config.num_ctx, 2048);
-        assert_eq!(config.max_tokens, 1024);
-        assert_eq!(config.num_predict, Some(100));
+        assert_eq!(config.temperature, Some(0.5));
+        assert_eq!(config.num_ctx, Some(2048));
+        assert_eq!(config.max_tokens, Some(1024));
         assert_eq!(config.top_p, Some(0.9));
         assert_eq!(config.top_k, Some(40));
         assert!(matches!(config.response_format, Some(ResponseFormat::Text)));
@@ -260,10 +273,9 @@ mod tests {
     #[test]
     fn test_completion_config_clone() {
         let config1 = CompletionConfig {
-            temperature: 0.7,
-            num_ctx: 4096,
-            max_tokens: 2048,
-            num_predict: Some(50),
+            temperature: Some(0.7),
+            num_ctx: Some(4096),
+            max_tokens: Some(2048),
             top_p: Some(0.95),
             top_k: Some(50),
             response_format: Some(ResponseFormat::JsonObject { schema: None }),
@@ -278,7 +290,6 @@ mod tests {
         assert_eq!(config1.temperature, config2.temperature);
         assert_eq!(config1.num_ctx, config2.num_ctx);
         assert_eq!(config1.max_tokens, config2.max_tokens);
-        assert_eq!(config1.num_predict, config2.num_predict);
         assert_eq!(config1.top_p, config2.top_p);
         assert_eq!(config1.top_k, config2.top_k);
     }
@@ -318,10 +329,9 @@ mod tests {
     #[test]
     fn test_completion_config_with_all_sampling_params() {
         let config = CompletionConfig {
-            temperature: 0.8,
-            num_ctx: 8192,
-            max_tokens: 4096,
-            num_predict: Some(2000),
+            temperature: Some(0.8),
+            num_ctx: Some(8192),
+            max_tokens: Some(4096),
             top_p: Some(0.92),
             top_k: Some(60),
             response_format: Some(ResponseFormat::JsonObject {
@@ -333,7 +343,7 @@ mod tests {
             max_tool_iterations: 10,
         };
 
-        assert_eq!(config.temperature, 0.8);
+        assert_eq!(config.temperature, Some(0.8));
         assert_eq!(config.top_p, Some(0.92));
         assert_eq!(config.top_k, Some(60));
         assert!(config.response_format.is_some());
@@ -370,10 +380,9 @@ mod tests {
     #[test]
     fn test_completion_config_with_reasoning_effort() {
         let config = CompletionConfig {
-            temperature: 1.0,
-            num_ctx: 32768,
-            max_tokens: 16384,
-            num_predict: None,
+            temperature: Some(1.0),
+            num_ctx: Some(32768),
+            max_tokens: Some(16384),
             top_p: None,
             top_k: None,
             response_format: None,

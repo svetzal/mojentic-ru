@@ -82,8 +82,9 @@ pub struct LlmCallTracerEvent {
     pub model: String,
     /// The messages sent to the LLM (simplified representation)
     pub messages: Vec<HashMap<String, serde_json::Value>>,
-    /// The temperature setting used for the call
-    pub temperature: f64,
+    /// Caller-selected temperature; absent when delegated to provider settings.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub temperature: Option<f64>,
     /// The tools available to the LLM, if any
     pub tools: Option<Vec<HashMap<String, serde_json::Value>>>,
 }
@@ -118,8 +119,8 @@ impl TracerEvent for LlmCallTracerEvent {
             summary.push_str(&format!("\n   Messages: {} message{}", msg_count, plural));
         }
 
-        if (self.temperature - 1.0).abs() > f64::EPSILON {
-            summary.push_str(&format!("\n   Temperature: {}", self.temperature));
+        if let Some(temperature) = self.temperature {
+            summary.push_str(&format!("\n   Temperature: {}", temperature));
         }
 
         if let Some(tools) = &self.tools {
@@ -426,13 +427,13 @@ mod tests {
             source: "test".to_string(),
             model: "llama3.2".to_string(),
             messages: vec![],
-            temperature: 0.7,
+            temperature: Some(0.7),
             tools: None,
         };
 
         assert_eq!(event.correlation_id(), "test-123");
         assert_eq!(event.model, "llama3.2");
-        assert!((event.temperature - 0.7).abs() < f64::EPSILON);
+        assert!((event.temperature.expect("explicit temperature") - 0.7).abs() < f64::EPSILON);
 
         let summary = event.printable_summary();
         assert!(summary.contains("LlmCallTracerEvent"));

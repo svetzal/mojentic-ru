@@ -264,12 +264,12 @@ mod request_body {
         // "o1" and "o3" would make the OpenAI registry treat this as a reasoning model.
         let model = "o1-o3-local-distill";
         let config = CompletionConfig {
-            temperature: 0.5,
-            max_tokens: 256,
+            temperature: Some(0.5),
+            max_tokens: Some(256),
             top_p: Some(0.25),
             top_k: Some(20),
-            num_ctx: 4096,
-            num_predict: Some(99),
+            num_ctx: Some(4096),
+
             reasoning_effort: Some(ReasoningEffort::Low),
             ..Default::default()
         };
@@ -307,18 +307,18 @@ mod request_body {
             .unwrap();
 
         let body = sent(&captured);
-        assert_eq!(body["max_tokens"], 16384);
+        assert!(body.get("max_tokens").is_none());
+        assert!(body.get("temperature").is_none());
         for absent in ["top_p", "top_k", "reasoning_effort", "enable_thinking"] {
             assert!(body.get(absent).is_none(), "{absent} should not be sent: {body}");
         }
     }
 
     #[tokio::test]
-    async fn always_sends_max_tokens_from_the_config() {
+    async fn sends_explicit_zero_output_limit() {
         let (server, captured) = chat_server(CHAT_LENGTH).await;
         let config = CompletionConfig {
-            max_tokens: 0,
-            num_predict: Some(7),
+            max_tokens: Some(0),
             ..Default::default()
         };
 
@@ -475,7 +475,7 @@ mod response_mapping {
     async fn truncation_during_thinking_keeps_the_fields_as_reported() {
         let (server, _) = chat_server(CHAT_LENGTH).await;
         let config = CompletionConfig {
-            max_tokens: 5,
+            max_tokens: Some(5),
             ..Default::default()
         };
 

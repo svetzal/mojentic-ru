@@ -114,40 +114,33 @@ impl OpenAIGateway {
             "Adapting parameters for model"
         );
 
-        // Handle token limit parameter conversion
-        let max_tokens = if config.max_tokens > 0 {
-            config.max_tokens
-        } else if let Some(np) = config.num_predict {
-            np as usize
-        } else {
-            16384
-        };
-
-        if capabilities.model_type == ModelType::Reasoning {
-            params.insert("max_completion_tokens".to_string(), serde_json::json!(max_tokens));
-        } else {
-            params.insert("max_tokens".to_string(), serde_json::json!(max_tokens));
+        if let Some(max_tokens) = config.max_tokens {
+            params.insert(
+                capabilities.get_token_limit_param().to_string(),
+                serde_json::json!(max_tokens),
+            );
         }
 
-        // Handle temperature restrictions
-        if capabilities.supports_temperature(config.temperature) {
-            params.insert("temperature".to_string(), serde_json::json!(config.temperature));
-        } else if capabilities.supported_temperatures.as_ref().is_some_and(|t| t.is_empty()) {
-            // Model doesn't support temperature at all - don't add it
-            warn!(
-                model = model,
-                requested_temperature = config.temperature,
-                "Model does not support temperature parameter at all"
-            );
-        } else {
-            // Use default temperature
-            warn!(
-                model = model,
-                requested_temperature = config.temperature,
-                default_temperature = 1.0,
-                "Model does not support requested temperature, using default"
-            );
-            params.insert("temperature".to_string(), serde_json::json!(1.0));
+        if let Some(temperature) = config.temperature {
+            if capabilities.supports_temperature(temperature) {
+                params.insert("temperature".to_string(), serde_json::json!(temperature));
+            } else if let Some(allowed) = &capabilities.supported_temperatures {
+                if let [fixed] = allowed.as_slice() {
+                    warn!(
+                        model,
+                        requested_temperature = temperature,
+                        fixed_temperature = fixed,
+                        "Model requires a fixed temperature"
+                    );
+                    params.insert("temperature".to_string(), serde_json::json!(fixed));
+                } else {
+                    warn!(
+                        model,
+                        requested_temperature = temperature,
+                        "Model does not support temperature parameter"
+                    );
+                }
+            }
         }
 
         // Add optional sampling parameters
@@ -155,31 +148,18 @@ impl OpenAIGateway {
             params.insert("top_p".to_string(), serde_json::json!(top_p));
         }
 
-        // Handle reasoning effort for reasoning models
-        if let Some(reasoning_effort) = config.reasoning_effort.filter(|effort| {
-            !matches!(
+        if let Some(effort) = config.reasoning_effort {
+            if capabilities.model_type != ModelType::Reasoning {
+                warn!(
+                    model,
+                    "reasoning_effort specified but model is not a reasoning model, ignoring"
+                );
+            } else if !matches!(
                 effort,
                 crate::llm::gateway::ReasoningEffort::Disabled
                     | crate::llm::gateway::ReasoningEffort::Enabled
-            )
-        }) {
-            if capabilities.model_type == ModelType::Reasoning {
-                use crate::llm::gateway::ReasoningEffort;
-                let effort_str = match reasoning_effort {
-                    ReasoningEffort::Disabled | ReasoningEffort::Enabled => {
-                        unreachable!("disabled effort was filtered")
-                    }
-                    ReasoningEffort::Low => "low",
-                    ReasoningEffort::Medium => "medium",
-                    ReasoningEffort::High => "high",
-                    ReasoningEffort::XHigh => "xhigh",
-                };
-                params.insert("reasoning_effort".to_string(), serde_json::json!(effort_str));
-            } else {
-                warn!(
-                    model = model,
-                    "reasoning_effort specified but model is not a reasoning model, ignoring"
-                );
+            ) {
+                params.insert("reasoning_effort".to_string(), serde_json::json!(effort));
             }
         }
 
@@ -792,8 +772,8 @@ mod tests {
     fn test_adapt_parameters_chat_model() {
         let gateway = OpenAIGateway::new();
         let config = CompletionConfig {
-            temperature: 0.7,
-            max_tokens: 1000,
+            temperature: Some(0.7),
+            max_tokens: Some(1000),
             ..Default::default()
         };
 
@@ -808,8 +788,8 @@ mod tests {
     fn test_adapt_parameters_reasoning_model() {
         let gateway = OpenAIGateway::new();
         let config = CompletionConfig {
-            temperature: 0.7,
-            max_tokens: 1000,
+            temperature: Some(0.7),
+            max_tokens: Some(1000),
             ..Default::default()
         };
 

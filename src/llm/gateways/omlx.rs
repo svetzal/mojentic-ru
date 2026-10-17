@@ -337,9 +337,13 @@ fn chat_body(model: &str, messages: &[LlmMessage], config: &CompletionConfig) ->
     let mut body = serde_json::json!({
         "model": model,
         "messages": adapt_messages_to_openai_with_reasoning(messages, true)?,
-        "temperature": config.temperature,
-        "max_tokens": config.max_tokens,
     });
+    if let Some(temperature) = config.temperature {
+        body["temperature"] = serde_json::json!(temperature);
+    }
+    if let Some(max_tokens) = config.max_tokens {
+        body["max_tokens"] = serde_json::json!(max_tokens);
+    }
     if config.preserve_reasoning {
         body["chat_template_kwargs"] = serde_json::json!({"preserve_thinking": true});
     }

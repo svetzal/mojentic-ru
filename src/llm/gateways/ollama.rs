@@ -638,17 +638,15 @@ fn chat_body(
 
 // Extract Ollama-specific options from config
 fn extract_ollama_options(config: &CompletionConfig) -> Value {
-    let mut options = serde_json::json!({
-        "temperature": config.temperature,
-        "num_ctx": config.num_ctx,
-    });
-
-    if let Some(num_predict) = config.num_predict {
-        if num_predict > 0 {
-            options["num_predict"] = serde_json::json!(num_predict);
-        }
-    } else if config.max_tokens > 0 {
-        options["num_predict"] = serde_json::json!(config.max_tokens);
+    let mut options = serde_json::json!({});
+    if let Some(temperature) = config.temperature {
+        options["temperature"] = serde_json::json!(temperature);
+    }
+    if let Some(num_ctx) = config.num_ctx {
+        options["num_ctx"] = serde_json::json!(num_ctx);
+    }
+    if let Some(max_tokens) = config.max_tokens {
+        options["num_predict"] = serde_json::json!(max_tokens);
     }
 
     if let Some(top_p) = config.top_p {
@@ -899,10 +897,9 @@ mod tests {
     #[test]
     fn test_extract_ollama_options_basic() {
         let config = CompletionConfig {
-            temperature: 0.7,
-            num_ctx: 4096,
-            max_tokens: 2048,
-            num_predict: None,
+            temperature: Some(0.7),
+            num_ctx: Some(4096),
+            max_tokens: Some(2048),
             top_p: None,
             top_k: None,
             response_format: None,
@@ -917,17 +914,16 @@ mod tests {
         // Use as_f64 for floating point comparison
         assert!((options["temperature"].as_f64().unwrap() - 0.7).abs() < 0.01);
         assert_eq!(options["num_ctx"], 4096);
-        // max_tokens should be used as num_predict when num_predict is None
+        // The sole output limit uses Ollama's provider field name.
         assert_eq!(options["num_predict"], 2048);
     }
 
     #[test]
-    fn test_extract_ollama_options_with_num_predict() {
+    fn test_extract_ollama_options_output_limit() {
         let config = CompletionConfig {
-            temperature: 0.5,
-            num_ctx: 2048,
-            max_tokens: 1000,
-            num_predict: Some(500),
+            temperature: Some(0.5),
+            num_ctx: Some(2048),
+            max_tokens: Some(1000),
             top_p: None,
             top_k: None,
             response_format: None,
@@ -941,17 +937,16 @@ mod tests {
 
         assert!((options["temperature"].as_f64().unwrap() - 0.5).abs() < 0.01);
         assert_eq!(options["num_ctx"], 2048);
-        // num_predict takes precedence over max_tokens
-        assert_eq!(options["num_predict"], 500);
+        // There is no separate configuration field to override max_tokens.
+        assert_eq!(options["num_predict"], 1000);
     }
 
     #[test]
-    fn test_extract_ollama_options_zero_num_predict() {
+    fn test_extract_ollama_options_unset_output_limit() {
         let config = CompletionConfig {
-            temperature: 1.0,
-            num_ctx: 8192,
-            max_tokens: 4096,
-            num_predict: Some(0),
+            temperature: Some(1.0),
+            num_ctx: Some(8192),
+            max_tokens: None,
             top_p: None,
             top_k: None,
             response_format: None,
@@ -965,18 +960,15 @@ mod tests {
 
         assert!((options["temperature"].as_f64().unwrap() - 1.0).abs() < 0.01);
         assert_eq!(options["num_ctx"], 8192);
-        // When num_predict is Some(0) (not > 0), num_predict field is not added
-        // (the else-if branch only runs when num_predict is None)
-        assert!(options.get("num_predict").is_none() || options["num_predict"].is_null());
+        assert!(options.get("num_predict").is_none());
     }
 
     #[test]
     fn test_extract_ollama_options_zero_max_tokens() {
         let config = CompletionConfig {
-            temperature: 0.8,
-            num_ctx: 1024,
-            max_tokens: 0,
-            num_predict: None,
+            temperature: Some(0.8),
+            num_ctx: Some(1024),
+            max_tokens: Some(0),
             top_p: None,
             top_k: None,
             response_format: None,
@@ -990,19 +982,15 @@ mod tests {
 
         assert!((options["temperature"].as_f64().unwrap() - 0.8).abs() < 0.01);
         assert_eq!(options["num_ctx"], 1024);
-        // When max_tokens is 0 and num_predict is None, num_predict field is not added
-        // Check that it's either missing or null (not set in the options object)
-        let num_predict = options.get("num_predict");
-        assert!(num_predict.is_none() || num_predict.unwrap().is_null());
+        assert_eq!(options["num_predict"], 0);
     }
 
     #[test]
     fn test_extract_ollama_options_with_top_p() {
         let config = CompletionConfig {
-            temperature: 0.7,
-            num_ctx: 4096,
-            max_tokens: 2048,
-            num_predict: None,
+            temperature: Some(0.7),
+            num_ctx: Some(4096),
+            max_tokens: Some(2048),
             top_p: Some(0.9),
             top_k: None,
             response_format: None,
@@ -1023,10 +1011,9 @@ mod tests {
     #[test]
     fn test_extract_ollama_options_with_top_k() {
         let config = CompletionConfig {
-            temperature: 0.8,
-            num_ctx: 2048,
-            max_tokens: 1024,
-            num_predict: None,
+            temperature: Some(0.8),
+            num_ctx: Some(2048),
+            max_tokens: Some(1024),
             top_p: None,
             top_k: Some(40),
             response_format: None,
@@ -1046,10 +1033,9 @@ mod tests {
     #[test]
     fn test_extract_ollama_options_with_all_sampling_params() {
         let config = CompletionConfig {
-            temperature: 0.6,
-            num_ctx: 8192,
-            max_tokens: 4096,
-            num_predict: Some(2000),
+            temperature: Some(0.6),
+            num_ctx: Some(8192),
+            max_tokens: Some(4096),
             top_p: Some(0.95),
             top_k: Some(50),
             response_format: None,
@@ -1063,7 +1049,7 @@ mod tests {
 
         assert!((options["temperature"].as_f64().unwrap() - 0.6).abs() < 0.01);
         assert_eq!(options["num_ctx"], 8192);
-        assert_eq!(options["num_predict"], 2000);
+        assert_eq!(options["num_predict"], 4096);
         assert!((options["top_p"].as_f64().unwrap() - 0.95).abs() < 0.01);
         assert_eq!(options["top_k"], 50);
     }
@@ -1073,10 +1059,9 @@ mod tests {
         use crate::llm::gateway::ResponseFormat;
 
         let config = CompletionConfig {
-            temperature: 0.7,
-            num_ctx: 4096,
-            max_tokens: 2048,
-            num_predict: None,
+            temperature: Some(0.7),
+            num_ctx: Some(4096),
+            max_tokens: Some(2048),
             top_p: None,
             top_k: None,
             response_format: Some(ResponseFormat::Text),
@@ -1102,10 +1087,9 @@ mod tests {
         use crate::llm::gateway::ResponseFormat;
 
         let config = CompletionConfig {
-            temperature: 0.7,
-            num_ctx: 4096,
-            max_tokens: 2048,
-            num_predict: None,
+            temperature: Some(0.7),
+            num_ctx: Some(4096),
+            max_tokens: Some(2048),
             top_p: None,
             top_k: None,
             response_format: Some(ResponseFormat::JsonObject { schema: None }),
@@ -1138,10 +1122,9 @@ mod tests {
         });
 
         let config = CompletionConfig {
-            temperature: 0.7,
-            num_ctx: 4096,
-            max_tokens: 2048,
-            num_predict: None,
+            temperature: Some(0.7),
+            num_ctx: Some(4096),
+            max_tokens: Some(2048),
             top_p: None,
             top_k: None,
             response_format: Some(ResponseFormat::JsonObject {
@@ -1166,10 +1149,9 @@ mod tests {
     #[test]
     fn test_add_response_format_none() {
         let config = CompletionConfig {
-            temperature: 0.7,
-            num_ctx: 4096,
-            max_tokens: 2048,
-            num_predict: None,
+            temperature: Some(0.7),
+            num_ctx: Some(4096),
+            max_tokens: Some(2048),
             top_p: None,
             top_k: None,
             response_format: None,
@@ -1560,7 +1542,7 @@ mod tests {
         let mock = server
             .mock("POST", "/api/chat")
             .match_body(mockito::Matcher::JsonString(
-                r#"{"model":"llama2","messages":[{"role":"user","content":"Hi"}],"options":{"temperature":1.0,"num_ctx":32768,"num_predict":16384},"stream":false,"tools":[{"type":"function","function":{"name":"test_tool","description":"A test","parameters":{}}}]}"#.to_string()
+                r#"{"model":"llama2","messages":[{"role":"user","content":"Hi"}],"options":{},"stream":false,"tools":[{"type":"function","function":{"name":"test_tool","description":"A test","parameters":{}}}]}"#.to_string()
             ))
             .with_status(200)
             .with_body(r#"{"message":{"role":"assistant","content":"Result"}}"#)

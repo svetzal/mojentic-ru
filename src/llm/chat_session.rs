@@ -75,7 +75,7 @@ pub struct ChatSession {
     tools: Option<Vec<Box<dyn LlmTool>>>,
     max_context: usize,
     tokenizer_gateway: TokenizerGateway,
-    temperature: f32,
+    completion_config: CompletionConfig,
 }
 
 impl ChatSession {
@@ -149,10 +149,7 @@ impl ChatSession {
 
         // Generate response
         let messages: Vec<LlmMessage> = self.messages.iter().map(|m| m.message.clone()).collect();
-        let config = CompletionConfig {
-            temperature: self.temperature,
-            ..Default::default()
-        };
+        let config = self.completion_config.clone();
 
         let response = self
             .broker
@@ -203,10 +200,7 @@ impl ChatSession {
 
         // Clone messages for the broker call
         let messages: Vec<LlmMessage> = self.messages.iter().map(|m| m.message.clone()).collect();
-        let config = CompletionConfig {
-            temperature: self.temperature,
-            ..Default::default()
-        };
+        let config = self.completion_config.clone();
 
         Box::pin(async_stream::stream! {
             let mut accumulated = Vec::new();
@@ -297,7 +291,7 @@ pub struct ChatSessionBuilder {
     tools: Option<Vec<Box<dyn LlmTool>>>,
     max_context: usize,
     tokenizer_gateway: Option<TokenizerGateway>,
-    temperature: f32,
+    completion_config: CompletionConfig,
 }
 
 impl ChatSessionBuilder {
@@ -309,7 +303,7 @@ impl ChatSessionBuilder {
             tools: None,
             max_context: 32768,
             tokenizer_gateway: None,
-            temperature: 1.0,
+            completion_config: CompletionConfig::default(),
         }
     }
 
@@ -337,9 +331,18 @@ impl ChatSessionBuilder {
         self
     }
 
-    /// Set the temperature for generation (default: 1.0)
+    /// Set provider controls for every turn, including tool continuations and streams.
+    ///
+    /// Unset controls use provider settings. `max_context` remains a local history
+    /// budget and does not set the provider's `num_ctx`.
+    pub fn completion_config(mut self, config: CompletionConfig) -> Self {
+        self.completion_config = config;
+        self
+    }
+
+    /// Set the temperature for generation (default: provider setting)
     pub fn temperature(mut self, temperature: f32) -> Self {
-        self.temperature = temperature;
+        self.completion_config.temperature = Some(temperature);
         self
     }
 
@@ -355,7 +358,7 @@ impl ChatSessionBuilder {
             tools: self.tools,
             max_context: self.max_context,
             tokenizer_gateway,
-            temperature: self.temperature,
+            completion_config: self.completion_config,
         }
     }
 }
@@ -509,7 +512,7 @@ mod tests {
         let broker = LlmBroker::new("test-model", gateway, None);
         let session = ChatSession::builder(broker).temperature(0.5).build();
 
-        assert_eq!(session.temperature, 0.5);
+        assert_eq!(session.completion_config.temperature, Some(0.5));
     }
 
     #[tokio::test]

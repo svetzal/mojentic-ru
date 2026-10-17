@@ -98,7 +98,7 @@ impl LlmBroker {
             tracer.record_llm_call(
                 &self.model,
                 messages_json,
-                config.temperature as f64,
+                config.temperature.map(f64::from),
                 tools_json,
                 "LlmBroker",
                 &correlation_id,
@@ -371,7 +371,7 @@ impl LlmBroker {
             tracer.record_llm_call(
                 &self.model,
                 messages_json,
-                config.temperature as f64,
+                config.temperature.map(f64::from),
                 None,
                 "LlmBroker::generate_object",
                 &correlation_id,
@@ -498,7 +498,7 @@ impl LlmBroker {
                 tracer.record_llm_call(
                     &self.model,
                     messages_json,
-                    config.temperature as f64,
+                    config.temperature.map(f64::from),
                     tools_json,
                     "LlmBroker::generate_stream",
                     &correlation_id,
@@ -720,7 +720,7 @@ impl LlmBroker {
                 tracer.record_llm_call(
                     &self.model,
                     messages_for_trace(messages),
-                    config.temperature as f64,
+                    config.temperature.map(f64::from),
                     None,
                     SOURCE,
                     &correlation_id,
@@ -1614,10 +1614,9 @@ mod tests {
         let broker = LlmBroker::new("test-model", gateway, None);
 
         let config = CompletionConfig {
-            temperature: 0.5,
-            num_ctx: 2048,
-            max_tokens: 100,
-            num_predict: Some(50),
+            temperature: Some(0.5),
+            num_ctx: Some(2048),
+            max_tokens: Some(100),
             top_p: None,
             top_k: None,
             response_format: None,
@@ -1744,10 +1743,9 @@ mod tests {
         let broker = LlmBroker::new("test-model", gateway, None);
 
         let config = CompletionConfig {
-            temperature: 0.1,
-            num_ctx: 1024,
-            max_tokens: 50,
-            num_predict: None,
+            temperature: Some(0.1),
+            num_ctx: Some(1024),
+            max_tokens: Some(50),
             top_p: None,
             top_k: None,
             response_format: None,

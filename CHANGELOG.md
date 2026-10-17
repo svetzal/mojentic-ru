@@ -50,6 +50,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking changes
 
+- `CompletionConfig.temperature`, `num_ctx`, and `max_tokens` are now `Option`
+  with unset defaults. `num_predict` is removed; `max_tokens` is the only output
+  limit. Gateways send only caller-selected supported controls. Ollama may now
+  use a smaller model/server context and unlimited output; OpenAI output is no
+  longer capped at 16,384 by the library and reasoning output can cost more.
+  oMLX also omits unset output limits. Explicit zero temperature is preserved
+  except for OpenAI's documented model restrictions; a fixed temperature is
+  rewritten only when the caller selected one.
+- `LlmCallTracerEvent.temperature` and tracer recording methods now accept
+  `Option<f64>`. Unset temperature is absent from serialized call events;
+  numeric temperatures from older events still deserialize. ChatSession no
+  longer injects `1.0`; its builder accepts `completion_config` for all turns.
+
 - Invalid recovery category/status selections now fail during `with_recovery`
   or `RecoveryGateway::new`, before any entrypoint can dispatch HTTP, with
   `MojenticError::InvalidRecoveryPolicy(RecoveryPolicyError)`. Select HTTP error
@@ -77,6 +90,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   distinguish completed unresolved admission from rejection.
 
 ### Migration
+
+Use `Some(value)` in completion config literals and handle `None` on reads.
+Replace `num_predict: Some(n)` with `max_tokens: Some(n)` for nonnegative `n`;
+replace the former unlimited/negative sentinel with `max_tokens: None`.
+To restore the former explicit defaults:
+
+```rust
+use mojentic::llm::gateway::CompletionConfig;
+let config = CompletionConfig {
+    temperature: Some(1.0),
+    num_ctx: Some(32768),
+    max_tokens: Some(16384),
+    ..Default::default()
+};
+// ChatSession::builder(broker).completion_config(config).build()
+```
+
+See the request controls book page for provider names and session migration.
+Tracer callers pass `Some(temperature)` or `None`; consumers must allow the
+serialized temperature field to be absent.
 
 - Migrate serialized `request_cancel` key reads to `remote_request_cancellation`;
   existing Rust field reads remain supported as a remote cancellation alias;

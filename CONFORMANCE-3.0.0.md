@@ -1,6 +1,166 @@
 # Rust 3.0.0 scoped conformance
 
-## Current correction: public HTTP recovery evidence (amendment item 9)
+## Current correction: request fidelity, model-metadata sections 3–3.6
+
+Tested baseline: `e80c0a454cbb2677e70ebd56a78795457acef8f6` plus the
+uncommitted correction in this worktree. This section supersedes current-source
+claims below; historical results remain historical. Publication holds remain.
+Only Rust is changed. No dependency, version, edition, runtime, default feature,
+advisory policy, recovery admission rule or Git ref is changed.
+
+The initiative brief was read and verified as SHA-256
+`ea6a0efa56bfb3cd74b5ce728f80cc33c6fbd853114bec94b8aabe79f5d28e6e`.
+The binding input is `MODEL-METADATA-2026-10.md` sections 3–3.6 from the
+coordinating repository. Its other sections are not certified by this correction.
+Rust edition remains 2021, with no workspace resolver declaration or declared
+MSRV; CI uses stable Rust and this run uses rustc 1.99.0 / cargo 1.99.0.
+Tokio and all feature semantics are preserved. Declaring an MSRV remains a
+separate recommendation, requiring authorization rather than an inferred change.
+`Cargo.lock` is absent at baseline and gitignored; the checks generate a local
+lockfile without editing dependency declarations.
+
+### Characterization and resulting behavior
+
+Before migration, ChatSession injected temperature `1.0` in both send paths;
+four broker trace call sites cast it to `f64`, and tracer events required a
+number. Ollama `chat_body`, OpenAI `chat_body`/parameter adaptation, and oMLX
+`chat_body` serve ordinary, structured, legacy-stream, event-stream and
+prepared recovery requests. These shared paths remain shared.
+
+`temperature`, `num_ctx` and `max_tokens` now default to `None`. The separate
+signed `num_predict` config field and its negative-to-usize cast are removed.
+Ollama maps selected output limits to `options.num_predict`; OpenAI uses its
+registry's `max_tokens` or `max_completion_tokens`; oMLX uses `max_tokens`.
+Zero selections remain selections. Unsupported context/top-k controls remain
+omitted on the same adapters as before. Fixed OpenAI temperature is rewritten
+only for an explicit selection; a model accepting none omits it. Dropped
+non-reasoning effort warns. Native reasoning/profile validation is preserved.
+ChatSession carries the full completion config through both send paths and tool
+continuations; `max_context` remains local. Tracing represents caller intent
+with optional temperature and accepts older numeric trace fields.
+
+### Executable contract and source identities
+
+Reuse **request-fidelity-v1**, unchanged from
+`mojentic-ex/test/contracts/request_fidelity_v1.json` at inspected clean source
+`ff479d92067b6ffbd99d3cd5533f96e13ebc09b0`. That checkout was read only; its
+tests were not run here. Artifact SHA-256:
+`6f02088311f50707b9c12154d888f844928c23d359043cb2e5d5654bf7e5eaea`.
+The contract declares the 3.0.0 unreleased API and explicit migration from 2.1's
+former defaults, not binary compatibility with removed 2.1 Rust fields.
+The local copy is `tests/contracts/request_fidelity_v1.json`; the verifier is
+`tests/request_fidelity.rs`. Both run in the required `cargo test` gates.
+
+The frozen source identities below identify the tested uncommitted implementation;
+Foundry owns commit finalization:
+
+- Verifier SHA-256 (`sha256sum tests/request_fidelity.rs`):
+  `80f7b30a1becf5a3f8f5f8e3cffd2da1d0fe9927e0bdea85790fcf5a3048bb6b`.
+- Artifact plus verifier (`cat tests/contracts/request_fidelity_v1.json tests/request_fidelity.rs | sha256sum`):
+  `0d10f57a95588676592b6d5dbb5c5a84620e07e1dac6bd858965f1d6e695815e`.
+- Source manifest (`LC_ALL=C rg --files src | LC_ALL=C sort | xargs sha256sum | sha256sum`):
+  `22b367b58f4cdb55b0fceb08161ab1d1a5eeb563fd06b025673d5b76cd6ea830`.
+- Generated local lockfile (`sha256sum Cargo.lock`):
+  `390c599335be1aed77a5ff897c5f053631e31611d89ac66e2b06cd056e29034d`.
+- Binding metadata document SHA-256 equals the artifact's `source_sha256`:
+  `a085da1c0d110f9d587a24ace6ac2854b653e1ac28905b3829d94d665b2c906e`.
+
+| Binding behavior | Named executable test |
+| --- | --- |
+| Default omission through actual HTTP; rejecting original and corrected probe | `unset_controls_cross_http_boundary` |
+| All seven artifact cases plus explicit former defaults, ordinary/structured/legacy/event streams, actual field values/names/absence, tracer caller intent and missing response model/usage | `artifact_cases_through_broker_all_http_entrypoints` |
+| The same cases through session send/stream; local budget does not become provider context | `artifact_cases_through_session_send_and_stream` |
+| Artifact 503 then success, ordinary/structured/recovery streams, actual HTTP bytes equal across attempts and to wire observation, same logical id and different real attempt ids | `artifact_cases_recovery_replays_bytes_and_real_attempt_identities` |
+| Recovery-enabled broker structured output and session ordinary/legacy streams against the same cases and artifact-derived responses | `artifact_cases_recovery_through_broker_and_session` |
+| Tool call/Unicode arguments derived from artifact, tool execution/results/history and unchanged controls across both session tool-round requests | `artifact_tool_continuations_preserve_session_controls_and_history` |
+| Fixed/unsupported/unset temperature, named reasoning effort and correct output-limit field for chat/reasoning/search registry families | `openai_model_restrictions_preserve_selected_output_limits` |
+| All six native effort mappings alongside combined sampling/context/output intent | `native_reasoning_mappings_keep_request_fidelity` |
+| Non-reasoning effort omitted and warning observed | `dropped_openai_reasoning_warns_at_http_boundary` |
+| Artifact-derived HTTP errors (400/503), no implicit retry, older response without optional finish evidence | `artifact_error_and_optional_response_fields_through_broker` |
+| Default session and explicit temperature zero builder | `session_default_and_temperature_builder_preserve_absence_and_zero` |
+| Older numeric trace and new absent field serialization | `trace_temperature_reads_old_numeric_and_new_absent_fields` |
+
+The proof probe rejected the original production HTTP body (cargo exit 101) and
+passed with the corrected source (exit 0). It checks the request body and decoded
+answer, not a marker or call count. The complete matrix additionally checks
+replay and tool behavior at the real HTTP boundary. Scripted responses derive
+from the shared artifact; they are not independently authored provider mocks.
+Additional variants remove optional evidence or insert the artifact's tool call.
+
+Provider references: [Ollama chat](https://docs.ollama.com/api/chat) and
+[options](https://docs.ollama.com/modelfile#valid-parameters-and-values),
+[OpenAI Chat Completions](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create),
+and [pinned oMLX provider source](https://github.com/jundot/omlx/blob/53ab0e66d75fe46e3cfa7ed7a7762d3bbcf21e9c/omlx/server.py).
+The coordinated metadata contract section 3.4 records oMLX's successful omission
+capture; no new live provider claim is made here. The full pre-existing recovery
+and reasoning tests continue to guard unrelated characterized behavior.
+
+### Unfinished counterpart verification and publication holds
+
+**External provider and microgentic verification is unfinished initiative work.**
+No live Ollama/oMLX/OpenAI server source/version was exercised against this
+contract here; their verification commands/results and tested server identities
+are unavailable. The artifact's Elixir origin was identified and hashed, but
+its required gates were not run in this Rust-only task. No paired agreement is
+claimed from documentation or a common JSON schema.
+
+The initiative's microgentic finding identifies clean
+`e71b387e616cc8e7af813f9742715885fcce5254`, still pinned to Rust
+`4ca1ed279c02eab37827a1ed07c30e961155ecf3`, with local metadata/timing modules.
+Neither consumer identity was tested here. Coordination must run this exact
+request-fidelity-v1 artifact hash through that consumer and actual providers,
+cover supported API versions/errors/optional fields/behavior, include the same
+verification in each repository's required gates, and report source identities,
+commands and results alongside Rust's results. The post-release registry migration
+and benchmark-continuity hold remain. No sibling repository was modified.
+
+Stacey's coverage reconciliation remains binding: renewed passing evidence
+permits progress, the unexplained historical failure remains low severity, and
+further reproduction was not requested or performed. The 56% floor, engine,
+timeouts and existing assertions remain intact.
+
+### Current verification
+
+All commands ran with `/home/svetzal/.cargo/bin` on PATH and writable
+`CARGO_HOME=/tmp/mojentic-c2-cargo`. Verbose tests/builds and the remaining gates
+were run through `foundry capture`. Results are for the frozen source identities
+above, not substituted historical executions.
+
+| Exact command | Exit | Result |
+| --- | --- | --- |
+| `cargo fmt --check` | 0 | Passed |
+| `cargo clippy --all-targets --all-features -- -D warnings` | 0 | Passed |
+| `cargo test --verbose --all-features` | 0 | 697 passed, including all 12 request-fidelity verifier tests and 20 doctests; 24 pre-existing ignored doctests |
+| `cargo build --verbose --all-features` | 0 | Passed |
+| `cargo tarpaulin --all-features --fail-under 56` | 0 | 70.33%, 3350/4763 lines; all 12 verifier and 66 recovery tests passed under instrumentation |
+| `cargo deny check` | 0 | Advisories, bans, licenses and sources passed; existing duplicate-version warnings |
+| `cargo audit` | 0 | Passed; 267 locked dependencies scanned, no vulnerabilities reported |
+| `cargo test` | 0 | 697 passed; 24 pre-existing ignored doctests |
+| `cargo doc --no-deps --all-features` | 0 | Passed; two existing rustdoc warnings |
+| `mdbook build book` | 0 | HTML emitted; existing search-configuration diagnostic |
+| `cargo fetch` | 0 | Passed; CI setup dependency fetch |
+
+The targeted verifier command `cargo test --test request_fidelity` also passed
+(exit 0). The required all-feature/default/coverage gates execute that same
+artifact-backed verifier without a separate opt-in or independently authored
+fixture set. Contract and source hashes were rechecked after the gate sweep.
+
+The existing rustdoc warnings are an unresolved `connect` link in
+`src/realtime/broker.rs` and an unclosed `dyn` HTML tag in
+`src/examples/react/events.rs`. The installed mdBook emits
+`Failed to deserialize output.html` for the pre-existing `truncate-long-entries`
+search setting, then emits HTML and exits 0. These checks are not claimed
+warning-free. Generated `examples.md` and `use_cases.md` heading-only placeholders
+were removed after the build; the actual migration guide remains in the book.
+No gate, timeout, dependency or advisory policy was weakened or changed.
+
+All eleven discovered project/applicable CI checks exited 0. This completes the
+local request-fidelity correction; counterpart conformance and coordinated
+publication remain unfinished as stated above. Changes remain uncommitted for
+Foundry. Suggested commit message: `Preserve caller intent in completion requests`.
+
+
+## Historical correction: public HTTP recovery evidence (amendment item 9)
 
 Tested baseline: `17ad0cb1a6b5895f5dbe9f758189d61b266bb336` plus the
 uncommitted evidence correction. This section supersedes current-source claims

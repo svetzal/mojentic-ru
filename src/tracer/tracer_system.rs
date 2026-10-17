@@ -77,7 +77,7 @@ impl TracerSystem {
         &self,
         model: impl Into<String>,
         messages: Vec<HashMap<String, serde_json::Value>>,
-        temperature: f64,
+        temperature: Option<f64>,
         tools: Option<Vec<HashMap<String, serde_json::Value>>>,
         source: impl Into<String>,
         correlation_id: impl Into<String>,
@@ -393,7 +393,7 @@ mod tests {
     fn test_record_llm_call() {
         let tracer = TracerSystem::default();
 
-        tracer.record_llm_call("llama3.2", vec![], 0.7, None, "test", "corr-123");
+        tracer.record_llm_call("llama3.2", vec![], Some(0.7), None, "test", "corr-123");
 
         assert_eq!(tracer.len(), 1);
     }
@@ -482,7 +482,7 @@ mod tests {
         let tracer = TracerSystem::new(None, false);
         assert!(!tracer.is_enabled());
 
-        tracer.record_llm_call("llama3.2", vec![], 1.0, None, "test", "corr-123");
+        tracer.record_llm_call("llama3.2", vec![], Some(1.0), None, "test", "corr-123");
 
         assert_eq!(tracer.len(), 0);
     }
@@ -491,7 +491,7 @@ mod tests {
     fn test_clear() {
         let tracer = TracerSystem::default();
 
-        tracer.record_llm_call("llama3.2", vec![], 1.0, None, "test", "corr-123");
+        tracer.record_llm_call("llama3.2", vec![], Some(1.0), None, "test", "corr-123");
 
         assert_eq!(tracer.len(), 1);
 
@@ -505,7 +505,14 @@ mod tests {
         let tracer = TracerSystem::default();
 
         for i in 0..5 {
-            tracer.record_llm_call("llama3.2", vec![], 1.0, None, "test", format!("corr-{}", i));
+            tracer.record_llm_call(
+                "llama3.2",
+                vec![],
+                Some(1.0),
+                None,
+                "test",
+                format!("corr-{}", i),
+            );
         }
 
         assert_eq!(tracer.len(), 5);

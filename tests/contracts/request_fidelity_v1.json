@@ -1,0 +1,78 @@
+{
+  "version": "request-fidelity-v1",
+  "source_sha256": "a085da1c0d110f9d587a24ace6ac2854b653e1ac28905b3829d94d665b2c906e",
+  "supported_api": "3.0.0 (unreleased); 2.1 defaults require explicit migration settings",
+  "cases": [
+    {
+      "name": "unset",
+      "config": {}
+    },
+    {
+      "name": "zero-temperature",
+      "config": {
+        "temperature": 0
+      }
+    },
+    {
+      "name": "context-only",
+      "config": {
+        "num_ctx": 8192
+      }
+    },
+    {
+      "name": "output-only",
+      "config": {
+        "max_tokens": 73
+      }
+    },
+    {
+      "name": "sampling",
+      "config": {
+        "top_p": 0.8,
+        "top_k": 17
+      }
+    },
+    {
+      "name": "all",
+      "config": {
+        "temperature": 0,
+        "num_ctx": 8192,
+        "max_tokens": 73,
+        "top_p": 0.8,
+        "top_k": 17
+      }
+    },
+    {
+      "name": "explicit-nil",
+      "config": {
+        "temperature": null,
+        "num_ctx": null,
+        "max_tokens": null,
+        "top_p": null,
+        "top_k": null
+      }
+    }
+  ],
+  "responses": {
+    "ollama-complete": "{\"message\": {\"content\": \"answer\"}, \"done\": true, \"done_reason\": \"stop\"}",
+    "ollama-object": "{\"message\": {\"content\": \"{\\\"answer\\\":\\\"answer\\\"}\"}, \"done\": true, \"done_reason\": \"stop\"}",
+    "ollama-legacy": "{\"message\": {\"content\": \"answer\"}, \"done\": false}\n{\"message\": {\"content\": \"\"}, \"done\": true, \"done_reason\": \"stop\"}\n",
+    "ollama-events": "{\"message\": {\"content\": \"answer\"}, \"done\": false}\n{\"message\": {\"content\": \"\"}, \"done\": true, \"done_reason\": \"stop\"}\n",
+    "openai-complete": "{\"choices\": [{\"message\": {\"content\": \"answer\"}, \"finish_reason\": \"stop\"}]}",
+    "openai-object": "{\"choices\": [{\"message\": {\"content\": \"{\\\"answer\\\":\\\"answer\\\"}\"}, \"finish_reason\": \"stop\"}]}",
+    "openai-legacy": "data: {\"choices\": [{\"index\": 0, \"delta\": {\"content\": \"answer\"}, \"finish_reason\": null}]}\n\ndata: {\"choices\": [{\"index\": 0, \"delta\": {}, \"finish_reason\": \"stop\"}]}\n\ndata: [DONE]\n\n",
+    "openai-events": "data: {\"choices\": [{\"index\": 0, \"delta\": {\"content\": \"answer\"}, \"finish_reason\": null}]}\n\ndata: {\"choices\": [{\"index\": 0, \"delta\": {}, \"finish_reason\": \"stop\"}]}\n\ndata: [DONE]\n\n"
+  },
+  "tool_call": {
+    "id": "next-id",
+    "type": "function",
+    "function": {
+      "name": "count",
+      "arguments": "{\"value\":\"next-π\"}"
+    }
+  },
+  "retryable_error": {
+    "status": 503,
+    "body": "busy"
+  }
+}

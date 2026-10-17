@@ -28,6 +28,7 @@
   - [Chat Sessions with Tools](core/chat_sessions_with_tools.md)
   - [OpenAI Model Registry](core/openai_model_registry.md)
   - [oMLX Gateway](core/omlx.md)
+  - [Request Controls and 3.0 Migration](core/request_fidelity.md)
   - [Completion Recovery](core/recovery.md)
 - [Layer 2 - Agents](agents/README.md)
   - [Asynchronous Capabilities](agents/async_capabilities.md)

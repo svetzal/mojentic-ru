@@ -23,7 +23,7 @@ async fn main() {
         "Describe a river delta in three sentences.",
     )];
     let config = CompletionConfig {
-        num_predict: Some(40),
+        max_tokens: Some(40),
         ..Default::default()
     };
 

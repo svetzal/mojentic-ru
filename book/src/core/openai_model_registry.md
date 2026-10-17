@@ -314,3 +314,11 @@ The OpenAI Model Registry provides:
 - Custom registries for specialized use cases
 
 By consulting the registry, the OpenAI gateway ensures it uses the correct parameters and features for each model, providing a robust and maintainable integration layer.
+
+### Caller intent in 3.0
+
+The registry only adapts controls the caller selected. An unset temperature or
+output limit stays absent. For a model with one allowed temperature, an explicit
+selection is rewritten to that value; for a model accepting none, it is omitted.
+Reasoning effort on a non-reasoning model is dropped with a warning. Native named
+effort mappings and explicit reasoning profile validation remain unchanged.

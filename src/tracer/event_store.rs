@@ -231,7 +231,7 @@ mod tests {
             source: "test".to_string(),
             model: "llama3.2".to_string(),
             messages: vec![],
-            temperature: 1.0,
+            temperature: Some(1.0),
             tools: None,
         });
 
@@ -256,7 +256,7 @@ mod tests {
             source: "test".to_string(),
             model: "llama3.2".to_string(),
             messages: vec![],
-            temperature: 1.0,
+            temperature: Some(1.0),
             tools: None,
         });
 
@@ -274,7 +274,7 @@ mod tests {
             source: "test".to_string(),
             model: "llama3.2".to_string(),
             messages: vec![],
-            temperature: 1.0,
+            temperature: Some(1.0),
             tools: None,
         });
 
@@ -297,7 +297,7 @@ mod tests {
                 source: "test".to_string(),
                 model: "llama3.2".to_string(),
                 messages: vec![],
-                temperature: 1.0,
+                temperature: Some(1.0),
                 tools: None,
             });
             store.store(event);
@@ -318,7 +318,7 @@ mod tests {
             source: "test".to_string(),
             model: "llama3.2".to_string(),
             messages: vec![],
-            temperature: 1.0,
+            temperature: Some(1.0),
             tools: None,
         });
 

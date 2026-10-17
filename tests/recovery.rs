@@ -808,9 +808,9 @@ async fn immutable_reasoning_tools_schema_and_sampling_all_adapters() {
         let mut message = LlmMessage::assistant("prior");
         message.reasoning_content = Some("native prior reasoning".into());
         let config = CompletionConfig {
-            temperature: 0.5,
+            temperature: Some(0.5),
             top_p: Some(0.7),
-            max_tokens: 123,
+            max_tokens: Some(123),
             reasoning_effort: Some(mojentic::llm::gateway::ReasoningEffort::Enabled),
             ..Default::default()
         };
@@ -1304,9 +1304,9 @@ async fn native_history_tool_schema_combination_is_frozen_all_adapters() {
         let messages = [history, LlmMessage::user("next")];
         let tools: Vec<Box<dyn LlmTool>> = vec![Box::new(CountTool(Arc::new(AtomicUsize::new(0))))];
         let config = CompletionConfig {
-            temperature: 0.5,
+            temperature: Some(0.5),
             top_p: Some(0.6),
-            num_predict: Some(123),
+            max_tokens: Some(123),
             response_format: Some(mojentic::llm::gateway::ResponseFormat::JsonObject {
                 schema: Some(json!({"type":"object"})),
             }),
