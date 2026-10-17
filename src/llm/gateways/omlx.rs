@@ -10,7 +10,7 @@
 
 use crate::error::{MojenticError, Result};
 use crate::llm::gateway::{
-    CompletionConfig, LlmGateway, ReasoningEffort, ResponseFormat, StreamChunk,
+    CompletionConfig, LlmGateway, ModelContextWindow, ReasoningEffort, ResponseFormat, StreamChunk,
 };
 use crate::llm::gateways::openai::{add_response_format, openai_response_evidence};
 use crate::llm::gateways::openai_legacy_stream::{
@@ -423,6 +423,21 @@ fn legacy_chunks(parser: &mut OpenAiLegacyParser, line: &str) -> Vec<StreamChunk
 
 #[async_trait]
 impl LlmGateway for OmlxGateway {
+    async fn get_model_context_window(&self, model: &str) -> Result<Option<ModelContextWindow>> {
+        let response = success(self.request(Method::GET, "/models", false).send().await?).await?;
+        let body: Value = response.json().await?;
+        let models = body["data"]
+            .as_array()
+            .ok_or_else(|| MojenticError::GatewayError("Invalid response format".into()))?;
+        let Some(entry) = models.iter().find(|entry| entry["id"].as_str() == Some(model)) else {
+            return Ok(None);
+        };
+        entry
+            .get("max_model_len")
+            .map(|value| ModelContextWindow::advertised(value, "max_model_len".into()))
+            .transpose()
+    }
+
     async fn complete(
         &self,
         model: &str,

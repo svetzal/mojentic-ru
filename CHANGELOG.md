@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Async `LlmGateway::get_model_context_window` reports positive provider-advertised
+  capacity, field provenance and optional Ollama model `num_ctx`. Ollama uses
+  `/api/show`, oMLX uses authenticated `/v1/models`, and OpenAI uses exact local
+  registry entries without HTTP. Unknown windows remain `None`; third-party
+  gateways retain a default implementation, and recovery wrappers delegate.
+- Pure `OllamaGateway::effective_context_window` applies explicit/model context
+  precedence and maximum clamping without changing completion requests.
+  Versioned section-1 contract tests reuse coordinating provider captures;
+  external provider and microgentic paired verification remain outstanding.
+
 - Executable `recovery-status-selection-v1` evidence for HTTP 500/502 across
   Ollama, oMLX and OpenAI gateway/broker/session entrypoints: paired caller status
   and category selections, captured immutable HTTP payloads, attempt identities

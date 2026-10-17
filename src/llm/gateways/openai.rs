@@ -4,7 +4,9 @@
 //! including chat completions, streaming, and embeddings.
 
 use crate::error::{MojenticError, Result};
-use crate::llm::gateway::{CompletionConfig, LlmGateway, ResponseFormat, StreamChunk};
+use crate::llm::gateway::{
+    CompletionConfig, LlmGateway, ModelContextWindow, ResponseFormat, StreamChunk,
+};
 use crate::llm::gateways::openai_legacy_stream::{legacy_body_stream, OpenAiLegacyParser};
 use crate::llm::gateways::openai_messages_adapter::{adapt_messages_to_openai, convert_tool_calls};
 use crate::llm::gateways::openai_model_registry::{get_model_registry, ModelType};
@@ -252,6 +254,15 @@ impl Default for OpenAIGateway {
 
 #[async_trait]
 impl LlmGateway for OpenAIGateway {
+    async fn get_model_context_window(&self, model: &str) -> Result<Option<ModelContextWindow>> {
+        get_model_registry()
+            .registered_context_window(model)
+            .map(|tokens| {
+                ModelContextWindow::advertised(&serde_json::json!(tokens), "registry".into())
+            })
+            .transpose()
+    }
+
     async fn complete(
         &self,
         model: &str,

@@ -26,6 +26,7 @@
   - [Realtime Voice](realtime.md)
   - [Agent Delegation](core/agent_delegation.md)
   - [Chat Sessions with Tools](core/chat_sessions_with_tools.md)
+  - [Model Context Windows](core/model_metadata.md)
   - [OpenAI Model Registry](core/openai_model_registry.md)
   - [oMLX Gateway](core/omlx.md)
   - [Request Controls and 3.0 Migration](core/request_fidelity.md)

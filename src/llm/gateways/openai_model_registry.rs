@@ -453,6 +453,10 @@ impl OpenAIModelRegistry {
             .insert("text-moderation".to_string(), ModelType::Moderation);
     }
 
+    pub(crate) fn registered_context_window(&self, model: &str) -> Option<u32> {
+        self.models.get(model).and_then(|caps| caps.max_context_tokens)
+    }
+
     /// Get the capabilities for a specific model.
     pub fn get_model_capabilities(&self, model_name: &str) -> ModelCapabilities {
         // Direct lookup first

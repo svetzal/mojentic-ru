@@ -1,6 +1,6 @@
 use crate::error::{MojenticError, Result};
 use crate::llm::gateway::{
-    CompletionConfig, LlmGateway, StreamChunk, StreamMetrics, StreamProgress,
+    CompletionConfig, LlmGateway, ModelContextWindow, StreamChunk, StreamMetrics, StreamProgress,
 };
 use crate::llm::gateways::ollama_stream_events::OllamaEventParser;
 use crate::llm::models::{
@@ -84,6 +84,20 @@ impl OllamaGateway {
         self.client.post(format!("{}/api/chat", self.config.host)).json(body)
     }
 
+    /// Resolve the request's context capacity without sending a request.
+    /// Explicit `num_ctx` takes precedence over the model parameter; both are
+    /// clamped to the advertised maximum. With neither, this is an upper bound
+    /// because the server's `OLLAMA_CONTEXT_LENGTH` is unknown to the client.
+    pub fn effective_context_window(
+        window: Option<&ModelContextWindow>,
+        config: &CompletionConfig,
+    ) -> Option<usize> {
+        window.map(|window| {
+            let maximum = window.max_context_tokens.get();
+            maximum.min(config.num_ctx.or(window.model_num_ctx).unwrap_or(maximum))
+        })
+    }
+
     /// Pull a model from Ollama library
     pub async fn pull_model(&self, model: &str) -> Result<()> {
         info!("Pulling Ollama model: {}", model);
@@ -117,6 +131,50 @@ impl Default for OllamaGateway {
 
 #[async_trait]
 impl LlmGateway for OllamaGateway {
+    async fn get_model_context_window(&self, model: &str) -> Result<Option<ModelContextWindow>> {
+        let mut request = self
+            .client
+            .post(format!("{}/api/show", self.config.host.trim_end_matches('/')))
+            .json(&serde_json::json!({"model": model}));
+        for (key, value) in &self.config.headers {
+            request = request.header(key, value);
+        }
+        let response = request.send().await?;
+        if !response.status().is_success() {
+            return Err(MojenticError::GatewayError(format!(
+                "Failed to show model {model}: {}",
+                response.status()
+            )));
+        }
+        let body: Value = response.json().await?;
+        if !body.is_object() {
+            return Err(MojenticError::GatewayError("Invalid response format".into()));
+        }
+        let Some(info) = body.get("model_info") else {
+            return Ok(None);
+        };
+        let info = info
+            .as_object()
+            .ok_or_else(|| MojenticError::GatewayError("Invalid model_info".into()))?;
+        let Some((key, value)) = info.iter().find(|(key, _)| key.ends_with(".context_length"))
+        else {
+            return Ok(None);
+        };
+        let mut window = ModelContextWindow::advertised(value, format!("model_info.{key}"))?;
+        if let Some(parameters) = body.get("parameters") {
+            let parameters = parameters
+                .as_str()
+                .ok_or_else(|| MojenticError::GatewayError("Invalid parameters".into()))?;
+            window.model_num_ctx = parameters.lines().find_map(|line| {
+                let mut parts = line.split_whitespace();
+                (parts.next() == Some("num_ctx"))
+                    .then(|| parts.next().and_then(|n| n.parse().ok()))
+                    .flatten()
+            });
+        }
+        Ok(Some(window))
+    }
+
     async fn complete(
         &self,
         model: &str,

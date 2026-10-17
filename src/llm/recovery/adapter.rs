@@ -2,7 +2,7 @@ use super::{engine, *};
 use crate::{
     error::{MojenticError, Result},
     llm::{
-        gateway::{CompletionConfig, LlmGateway, StreamChunk},
+        gateway::{CompletionConfig, LlmGateway, ModelContextWindow, StreamChunk},
         models::{LlmGatewayResponse, LlmMessage},
         stream_events::{StreamEventError, StreamEventStream},
         tools::LlmTool,
@@ -158,6 +158,10 @@ fn legacy(error: RecoveryError) -> MojenticError {
 }
 #[async_trait]
 impl<G: RecoveryProvider> LlmGateway for RecoveryGateway<G> {
+    async fn get_model_context_window(&self, model: &str) -> Result<Option<ModelContextWindow>> {
+        self.inner.get_model_context_window(model).await
+    }
+
     async fn complete(
         &self,
         model: &str,

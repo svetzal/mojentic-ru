@@ -1,6 +1,146 @@
 # Rust 3.0.0 scoped conformance
 
-## Current correction: request fidelity, model-metadata sections 3–3.6
+## Current correction: model-metadata section 1
+
+Tested Rust baseline: `50387e33ba46e5b67737f70b6918bd6581b1b96b` plus this
+uncommitted working-tree correction. This section is the current scoped record;
+all earlier corrections recorded below retain historical identities and results.
+The initiative brief SHA-256 was verified as
+`ea6a0efa56bfb3cd74b5ce728f80cc33c6fbd853114bec94b8aabe79f5d28e6e`.
+The coordinating repository was clean for the relevant inputs at
+`4b08dcd1d87f520a4c70928c33a2bc84c228093d`.
+
+The binding input is MODEL-METADATA-2026-10.md **section 1**. First-token timing,
+packaging, registry migration and coordinated publication are outside this
+correction. Existing request-fidelity, native reasoning and completed recovery
+behavior are preserved. Edition 2021, stable CI toolchain, Tokio, feature flags,
+formatting, dependencies and versions are unchanged. No MSRV or workspace
+resolver is declared; adding an MSRV remains a separately authorized recommendation.
+The absent, gitignored Cargo.lock is generated only for local gate execution.
+No Git refs or sibling repository files were changed.
+
+### Characterization and executable mapping
+
+Before implementation, the gateway trait offered no metadata operation.
+Ollama completion requests use `/api/chat` and caller `num_ctx` only;
+oMLX uses the configured `/v1` host and bearer authentication. Existing OpenAI
+completion capability lookup uses exact entries followed by pattern/default
+fallback. RecoveryGateway delegates model listing/embeddings but previously had
+no metadata delegation. These paths were inspected before changing the boundary.
+The new operation has a compatibility default returning `Ok(None)`; its oMLX
+boundary probe first failed because this default supplied no window, then passed
+with the real HTTP implementation. Exact selected capacity/provenance and auth
+were exercised, not a marker or case-count change.
+
+| Named test in `tests/model_metadata.rs` | Exact behavior verified |
+| --- | --- |
+| `section1_configured_authenticated_boundary` | Configured host, bearer key, GET `/v1/models`, selected id, 262144 tokens, `max_model_len`, absent model parameter |
+| `section1_http_contract_exact_outcomes_direct_and_wrapped` | Both Ollama architecture prefixes, model selection, optional fields, not-advertised results, malformed/nonpositive/noninteger windows, transport JSON errors, 401/404/429/500/502 statuses, captured unknown-model 404; same outcomes through recovery wrappers |
+| `section1_registry_exact_lookup_is_request_free` | Exact registered OpenAI values/provenance, unknown models including familiar prefixes yield None; no requests, including with unreachable host; direct and wrapped |
+| `section1_effective_precedence_and_clamping` | Explicit configuration precedes model parameter, each clamps to maximum, absent controls use advertised upper bound, absent window remains None even with config |
+| `section1_transport_failure_direct_and_wrapped` | Existing HTTP error variant survives direct and wrapped Ollama/oMLX lookup |
+| `section1_lookup_preserves_subsequent_completion_payload` | Exact completion requests before/after metadata, all three adapters direct/wrapped, unset and explicit context/output/temperature controls; response behavior retained |
+| `section1_existing_third_party_gateway_is_source_compatible` | Existing implementation compiles without new method and returns None |
+| `section1_contract_reuses_coordinating_captures` | Contract's embedded provider bodies remain byte-identical to coordinating captures |
+
+The preservation tests characterize the existing `stream: false` field on
+recovery completion requests and its omission on direct oMLX/OpenAI requests;
+this difference is retained. Metadata does not use completion recovery/admission
+or mutate config or request state. Pure helper results are application inputs,
+not changes to later requests. Without configured/model `num_ctx`, the result is
+an upper bound because the server's context setting is unknown.
+
+### Contract identity and paired verification gap
+
+Executable artifact: `tests/contracts/model_metadata_section1_v1.json`, version
+**model-metadata-section1-v1**, SHA-256:
+`617c0df913416e8cbfa5873256d427857c1f998103b9b04a4e2b3a456d07ac07`.
+Provider citations, source specification hash and compatibility limits are in
+`tests/contracts/MODEL-METADATA-SECTION1.md`. The existing JSON-fixture mechanism
+is reused; no applicable section-1 executable set was present in the coordinating
+checkout. The captured Ollama 0.40.5 and oMLX 0.7.0rc1 bodies are reused verbatim;
+edge inputs exercise the agreed section-1 semantics without new contract policy.
+OpenAI registry values and completion inference remain unchanged.
+
+Local provider-adapter verification command:
+`cargo test --all-features --test model_metadata` (exit **0**, all eight named
+behavioral tests pass). The same verifier runs in default/all-feature tests and
+the existing tarpaulin required gate; no new gate opt-in is needed.
+
+**External provider and microgentic verification are missing and unfinished.**
+Fixture-derived doubles establish local conformance only. No live provider
+implementation ran this executable set/hash, so there is no tested provider
+commit or provider verification command/result from this run. Captures are
+historical evidence, not renewed provider verification. No microgentic commit
+was tested against this set/hash and no consumer command/result is available.
+The initiative records microgentic at `e71b387e`, retaining Mojentic pin `4ca1ed2`
+and local metadata/timing modules; neither identity was verified here. Initiative
+coordination must arrange both sides' verification of this identical version/hash
+in their required gates, record tested commits/commands/results, and preserve
+benchmark continuity and the owner hold. No cross-repository compatibility,
+consumer migration, whole-3.0 certification or publication readiness is claimed.
+
+### Frozen implementation and verifier identities
+
+SHA-256 values below identify the uncommitted source tested, alongside the
+baseline commit and contract hash. Documentation-only result updates follow gates.
+
+```text
+b52db0c75eb501208deab98e840393759e0ffed29ba76e3fd74cdde0d7238f58  src/llm/gateway.rs
+cc529729358f3602a76143eaabf3612b2c84cabc19f8ba8158c81ca34b3d79f8  src/llm/gateways/ollama.rs
+1ca5b9bff6ff207941eb9f6820efeb51b6787764e6297be96af0a2666917e78e  src/llm/gateways/omlx.rs
+aa453a329763c80ddb66a56cdf3c7f6ba0572f6d6277e86e272f3e35e0554ba0  src/llm/gateways/openai.rs
+621481427425d9f3d656a0fa3f29189316a2c8d0aa45c277390423d6e7df22ec  src/llm/gateways/openai_model_registry.rs
+feac5313c4ed2ca1fb6c8d46f5899351d515c72bbdf0f188ba97bd4013b3013e  src/llm/recovery/adapter.rs
+64607798f10ea5c7391780d7f8d7ec68bac0c7665a60502cd582f4c79fc3596e  src/llm/mod.rs
+50171be5e176982d9c7df56d4105c8b8d7397ecb34aa1cfbb000d47d7b0f185a  tests/model_metadata.rs
+```
+
+### Section-1 verification results
+
+All commands used `/home/svetzal/.cargo/bin` on PATH and writable
+`CARGO_HOME=/tmp/mojentic-c2-cargo`; output was captured with `foundry capture`.
+Results refer to the frozen source and contract identities above.
+
+| Exact command | Exit | Result |
+| --- | --- | --- |
+| `cargo fmt --check` | 0 | Passed |
+| `cargo clippy --all-targets --all-features -- -D warnings` | 0 | Passed |
+| `cargo test --verbose --all-features` | 0 | 705 passed, including 8 metadata verifier tests and 20 doctests; 24 existing ignored doctests |
+| `cargo build --verbose --all-features` | 0 | Passed |
+| `cargo tarpaulin --all-features --fail-under 56` | 0 | 70.70%, 3410/4823 lines; 8 metadata, 66 recovery and 12 request-fidelity tests passed under instrumentation |
+| `cargo deny check` | 0 | Advisories, bans, licenses and sources passed; existing duplicate-version warnings |
+| `cargo audit` | 0 | 267 locked dependencies scanned; no vulnerabilities reported |
+| `cargo test` | 0 | 705 passed; 24 existing ignored doctests |
+| `cargo doc --no-deps --all-features` | 0 | Passed; two existing rustdoc warnings |
+| `mdbook build book` | 0 | HTML emitted, exit 0; existing search-configuration diagnostic |
+| `cargo fetch` | 0 | CI setup dependency fetch passed |
+| `cargo test --all-features --test model_metadata` | 0 | Final frozen-source targeted verifier: all 8 named tests passed |
+
+The book example was also extracted and compiled against the built library with
+`rustc --edition=2021 --crate-type lib` (exit 0; expected unused-example warning).
+No live server is required to compile the example.
+
+Rustdoc retains the pre-existing unresolved `connect` link in
+`src/realtime/broker.rs` and unclosed `dyn` tag in `src/examples/react/events.rs`.
+Installed mdBook retains the pre-existing `truncate-long-entries` search-setting
+diagnostic and still emits HTML with exit 0. These checks are not claimed
+warning-free. Generated heading-only `examples.md` and `use_cases.md` placeholders
+were removed after the book build. No dependency, gate or advisory policy was
+changed. The final source/contract hashes and behavioral rejection/correction
+evidence were validated; the actual probe exits were 101 and 0.
+
+All eleven discovered project/applicable CI checks passed. The targeted contract
+verifier also passed. Changes remain uncommitted for Foundry; no publication,
+tagging or Git finalization occurred. Suggested commit message:
+`Add provider-advertised model context metadata`.
+
+Stacey's binding reconciliation is preserved: renewed passing coverage evidence
+permits progress, the historical unexplained failure remains low severity, and
+further reproduction is not requested. The coverage engine, assertions,
+timeouts, test scope and **56%** floor remain unchanged.
+
+## Historical correction: request fidelity, model-metadata sections 3–3.6
 
 Tested baseline: `e80c0a454cbb2677e70ebd56a78795457acef8f6` plus the
 uncommitted correction in this worktree. This section supersedes current-source

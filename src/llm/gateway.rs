@@ -107,9 +107,49 @@ impl Default for CompletionConfig {
     }
 }
 
+/// Provider-advertised context capacity; independent of completion configuration.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ModelContextWindow {
+    /// Positive provider maximum, in tokens.
+    pub max_context_tokens: std::num::NonZeroUsize,
+    /// Provider field path, or `registry` for OpenAI.
+    pub field: String,
+    /// Ollama model parameter used when the request omits `num_ctx`.
+    pub model_num_ctx: Option<usize>,
+}
+
+impl ModelContextWindow {
+    pub(crate) fn advertised(value: &Value, field: String) -> Result<Self> {
+        let tokens = value
+            .as_u64()
+            .and_then(|n| usize::try_from(n).ok())
+            .and_then(std::num::NonZeroUsize::new)
+            .ok_or_else(|| {
+                crate::error::MojenticError::GatewayError(format!(
+                    "Invalid positive integer at {field}"
+                ))
+            })?;
+        Ok(Self {
+            max_context_tokens: tokens,
+            field,
+            model_num_ctx: None,
+        })
+    }
+}
+
 /// Abstract interface for LLM providers
 #[async_trait]
 pub trait LlmGateway: Send + Sync {
+    /// Query advertised context capacity without changing subsequent requests.
+    ///
+    /// Third-party gateways default to not advertised.
+    ///
+    /// # Errors
+    /// Returns the gateway's existing transport, status or malformed-body error.
+    async fn get_model_context_window(&self, _model: &str) -> Result<Option<ModelContextWindow>> {
+        Ok(None)
+    }
+
     /// Complete an LLM request with text response
     async fn complete(
         &self,
