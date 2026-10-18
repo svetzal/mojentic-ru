@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.1] - 2026-10-18
+
 ### Fixed
 
 - `OllamaGateway::get_model_context_window` returns a window for a model whose
