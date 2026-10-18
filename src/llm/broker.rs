@@ -521,6 +521,7 @@ impl LlmBroker {
                 &config,
             );
 
+            let mut stream_error = None;
             while let Some(chunk_result) = stream.next().await {
                 match chunk_result {
                     Ok(StreamChunk::Content(content)) => {
@@ -540,8 +541,8 @@ impl LlmBroker {
                         stream_evidence.usage = metrics.provider_usage;
                     }
                     Err(e) => {
-                        yield Err(e);
-                        return;
+                        stream_error = Some(e);
+                        break;
                     }
                 }
             }
@@ -577,6 +578,13 @@ impl LlmBroker {
                     "LlmBroker::generate_stream",
                     &correlation_id,
                 );
+            }
+
+            // Publish terminal timing before propagating the original error.
+            // Failed output must never reach tool execution or session history.
+            if let Some(error) = stream_error {
+                yield Err(error);
+                return;
             }
 
             // Handle tool calls if present

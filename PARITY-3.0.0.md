@@ -9,14 +9,17 @@ current source identities, package evidence and final verification results.
 | --- | --- |
 | 1. Transient recovery and October 12 amendment | Ollama/oMLX/OpenAI public HTTP gateway/broker/session matrices; exact capabilities and cited provider facilities; admission item 2 preserved |
 | 2. Native reasoning | Exact six efforts, caller profiles, separate history, opt-in retention, structured/stream/tool parity and explicit OpenAI restrictions |
-| 3. Context metadata, timing, request fidelity | Versioned public contracts; all maintained streaming boundaries; one retry clock and fresh tool-continuation clocks; packaged-consumer execution |
+| 3. Context metadata, timing, request fidelity | Versioned public contracts; all maintained streaming boundaries; one retry clock and fresh tool-continuation clocks; real post-token HTTP transport interruptions retain broker/session timing without partial assistant history; packaged-consumer execution |
 | 4. Kotlin iOS removal | Inapplicable to Rust; Kotlin verification belongs to its authorized task |
 | 5. Audit fixes and packaging | Negative num_predict cast removed with the separate field; crate allowlist excludes Foundry state; fresh extracted-artifact consumer verifies public APIs |
 
-Rust local readiness is verified: all required gates passed, coverage is
-71.35% against the unchanged 56% floor, and the fresh packaged consumer
-passed 151 public tests. The final source and contract hashes are in the
-conformance-linked audit records.
+Cycle 10 supersedes the direct text-stream timing sub-gap at `602d8a8`.
+Its versioned interruption cases cover thinking, content and tool arguments on
+all three providers through gateways, brokers and sessions. Original-source
+broker/session regressions reject missing timing; the corrected implementation
+passes. Current gates, coverage against the unchanged 56% floor, fresh packaged
+consumer results, and exact source/contract hashes are in the conformance-linked
+audit records. Cycle 9 records are preserved in `audit/readiness-cycle-9.json`.
 Stacey's library self-validation rule removes unreleased dependent/provider/other
 port snapshots as publication prerequisites. External tested commits/results are
 not claimed. Coordinated release approval still requires all six ports ready.

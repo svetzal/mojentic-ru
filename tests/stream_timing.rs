@@ -552,3 +552,225 @@ async fn section2_retry_does_not_relabel_prior_attempt_provider_usage() {
         second.assert_async().await;
     }
 }
+
+// Interrupt a real HTTP body only after the semantic frame has been observed.
+struct InterruptedClock {
+    script: Arc<ScriptClock>,
+    observed: Arc<tokio::sync::Notify>,
+}
+impl StreamClock for InterruptedClock {
+    fn now(&self) -> Duration {
+        let now = self.script.now();
+        if self.script.remaining() == 1 {
+            self.observed.notify_one();
+        }
+        now
+    }
+}
+
+async fn verify_transport_interruption(entry: &str) {
+    use mojentic::{
+        llm::{ChatSession, LlmBroker},
+        tracer::{EventStore, LlmResponseTracerEvent, TracerSystem},
+    };
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let contract = artifact();
+    for provider in ["ollama", "omlx", "openai"] {
+        for case in contract["transport_interruption"]["providers"][provider]
+            .as_array()
+            .expect("interruption cases")
+        {
+            let observed = Arc::new(tokio::sync::Notify::new());
+            let script = ScriptClock::new(&[
+                contract["clock"]["dispatch"].as_u64().expect("dispatch"),
+                contract["clock"]["first"].as_u64().expect("first"),
+                contract["clock"]["terminal"].as_u64().expect("terminal"),
+            ]);
+            let clock = Arc::new(InterruptedClock {
+                script: script.clone(),
+                observed: observed.clone(),
+            });
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.expect("listen");
+            let url = format!("http://{}", listener.local_addr().expect("address"));
+            let body = case["body"].as_str().expect("contract frame").to_owned();
+            let server = tokio::spawn(async move {
+                let (mut socket, _) = listener.accept().await.expect("accept");
+                let mut request = Vec::new();
+                let mut buffer = [0; 4096];
+                loop {
+                    let n = socket.read(&mut buffer).await.expect("request");
+                    assert!(n > 0);
+                    request.extend_from_slice(&buffer[..n]);
+                    if let Some(end) = request.windows(4).position(|w| w == b"\r\n\r\n") {
+                        let headers = String::from_utf8_lossy(&request[..end]);
+                        let length: usize = headers
+                            .lines()
+                            .find_map(|line| {
+                                line.to_ascii_lowercase()
+                                    .strip_prefix("content-length: ")
+                                    .map(str::to_owned)
+                            })
+                            .expect("length")
+                            .parse()
+                            .expect("length number");
+                        if request.len() >= end + 4 + length {
+                            assert!(
+                                headers.starts_with(&format!("POST {} HTTP/1.1", path(provider)))
+                            );
+                            let payload: Value =
+                                serde_json::from_slice(&request[end + 4..end + 4 + length])
+                                    .expect("JSON request");
+                            assert_eq!(payload["stream"], true);
+                            assert_eq!(payload["model"], "gpt-4o");
+                            assert_eq!(
+                                payload["messages"]
+                                    .as_array()
+                                    .expect("messages")
+                                    .last()
+                                    .expect("query")["content"],
+                                "question"
+                            );
+                            break;
+                        }
+                    }
+                }
+                socket.write_all(format!("HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n{:x}\r\n{}\r\n", body.len(), body).as_bytes()).await.expect("frame");
+                tokio::time::timeout(Duration::from_secs(10), observed.notified())
+                    .await
+                    .expect("semantic observation before interruption");
+                // Deliberately omit the HTTP terminating zero chunk: this is a
+                // transport error, not a normally completed provider body.
+                socket.shutdown().await.expect("interrupt");
+            });
+            let gateway = gateway(provider, &url, clock, false, 1);
+            let evidence = Arc::new(Mutex::new(Vec::<Value>::new()));
+            let captured = evidence.clone();
+            let store = Arc::new(EventStore::new(Some(Arc::new(move |event| {
+                if let Some(response) =
+                    event.as_any().and_then(|e| e.downcast_ref::<LlmResponseTracerEvent>())
+                {
+                    captured
+                        .lock()
+                        .expect("trace")
+                        .push(serde_json::to_value(&response.evidence.metadata).expect("metadata"));
+                }
+            }))));
+            let broker = LlmBroker::new(
+                "gpt-4o",
+                gateway.clone(),
+                Some(Arc::new(TracerSystem::new(Some(store), true))),
+            );
+            let check_error = |item: &mojentic::error::Result<String>| {
+                if item.is_err() {
+                    let retained = evidence.lock().expect("evidence at error delivery");
+                    assert_eq!(
+                        retained.len(),
+                        1,
+                        "{provider}/{entry}: evidence before error delivery"
+                    );
+                    assert_timing(&retained[0], case);
+                }
+            };
+            let messages = [LlmMessage::user("question")];
+            let metrics = if entry == "gateway" {
+                let events: Vec<_> = gateway
+                    .complete_stream("gpt-4o", &messages, None, &CompletionConfig::default())
+                    .collect()
+                    .await;
+                assert_transport_error(events.last().expect("terminal"));
+                assert!(matches!(events[events.len() - 2], Ok(StreamChunk::Metrics(_))));
+                let text: Vec<_> = events
+                    .iter()
+                    .filter_map(|event| match event {
+                        Ok(StreamChunk::Content(text)) => Some(text),
+                        _ => None,
+                    })
+                    .collect();
+                assert_eq!(serde_json::to_value(text).expect("gateway text"), case["text_chunks"]);
+                events
+                    .iter()
+                    .find_map(|item| match item {
+                        Ok(StreamChunk::Metrics(m)) => {
+                            Some(serde_json::to_value(m).expect("metrics"))
+                        }
+                        _ => None,
+                    })
+                    .expect("gateway timing")
+            } else {
+                let events = if entry == "session" {
+                    let mut session = ChatSession::builder(broker).build();
+                    session.insert_message(LlmMessage::assistant("previous answer"));
+                    let before = session.messages().to_vec();
+                    let events = session
+                        .send_stream("question")
+                        .inspect(check_error)
+                        .collect::<Vec<_>>()
+                        .await;
+                    assert_eq!(session.messages().len(), before.len() + 1);
+                    for (old, retained) in before.iter().zip(session.messages()) {
+                        assert_eq!(
+                            serde_json::to_value(&old.message).expect("old"),
+                            serde_json::to_value(&retained.message).expect("retained")
+                        );
+                    }
+                    assert_eq!(
+                        serde_json::to_value(&session.messages().last().expect("user").message)
+                            .expect("user"),
+                        serde_json::to_value(LlmMessage::user("question")).expect("expected user")
+                    );
+                    events
+                } else {
+                    broker
+                        .generate_stream(&messages, None, None, None)
+                        .inspect(check_error)
+                        .collect::<Vec<_>>()
+                        .await
+                };
+                let text: Vec<_> = events.iter().filter_map(|event| event.as_ref().ok()).collect();
+                assert_eq!(serde_json::to_value(text).expect("text"), case["text_chunks"]);
+                assert_transport_error(events.last().expect("terminal"));
+                let retained = evidence.lock().expect("evidence");
+                assert_eq!(retained.len(), 1, "{provider}/{entry}: terminal response evidence");
+                assert_timing(&retained[0]["stream_metrics"], case);
+                retained[0].clone()
+            };
+            assert_timing(&metrics, case);
+            assert_eq!(script.remaining(), 0);
+            server.await.expect("HTTP server");
+        }
+    }
+}
+
+fn assert_transport_error<T: std::fmt::Debug>(terminal: &mojentic::error::Result<T>) {
+    match terminal {
+        Err(mojentic::error::MojenticError::HttpError(error)) => {
+            use std::error::Error;
+            assert!(error.is_body() || error.is_decode(), "HTTP body interruption: {error:?}");
+            let mut cause = error.source();
+            let mut unexpected_eof = false;
+            while let Some(source) = cause {
+                unexpected_eof |= source
+                    .downcast_ref::<std::io::Error>()
+                    .is_some_and(|io| io.kind() == std::io::ErrorKind::UnexpectedEof);
+                cause = source.source();
+            }
+            assert!(unexpected_eof, "original transport EOF cause retained: {error:?}");
+        }
+        other => panic!("expected actual HTTP body error, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn section2_transport_interruption_gateway() {
+    verify_transport_interruption("gateway").await;
+}
+
+#[tokio::test]
+async fn section2_transport_interruption_broker() {
+    verify_transport_interruption("broker").await;
+}
+
+#[tokio::test]
+async fn section2_transport_interruption_session() {
+    verify_transport_interruption("session").await;
+}

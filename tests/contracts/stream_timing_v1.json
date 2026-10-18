@@ -340,5 +340,96 @@
     "ollama": "{\"message\": {\"tool_calls\": [{\"id\": \"inspect-1\", \"function\": {\"name\": \"inspect\", \"arguments\": {}}}]}, \"done\": false}\n{\"message\": {}, \"done\": true, \"done_reason\": \"stop\"}\n",
     "omlx": "data: {\"choices\": [{\"delta\": {\"tool_calls\": [{\"id\": \"inspect-1\", \"function\": {\"name\": \"inspect\", \"arguments\": \"{}\"}, \"index\": 0, \"type\": \"function\"}]}, \"finish_reason\": \"tool_calls\"}]}\n\ndata: [DONE]\n\n",
     "openai": "data: {\"choices\": [{\"delta\": {\"tool_calls\": [{\"id\": \"inspect-1\", \"function\": {\"name\": \"inspect\", \"arguments\": \"{}\"}, \"index\": 0, \"type\": \"function\"}]}, \"finish_reason\": \"tool_calls\"}]}\n\ndata: [DONE]\n\n"
+  },
+  "transport_interruption": {
+    "version": "rust-stream-timing-transport-interruption-v1",
+    "http_framing": "chunked body closed after semantic observation, without terminating zero chunk",
+    "terminal_error": "http_body_error",
+    "providers": {
+      "ollama": [
+        {
+          "name": "content-transport-interruption",
+          "body": "{\"message\":{\"content\":\"answer\"},\"done\":false}\n",
+          "first_token_kind": "content",
+          "time_to_first_token_ms": 25,
+          "request_duration_ms": 60,
+          "text_chunks": [
+            "answer"
+          ]
+        },
+        {
+          "name": "thinking-transport-interruption",
+          "body": "{\"message\":{\"thinking\":\"reason\"},\"done\":false}\n",
+          "first_token_kind": "thinking",
+          "time_to_first_token_ms": 25,
+          "request_duration_ms": 60,
+          "text_chunks": []
+        },
+        {
+          "name": "tool_call-transport-interruption",
+          "body": "{\"message\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{\"}}]},\"done\":false}\n",
+          "first_token_kind": "tool_call",
+          "time_to_first_token_ms": 25,
+          "request_duration_ms": 60,
+          "text_chunks": []
+        }
+      ],
+      "omlx": [
+        {
+          "name": "content-transport-interruption",
+          "body": "data: {\"choices\":[{\"delta\":{\"content\":\"answer\"}}]}\n\n",
+          "first_token_kind": "content",
+          "time_to_first_token_ms": 25,
+          "request_duration_ms": 60,
+          "text_chunks": [
+            "answer"
+          ]
+        },
+        {
+          "name": "thinking-transport-interruption",
+          "body": "data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"reason\"}}]}\n\n",
+          "first_token_kind": "thinking",
+          "time_to_first_token_ms": 25,
+          "request_duration_ms": 60,
+          "text_chunks": []
+        },
+        {
+          "name": "tool_call-transport-interruption",
+          "body": "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{\"}}]}}]}\n\n",
+          "first_token_kind": "tool_call",
+          "time_to_first_token_ms": 25,
+          "request_duration_ms": 60,
+          "text_chunks": []
+        }
+      ],
+      "openai": [
+        {
+          "name": "content-transport-interruption",
+          "body": "data: {\"choices\":[{\"delta\":{\"content\":\"answer\"}}]}\n\n",
+          "first_token_kind": "content",
+          "time_to_first_token_ms": 25,
+          "request_duration_ms": 60,
+          "text_chunks": [
+            "answer"
+          ]
+        },
+        {
+          "name": "thinking-transport-interruption",
+          "body": "data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"reason\"}}]}\n\n",
+          "first_token_kind": "thinking",
+          "time_to_first_token_ms": 25,
+          "request_duration_ms": 60,
+          "text_chunks": []
+        },
+        {
+          "name": "tool_call-transport-interruption",
+          "body": "data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"index\":0,\"function\":{\"arguments\":\"{\"}}]}}]}\n\n",
+          "first_token_kind": "tool_call",
+          "time_to_first_token_ms": 25,
+          "request_duration_ms": 60,
+          "text_chunks": []
+        }
+      ]
+    }
   }
 }

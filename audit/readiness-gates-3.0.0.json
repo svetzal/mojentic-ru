@@ -1,13 +1,12 @@
 {
-  "base_commit": "8ac38ea134af7816c6fdd02e07a420ed3be1a2f4",
-  "authorized_start": "ac81c44fff024d9675417d4da6d1f24134cc4eac",
+  "cycle": 10,
+  "base_commit": "602d8a8d0262c57ac95cb97df950ea392de2f3ae",
+  "working_tree_correction": true,
+  "started_at": "2026-10-18T00:45:50.690443+00:00",
   "toolchain": "rustc 1.99.0 (b940084d7 2026-09-28)",
-  "cargo_lock_sha256": "390c599335be1aed77a5ff897c5f053631e31611d89ac66e2b06cd056e29034d",
-  "tested_source_hashes": {
+  "source_hashes": {
     "Cargo.toml": "99262be549ca21294b9799ac8841bb6cd337c9f3478af531e937069fff737f73",
-    "rustfmt.toml": "cac8e85e03d216c9142996f15fabbfa662a953b6993fb49f07b3161f229f2f6f",
-    "tarpaulin.toml": "6d75f013119b56c7a35d51a9dac9fb51964c30724721397123e77f842db2d95c",
-    "deny.toml": "f6a910cb2627f39b61103da8ce20d260477571e4f6c01de26f101b23fd25270b",
+    "scripts/verify_package.py": "01cfecc0febc2a010877ec9293d3939f6c60a28fc18e6f6b3aa533327431a9ac",
     "src/agents/async_aggregator_agent.rs": "ddb25c22fd87b966f5e6f0adcc39e6402dea646b9bc8fb896082008d303b8f32",
     "src/agents/async_llm_agent.rs": "f8a19a4d893f3a89837a55cd1e827f152bc47d04ee5f9159d1c8446cb8139fd1",
     "src/agents/base_agent.rs": "b52d7928973345383b22a992d82857d397566d85f36519f17e16aadd7a0abf48",
@@ -30,7 +29,7 @@
     "src/examples/react/thinking_agent.rs": "7a7f1088df95579e5c19166453d1192f0e2b687d1d9cc2bc4f9397299e20fba0",
     "src/examples/react/tool_call_agent.rs": "8632f6ded030d5cbb5c328eb065def66d603164c13f91574cf6f68739f1562ec",
     "src/lib.rs": "c8a3891ab74c022dae401f4474a7de4f708733e48a75fc4fdbf1d5b346eecf00",
-    "src/llm/broker.rs": "44aa2d2bf8667ce5f8dd607b743e15975434d3a33a7509b02228a2f3000ad8c2",
+    "src/llm/broker.rs": "80443744ac055096d4067438c2fd5c019cc0de3ed2769888f025ea315f81d0d4",
     "src/llm/chat_session.rs": "b45b6eb0dd59c65a41e918915f8e17f73310491211092cbe648988a420f2c0ee",
     "src/llm/gateway.rs": "c170c2a3423d1d47b97c727cf1237c5439374976a9740a65d00d6ababa56cc7d",
     "src/llm/gateways/mod.rs": "960a884aee3ec220e8b91b8cf88e7af0e70931dea67180787aed4360e1ac2a72",
@@ -97,7 +96,7 @@
     "tests/contracts/recovery_capabilities_v1.json": "40e8da683ce4bfcfebf9892ca51a53a701488d463977f021922cd6317203aa76",
     "tests/contracts/recovery_status_selection_v1.json": "8250dd928817d3634eb239f90dbeee908398f8fcbba8623ba2913278fba19b30",
     "tests/contracts/request_fidelity_v1.json": "6f02088311f50707b9c12154d888f844928c23d359043cb2e5d5654bf7e5eaea",
-    "tests/contracts/stream_timing_v1.json": "83bc48949b4a81eb0730b3c0f1f5d20bf9d3360eead3bfc504b0adcc53364755",
+    "tests/contracts/stream_timing_v1.json": "efb8271a85620c75db34f7c504a65d42fdc97e9868d08a280ce558aa0c092fba",
     "tests/contracts/typed_errors_v1.json": "48d957ccdabc9fa606d9e1fa32f7969c7f0c61259b6072c832eb0778e3450aee",
     "tests/fixtures/ollama/README.md": "280fb1f2156bc5ac3a2fb37e61924e5a6688637d2c65432a388659159f5579eb",
     "tests/fixtures/ollama/error_model_not_found.json": "f5302087e61a9af18abef1b9315b226aa8dfab326ed1751d4bff12b05e1b9dab",
@@ -129,101 +128,115 @@
     "tests/reasoning_contract.rs": "779e45c16fa5265e4487fa3dcc4b074988b9588e368cab7a112eed894981e269",
     "tests/recovery.rs": "6a78af7ebc787566eed623eed7f02a2672dea73f1fb22ad5b6511cb3f2cac801",
     "tests/request_fidelity.rs": "80f7b30a1becf5a3f8f5f8e3cffd2da1d0fe9927e0bdea85790fcf5a3048bb6b",
-    "tests/stream_timing.rs": "d9705d4505fec2fd5b55b3bcaa04b4688051b45140925003355cddf0da0e45c0",
-    "scripts/verify_package.py": "ced4633210ae6d9f6eb4842fc80fa016003453bea694ed4987bf695b47b6851f"
+    "tests/stream_timing.rs": "86375c4efa2deda9a2eaa79dd41d530b2db7fef0a568876c878f8eaef640c71c"
+  },
+  "contracts": {
+    "tests/contracts/stream_timing_v1.json": "efb8271a85620c75db34f7c504a65d42fdc97e9868d08a280ce558aa0c092fba",
+    "tests/contracts/recovery_capabilities_v1.json": "40e8da683ce4bfcfebf9892ca51a53a701488d463977f021922cd6317203aa76",
+    "tests/contracts/typed_errors_v1.json": "48d957ccdabc9fa606d9e1fa32f7969c7f0c61259b6072c832eb0778e3450aee",
+    "tests/contracts/request_fidelity_v1.json": "6f02088311f50707b9c12154d888f844928c23d359043cb2e5d5654bf7e5eaea",
+    "tests/contracts/recovery_status_selection_v1.json": "8250dd928817d3634eb239f90dbeee908398f8fcbba8623ba2913278fba19b30",
+    "tests/contracts/model_metadata_section1_v1.json": "617c0df913416e8cbfa5873256d427857c1f998103b9b04a4e2b3a456d07ac07"
+  },
+  "proof": {
+    "kind": "behavioral",
+    "source_change": "src/llm/broker.rs: retain terminal response evidence before returning the original gateway transport error; leave failed assistant output uncommitted",
+    "rejecting": {
+      "command": "cargo test --all-features --test stream_timing section2_transport_interruption",
+      "exit_code": 101
+    },
+    "corrected": {
+      "command": "cargo test --all-features --test stream_timing section2_transport_interruption",
+      "exit_code": 0
+    },
+    "rejecting_source": "Original src/llm/broker.rs at 602d8a8d0262c57ac95cb97df950ea392de2f3ae",
+    "corrected_source_sha256": "80443744ac055096d4067438c2fd5c019cc0de3ed2769888f025ea315f81d0d4"
   },
   "results": [
     {
       "command": "cargo fmt --check",
       "exit_code": 0,
-      "duration_seconds": 0.368
+      "duration_seconds": 0.376
     },
     {
       "command": "cargo clippy --all-targets --all-features -- -D warnings",
       "exit_code": 0,
-      "duration_seconds": 3.243
-    },
-    {
-      "command": "cargo test --all-features --test stream_timing section2_retry_keeps_first_dispatch_clock",
-      "exit_code": 0,
-      "duration_seconds": 12.361
+      "duration_seconds": 22.807
     },
     {
       "command": "cargo test --verbose --all-features",
       "exit_code": 0,
-      "duration_seconds": 80.407
+      "duration_seconds": 84.772
     },
     {
       "command": "cargo build --verbose --all-features",
       "exit_code": 0,
-      "duration_seconds": 2.361
+      "duration_seconds": 33.972
     },
     {
       "command": "cargo tarpaulin --all-features --fail-under 56",
       "exit_code": 0,
-      "duration_seconds": 434.384
+      "duration_seconds": 472.885
     },
     {
       "command": "cargo deny check",
       "exit_code": 0,
-      "duration_seconds": 1.208
+      "duration_seconds": 1.207
     },
     {
       "command": "cargo audit",
       "exit_code": 0,
-      "duration_seconds": 2.125
+      "duration_seconds": 1.371
     },
     {
       "command": "cargo test",
       "exit_code": 0,
-      "duration_seconds": 73.261
+      "duration_seconds": 87.148
     },
     {
       "command": "cargo test --no-default-features",
       "exit_code": 0,
-      "duration_seconds": 63.714
+      "duration_seconds": 90.651
     },
     {
       "command": "cargo doc --no-deps --all-features",
       "exit_code": 0,
-      "duration_seconds": 2.743
+      "duration_seconds": 25.111
     },
     {
       "command": "mdbook build book",
       "exit_code": 0,
-      "duration_seconds": 0.241
+      "duration_seconds": 0.483
     },
     {
       "command": "python3 scripts/verify_package.py",
       "exit_code": 0,
-      "duration_seconds": 151.932
+      "duration_seconds": 120.339
     }
   ],
-  "started_at": "2026-10-18T00:03:58.209228+00:00",
   "environment": {
-    "PATH_prefix": "/home/svetzal/.cargo/bin",
     "CARGO_HOME": "/tmp/mojentic-c2-cargo",
     "CARGO_TARGET_DIR": null
   },
-  "verification_note": "Complete fresh sweep after restoring required-provider deserialization; all commands use the same frozen source snapshot.",
-  "generated_book_placeholders_removed": [
-    "book/src/use_cases.md",
-    "book/src/examples.md"
-  ],
-  "finished_at": "2026-10-18T00:17:46.564791+00:00",
+  "prior_cycle": "audit/readiness-cycle-9.json",
+  "finished_at": "2026-10-18T01:01:31.871717+00:00",
+  "verification_note": "Full cycle-10 sweep on unchanged executable sources; same versioned HTTP interruption cases verified from source and fresh extracted package.",
   "certification": {
     "scope": "Rust library RELEASE-3.0.0 parts 1-5",
     "ready_for_coordinated_release_approval": true,
     "publication": "held",
     "registry_adoption": "held",
     "post_publication_install": "held",
-    "provider_tests_passed": 713,
+    "archive_sha256": "2f1fa8b6dc15186aea231e28db645323168c6f2cb4f510cceb0f8a7b8dbe7725",
+    "provider_tests_passed": 716,
     "provider_preexisting_ignored_doctests": 24,
-    "packaged_consumer_tests_passed": 151,
-    "coverage_percent": 71.35,
-    "covered_lines": 3563,
-    "measured_lines": 4994,
-    "archive_sha256": "5f8bd4efdafd2b931d7a7c8bdca67213a47d159e2ed70dc64551a2d8f74ffa7b",
-    "verified_at": "2026-10-18T00:18:04.831181+00:00"
-  }
+    "packaged_consumer_tests_passed": 154,
+    "coverage_percent": 71.33,
+    "covered_lines": 3565,
+    "measured_lines": 4998,
+    "verified_at": "2026-10-18T01:01:34.344294+00:00"
+  },
+  "execution_evidence": "Complete capture logs and behavioral proof archived by Foundry; audit records retain commands, actual exit codes and exact tested source identities.",
+  "resolved_lock_sha256": "390c599335be1aed77a5ff897c5f053631e31611d89ac66e2b06cd056e29034d",
+  "source_snapshot_sha256": "351d9c0ad63cc6374c671185081afbe4b4027eb907f67db5c9f2b60c1d7a23de"
 }

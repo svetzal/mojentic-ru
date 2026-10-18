@@ -159,6 +159,11 @@ at completion. `complete_stream_events` emits nonterminal `StreamEvent::Metrics`
 immediately before `Completed` or `Error`; keep polling for the terminal outcome.
 Completed and incomplete-completion evidence also carry client fields in metadata.
 Preserve the metrics event when collecting errors that have no provider evidence.
+`LlmBroker::generate_stream` and `ChatSession::send_stream` expose terminal timing
+through `LlmResponseTracerEvent.evidence.metadata` when tracing is enabled,
+including when the HTTP body is interrupted after a semantic token. The original
+error still terminates the text stream. A failed session retains the user message
+and existing history without adding a partial assistant response.
 Provider usage and durations keep their original fields and units; client timing
 does not replace oMLX's usage timings or Ollama's nanosecond durations.
 

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Direct broker/session text streams now publish terminal timing in response tracer
+  evidence before returning a gateway error, without committing partial assistant
+  history. Versioned HTTP contracts interrupt chunked transport after observed
+  thinking, content and tool arguments on Ollama, oMLX and OpenAI; they verify
+  original transport errors and exact timing through fresh packaged consumers.
+
 ### Added
 
 - Client stream timing on Ollama, oMLX and OpenAI: `time_to_first_token_ms`,

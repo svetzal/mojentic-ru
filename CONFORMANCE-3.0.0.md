@@ -3,7 +3,9 @@
 This assessment covers RELEASE-3.0.0.md parts 1–5 for the maintained Ollama,
 oMLX and OpenAI adapters. It starts at `ac81c44fff024d9675417d4da6d1f24134cc4eac`
 and includes delivered trunk `8ac38ea134af7816c6fdd02e07a420ed3be1a2f4`
-(the current HEAD, with this uncommitted correction). The first is an ancestor
+(historical cycle-9 evidence). Cycle 10 corrects base commit
+`602d8a8d0262c57ac95cb97df950ea392de2f3ae` with the working-tree changes
+described below. The first is an ancestor
 of the second. The delivered 8ac38ea delta consists solely of ten execution-log
 files (2,475 added lines); no source, manifest or CI change was dropped.
 Foundry owns finalization; no ref, version or dependency was changed.
@@ -49,7 +51,7 @@ in historical section-1 and recovery records.
 | recovery-capabilities-v1 | tests/contracts/recovery_capabilities_v1.json | `40e8da683ce4bfcfebf9892ca51a53a701488d463977f021922cd6317203aa76` |
 | recovery-status-selection-v1 | tests/contracts/recovery_status_selection_v1.json | `8250dd928817d3634eb239f90dbeee908398f8fcbba8623ba2913278fba19b30` |
 | typed-errors-v1 | tests/contracts/typed_errors_v1.json | `48d957ccdabc9fa606d9e1fa32f7969c7f0c61259b6072c832eb0778e3450aee` |
-| rust-stream-timing-v1 | tests/contracts/stream_timing_v1.json | `83bc48949b4a81eb0730b3c0f1f5d20bf9d3360eead3bfc504b0adcc53364755` |
+| rust-stream-timing-v1 | tests/contracts/stream_timing_v1.json | `efb8271a85620c75db34f7c504a65d42fdc97e9868d08a280ce558aa0c092fba` |
 | Rust native-reasoning public executable set | tests/reasoning_contract.rs, versioned by tested source hash | See audit/package-readiness-3.0.0.json |
 
 The timing set adapts the binding TypeScript `ts-stream-first-token-v1` semantics
@@ -121,6 +123,7 @@ explicitly inspected rather than added to default safe summaries.
 | Effective Ollama explicit/model num_ctx, maximum clamping, absent metadata; lookup has no completion side effect | `section1_effective_precedence_and_clamping`, `section1_lookup_preserves_subsequent_completion_payload` |
 | Third-party gateway compatibility | `section1_existing_third_party_gateway_is_source_compatible` |
 | Monotonic dispatch timing, unpolled construction, frame precedence, first-only, arguments before complete call, keepalive exclusion, empty streams, exact successful/error durations, retained first timing | tests/stream_timing.rs: `section2_exact_clocks_all_public_http_streams`, `section2_native_recovery_terminal_success_and_failure_retain_timing` |
+| Actual post-token HTTP transport interruption; broker/session terminal evidence; unchanged assistant history | `section2_transport_interruption_gateway`, `section2_transport_interruption_broker`, `section2_transport_interruption_session` |
 | One clock across admitted retries; new clock for each tool continuation | `section2_retry_keeps_first_dispatch_clock`, `section2_broker_session_tool_continuations_start_fresh_clocks` (all three providers, direct/recovery, broker/session; exact 25/60 ms followed by 7/30 ms) |
 | Provider metrics unchanged, optional old metric shape readable | `first_frame_precedence_crosses_public_http_boundary`, `section2_old_metric_documents_remain_readable`, `section2_retry_does_not_relabel_prior_attempt_provider_usage`; frozen recovery telemetry tests above; section-2 matrix checks oMLX usage units |
 | Optional controls, max_tokens only, exact provider mapping, zero values, old explicit defaults and new unset values, no client controls leaked | tests/request_fidelity.rs: `unset_controls_cross_http_boundary`, `artifact_cases_through_broker_all_http_entrypoints`, `artifact_cases_through_session_send_and_stream`, `artifact_cases_recovery_replays_bytes_and_real_attempt_identities`, `artifact_cases_recovery_through_broker_and_session` |
@@ -158,10 +161,11 @@ actual result. Audit JSON records are detached source-checkout evidence, exclude
 from the archive to avoid self-referential artifact hashes. This is a prepublication artifact at unchanged version 2.1.0;
 registry adoption and post-publication installation remain held.
 
-## Verification and certification
+## Cycle 9 verification and certification (historical)
 
-Current commands/results and exact source/test hashes are recorded in
-`audit/readiness-gates-3.0.0.json`; packaged consumer evidence is recorded above.
+The original gate and package records are retained in
+`audit/readiness-cycle-9.json`. Cycle 10 records below supersede the direct
+text-stream transport-interruption claim; all earlier cases remain in the suite.
 The behavioral negative control reset the timing origin on each actual retry:
 the public HTTP probe rejected 35/75 ms instead of 25/60 ms (exit 101), then
 passed with one logical dispatch origin (exit 0). This tests behavior rather
@@ -218,3 +222,56 @@ migration, stopped benchmark rerun or cross-repository modification occurred.
 Stacey's coverage reconciliation remains binding: renewed passing evidence
 permits progress; the historical unexplained failure remains low severity and
 further reproduction was not requested or attempted.
+
+
+## Cycle 10: direct text-stream transport interruption
+
+The Rust change is limited to `LlmBroker::generate_stream`: publish the existing
+response tracer event, including retained terminal client timing, before yielding
+the original gateway error. Failed output returns before tool execution, and
+`ChatSession::send_stream` retains existing history and the new user message
+without committing an assistant message. Timing is observable in
+`LlmResponseTracerEvent.evidence.metadata` when tracing is enabled.
+
+The additive `rust-stream-timing-transport-interruption-v1` extension in
+`rust-stream-timing-v1` retains every earlier case. Its HTTP doubles derive their
+frames from the versioned artifact above. They send a nonterminal semantic frame,
+wait for the injected observation clock to confirm its consumption, then close
+the chunked body without the required HTTP zero chunk. The public APIs return
+`MojenticError::HttpError` with the original `UnexpectedEof` transport cause.
+Normally completed bodies without provider terminators in older cases establish
+other parser behavior; they are not transport-interruption evidence.
+
+`section2_transport_interruption_gateway`,
+`section2_transport_interruption_broker` and
+`section2_transport_interruption_session` exercise 27 declared combinations:
+three providers × thinking/content/tool arguments × three public entrypoints.
+They assert an actual terminal transport error, exact first-token kind, 25 ms
+first-token time and 60 ms duration, immediate timing visibility when the error
+is delivered, and unchanged prior session messages with no partial assistant.
+Gateway terminal metrics must immediately precede the error. Existing successful,
+empty, optional-field, retry and tool-continuation contracts remain unchanged.
+
+The regression probe uses
+`cargo test --all-features --test stream_timing section2_transport_interruption`.
+Against the original broker source from base `602d8a8`, the gateway test passes
+and both broker and session tests fail because terminal response evidence is
+absent (exit 101). Restoring the correction passes all three tests (exit 0).
+This is a differential test of the implementation through real HTTP, with no
+synthetic gateway error or marker toggle.
+
+Source-checkout verification is recorded in `audit/readiness-gates-3.0.0.json`;
+`python3 scripts/verify_package.py` runs the same public tests from a newly
+extracted archive in a fresh consumer and records source hashes, contract hash,
+archive identity, resolved dependency path and result in
+`audit/package-readiness-3.0.0.json`. Both sides of this package boundary use the
+same executable contracts and byte-identical implementation. External live
+providers, dependents and other ports are outside this library readiness check.
+Their current adoption gaps remain initiative coordination work, and registry
+adoption and post-publication install verification remain held.
+
+No dependency, feature, edition, formatting edition, runtime, version or Git ref
+changes are authorized or made. The absent manifest MSRV remains a separate
+recommendation. Cycles 1–9 and the accepted coverage reconciliation are preserved;
+further reproduction of the historical coverage failure was not requested.
+Publication remains held for coordinated approval across all six ports.

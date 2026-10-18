@@ -1,10 +1,10 @@
 {
   "kind": "packaged-public-consumer",
-  "base_commit": "8ac38ea134af7816c6fdd02e07a420ed3be1a2f4",
-  "archive_sha256": "5f8bd4efdafd2b931d7a7c8bdca67213a47d159e2ed70dc64551a2d8f74ffa7b",
-  "archive": "/home/svetzal/.foundry/worktrees/mojentic-ru/mojentic-3-0-ru-c9-523592/target/package/mojentic-2.1.0.crate",
-  "consumer": "/tmp/mojentic-package-consumer-tp38o_ab",
-  "resolved_library": "/tmp/mojentic-package-consumer-tp38o_ab/artifact/mojentic-2.1.0",
+  "base_commit": "602d8a8d0262c57ac95cb97df950ea392de2f3ae",
+  "archive_sha256": "2f1fa8b6dc15186aea231e28db645323168c6f2cb4f510cceb0f8a7b8dbe7725",
+  "archive": "/home/svetzal/.foundry/worktrees/mojentic-ru/mojentic-3-0-ru-c10-d915ef/target/package/mojentic-2.1.0.crate",
+  "consumer": "/tmp/mojentic-package-consumer-seav4k33",
+  "resolved_library": "/tmp/mojentic-package-consumer-seav4k33/artifact/mojentic-2.1.0",
   "forbidden_artifacts": "absent",
   "provider_consumer_sources": "byte-identical src and tests",
   "commands": [
@@ -13,12 +13,24 @@
     "cargo test --verbose --all-features"
   ],
   "exit_code": 0,
+  "transport_interruption": {
+    "contract_set": "rust-stream-timing-v1",
+    "extension": "rust-stream-timing-transport-interruption-v1",
+    "entrypoints": [
+      "gateway",
+      "broker",
+      "session"
+    ],
+    "cases_per_entrypoint": 9,
+    "terminal_error": "http_body_error",
+    "verification": "cargo test --verbose --all-features (includes section2_transport_interruption_* tests)"
+  },
   "contracts": {
     "model_metadata_section1_v1.json": "617c0df913416e8cbfa5873256d427857c1f998103b9b04a4e2b3a456d07ac07",
     "recovery_capabilities_v1.json": "40e8da683ce4bfcfebf9892ca51a53a701488d463977f021922cd6317203aa76",
     "recovery_status_selection_v1.json": "8250dd928817d3634eb239f90dbeee908398f8fcbba8623ba2913278fba19b30",
     "request_fidelity_v1.json": "6f02088311f50707b9c12154d888f844928c23d359043cb2e5d5654bf7e5eaea",
-    "stream_timing_v1.json": "83bc48949b4a81eb0730b3c0f1f5d20bf9d3360eead3bfc504b0adcc53364755",
+    "stream_timing_v1.json": "efb8271a85620c75db34f7c504a65d42fdc97e9868d08a280ce558aa0c092fba",
     "typed_errors_v1.json": "48d957ccdabc9fa606d9e1fa32f7969c7f0c61259b6072c832eb0778e3450aee"
   },
   "tested_sources": {
@@ -44,7 +56,7 @@
     "src/examples/react/thinking_agent.rs": "7a7f1088df95579e5c19166453d1192f0e2b687d1d9cc2bc4f9397299e20fba0",
     "src/examples/react/tool_call_agent.rs": "8632f6ded030d5cbb5c328eb065def66d603164c13f91574cf6f68739f1562ec",
     "src/lib.rs": "c8a3891ab74c022dae401f4474a7de4f708733e48a75fc4fdbf1d5b346eecf00",
-    "src/llm/broker.rs": "44aa2d2bf8667ce5f8dd607b743e15975434d3a33a7509b02228a2f3000ad8c2",
+    "src/llm/broker.rs": "80443744ac055096d4067438c2fd5c019cc0de3ed2769888f025ea315f81d0d4",
     "src/llm/chat_session.rs": "b45b6eb0dd59c65a41e918915f8e17f73310491211092cbe648988a420f2c0ee",
     "src/llm/gateway.rs": "c170c2a3423d1d47b97c727cf1237c5439374976a9740a65d00d6ababa56cc7d",
     "src/llm/gateways/mod.rs": "960a884aee3ec220e8b91b8cf88e7af0e70931dea67180787aed4360e1ac2a72",
@@ -111,6 +123,6 @@
     "tests/reasoning_contract.rs": "779e45c16fa5265e4487fa3dcc4b074988b9588e368cab7a112eed894981e269",
     "tests/recovery.rs": "6a78af7ebc787566eed623eed7f02a2672dea73f1fb22ad5b6511cb3f2cac801",
     "tests/request_fidelity.rs": "80f7b30a1becf5a3f8f5f8e3cffd2da1d0fe9927e0bdea85790fcf5a3048bb6b",
-    "tests/stream_timing.rs": "d9705d4505fec2fd5b55b3bcaa04b4688051b45140925003355cddf0da0e45c0"
+    "tests/stream_timing.rs": "86375c4efa2deda9a2eaa79dd41d530b2db7fef0a568876c878f8eaef640c71c"
   }
 }

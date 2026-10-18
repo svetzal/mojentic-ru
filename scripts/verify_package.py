@@ -66,6 +66,8 @@ def main():
     assert Path(resolved["manifest_path"]).resolve() == library / "Cargo.toml", resolved
     assert not str(library).startswith(str(ROOT)), "consumer must use extracted artifact"
     run("cargo", "test", "--verbose", "--all-features", cwd=consumer)
+    timing_contract = json.loads((library / "tests/contracts/stream_timing_v1.json").read_text())
+    interruption = timing_contract["transport_interruption"]
     record = {
         "kind": "packaged-public-consumer",
         "base_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
@@ -77,6 +79,14 @@ def main():
         "provider_consumer_sources": "byte-identical src and tests",
         "commands": ["cargo package --allow-dirty", "cargo metadata --format-version=1", "cargo test --verbose --all-features"],
         "exit_code": 0,
+        "transport_interruption": {
+            "contract_set": timing_contract["version"],
+            "extension": interruption["version"],
+            "entrypoints": ["gateway", "broker", "session"],
+            "cases_per_entrypoint": sum(len(cases) for cases in interruption["providers"].values()),
+            "terminal_error": interruption["terminal_error"],
+            "verification": "cargo test --verbose --all-features (includes section2_transport_interruption_* tests)",
+        },
         "contracts": {p.name: digest(p) for p in sorted((library / "tests/contracts").glob("*.json"))},
         "tested_sources": {str(p.relative_to(library)): digest(p) for base in ("src", "tests") for p in sorted((library / base).rglob("*.rs"))},
     }
