@@ -26,7 +26,7 @@ Add Mojentic to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-mojentic = "1.0.0"
+mojentic = "3.0"
 tokio = { version = "1", features = ["full"] }
 ```
 

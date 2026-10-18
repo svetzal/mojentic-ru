@@ -8,7 +8,7 @@ Add Mojentic to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-mojentic = "0.1.0"
+mojentic = "3.0"
 tokio = { version = "1.0", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
