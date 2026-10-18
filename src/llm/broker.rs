@@ -505,6 +505,7 @@ impl LlmBroker {
                 );
             }
 
+            let mut stream_evidence = ResponseEvidence::default();
             let mut accumulated_content = String::new();
             let mut accumulated_reasoning = String::new();
             let mut accumulated_tool_calls = Vec::new();
@@ -532,8 +533,12 @@ impl LlmBroker {
                     Ok(StreamChunk::Thinking(thinking)) => {
                         if config.preserve_reasoning { accumulated_reasoning.push_str(&thinking); }
                     }
-                    Ok(StreamChunk::Progress(_))
-                    | Ok(StreamChunk::Metrics(_)) => {}
+                    Ok(StreamChunk::Progress(_)) => {},
+                    Ok(StreamChunk::Metrics(metrics)) => {
+                        crate::llm::stream_timing::retain_timing(&mut stream_evidence, &metrics);
+                        stream_evidence.metadata.insert("stream_metrics".into(), serde_json::json!(metrics));
+                        stream_evidence.usage = metrics.provider_usage;
+                    }
                     Err(e) => {
                         yield Err(e);
                         return;
@@ -563,11 +568,12 @@ impl LlmBroker {
                     None
                 };
 
-                tracer.record_llm_response(
+                tracer.record_llm_response_with_evidence(
                     &self.model,
                     &accumulated_content,
                     tool_calls_json,
                     Some(call_duration_ms),
+                    stream_evidence,
                     "LlmBroker::generate_stream",
                     &correlation_id,
                 );
@@ -735,6 +741,7 @@ impl LlmBroker {
                         content.push_str(&text);
                         yield StreamEvent::Content(text);
                     }
+                    Some(StreamEvent::Metrics(metrics)) => yield StreamEvent::Metrics(metrics),
                     Some(terminal) => break terminal,
                     None => break StreamEvent::Error(StreamEventError::IncompleteStream(None)),
                 }

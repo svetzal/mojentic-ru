@@ -58,5 +58,9 @@ Provider evidence is the coordinating
 and [oMLX models capture](https://github.com/svetzal/mojentic-unify/blob/4b08dcd1d87f520a4c70928c33a2bc84c228093d/fixtures/omlx/models.json).
 The local executable contract is `tests/contracts/model_metadata_section1_v1.json`;
 `cargo test --all-features --test model_metadata` verifies the public adapters
-against it. Fixture-derived servers establish local conformance; live provider
-and paired microgentic verification remain initiative work.
+against it. The same public tests run in a fresh consumer of the packaged crate.
+External dependent adoption follows coordinated publication under Stacey’s library
+self-validation rule; no live provider verification is claimed.
+
+Client first-token and request-duration measurements are described in
+[Streaming](streaming.md#client-timing). Lookup itself does not start a stream clock.

@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Client stream timing on Ollama, oMLX and OpenAI: `time_to_first_token_ms`,
+  `first_token_kind` and `request_duration_ms`, including terminal failures.
+  Measurements start at first dispatch, span admitted retries, exclude keepalive
+  frames and restart for tool continuations. Provider metrics retain their units.
+- Explicit monotonic `StreamClock` injection for deterministic measurement.
+- Crate packaging allowlist and a fresh consumer verifier that exercises the
+  public contract suites from an extracted crate archive.
+
 - Async `LlmGateway::get_model_context_window` reports positive provider-advertised
   capacity, field provenance and optional Ollama model `num_ctx`. Ollama uses
   `/api/show`, oMLX uses authenticated `/v1/models`, and OpenAI uses exact local
@@ -17,13 +25,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pure `OllamaGateway::effective_context_window` applies explicit/model context
   precedence and maximum clamping without changing completion requests.
   Versioned section-1 contract tests reuse coordinating provider captures;
-  external provider and microgentic paired verification remain outstanding.
+  the library self-validates through public API and packaged-consumer tests.
 
 - Executable `recovery-status-selection-v1` evidence for HTTP 500/502 across
   Ollama, oMLX and OpenAI gateway/broker/session entrypoints: paired caller status
   and category selections, captured immutable HTTP payloads, attempt identities
-  and lifecycle decision fields. Runtime behavior is unchanged; external paired
-  provider/consumer verification remains initiative coordination work.
+  and lifecycle decision fields. Runtime recovery behavior is unchanged; library readiness uses its own
+  public contract tests. Dependent adoption follows coordinated publication.
 
 - Recovery adapters expose five endpoint-specific capability values and
   `capability_evidence()` with provider citations, inspection dates and limits.
@@ -37,7 +45,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   loops. Ollama recovery streaming reports provider progress and metrics while
   retaining terminal evidence and refusing replay after semantic output.
 - Native assistant reasoning history, opt-in broker retention, explicit model
-  reasoning profiles, and Enabled/XHigh effort controls (the Rust prototype).
+  reasoning profiles, and Enabled/XHigh effort controls under the coordinated
+  3.0.0 native reasoning contract.
 
 ### Fixed
 
@@ -59,6 +68,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   streaming calls. Preserve native history through oMLX and Ollama tool rounds.
 
 ### Breaking changes
+
+- `StreamMetrics` adds optional client timing and original provider usage fields;
+  use `..Default::default()` in literals. Old serialized metric records remain
+  readable. oMLX/OpenAI legacy streams now emit terminal `Metrics` chunks, also
+  before dispatched-request errors. Match this variant when consuming raw chunks.
+- `StreamEvent::Metrics` precedes terminal success/error for maintained adapters.
+  Handle it as nonterminal telemetry. Success and incomplete-completion evidence
+  also retain client timing in metadata. A request rejected before dispatch keeps
+  its existing error behavior without inventing a duration.
+- Recovery terminal reports/errors expose optional `stream_metrics`; raw recovery
+  provider telemetry and cancellation behavior remain intact. Initialize
+  `stream_metrics: None` in handwritten report/error literals. These explicit
+  inspection fields are omitted from default safe Debug/serialization. Broker
+  text streams retain per-completion metrics in response trace evidence.
 
 - `CompletionConfig.temperature`, `num_ctx`, and `max_tokens` are now `Option`
   with unset defaults. `num_predict` is removed; `max_tokens` is the only output

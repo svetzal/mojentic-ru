@@ -146,6 +146,7 @@ impl<G: RecoveryProvider> RecoveryGateway<G> {
                 failure.acceptance = Acceptance::No;
                 failure.classification.reason = Reason::InvalidConfiguration;
                 RecoveryError {
+                    stream_metrics: None,
                     outcome: Outcome::Failed,
                     failure: Box::new(failure),
                     history: vec![],
@@ -158,6 +159,10 @@ fn legacy(error: RecoveryError) -> MojenticError {
 }
 #[async_trait]
 impl<G: RecoveryProvider> LlmGateway for RecoveryGateway<G> {
+    fn stream_clock(&self) -> std::sync::Arc<dyn crate::llm::stream_timing::StreamClock> {
+        self.inner.stream_clock()
+    }
+
     async fn get_model_context_window(&self, model: &str) -> Result<Option<ModelContextWindow>> {
         self.inner.get_model_context_window(model).await
     }
@@ -218,11 +223,12 @@ impl<G: RecoveryProvider> LlmGateway for RecoveryGateway<G> {
             while let Some(event) = stream.next().await {
                 match event {
                     RecoveryStreamEvent::Progress { progress, .. } => yield Ok(StreamChunk::Progress(progress)),
-                    RecoveryStreamEvent::Metrics { metrics, .. } => yield Ok(StreamChunk::Metrics(metrics)),
+                    RecoveryStreamEvent::Metrics { .. } => {},
                     RecoveryStreamEvent::Content(text) => yield Ok(StreamChunk::Content(text)),
                     RecoveryStreamEvent::Reasoning(text) => yield Ok(StreamChunk::Thinking(text)),
-                    RecoveryStreamEvent::Completed(response) => { if !response.value.tool_calls.is_empty() { yield Ok(StreamChunk::ToolCalls(response.value.tool_calls)); } },
-                    RecoveryStreamEvent::Failed(error) => { yield Err(legacy(error)); break; },
+                    RecoveryStreamEvent::Completed(response) => { if let Some(metrics) = response.report.stream_metrics { yield Ok(StreamChunk::Metrics(*metrics)); }
+                        if !response.value.tool_calls.is_empty() { yield Ok(StreamChunk::ToolCalls(response.value.tool_calls)); } },
+                    RecoveryStreamEvent::Failed(error) => { if let Some(metrics) = error.stream_metrics.clone() { yield Ok(StreamChunk::Metrics(*metrics)); } yield Err(legacy(error)); break; },
                     _ => {}
                 }
             }

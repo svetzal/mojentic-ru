@@ -6,6 +6,7 @@ pub mod models;
 pub mod reasoning;
 pub use reasoning::ReasoningProfile;
 pub mod stream_events;
+pub mod stream_timing;
 pub mod tools;
 
 pub use broker::LlmBroker;

@@ -40,7 +40,7 @@ fn default_role() -> MessageRole {
     MessageRole::User
 }
 
-/// Completion evidence exactly as a provider reported it for one response.
+/// Provider completion evidence and client stream timing for one response.
 ///
 /// Every field is optional. A gateway fills what its provider reports and
 /// leaves the rest unknown: usage is never estimated from text length or a
@@ -54,7 +54,7 @@ pub struct ResponseEvidence {
     pub provider_model: Option<String>,
     /// Provider finish reason (OpenAI `finish_reason`, Ollama `done_reason`).
     pub finish_reason: Option<String>,
-    /// Other provider-reported response facts, such as ids or timings.
+    /// Other response facts: provider ids/durations and client stream timing fields.
     pub metadata: HashMap<String, serde_json::Value>,
 }
 

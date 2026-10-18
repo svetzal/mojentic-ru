@@ -140,6 +140,11 @@ impl ModelContextWindow {
 /// Abstract interface for LLM providers
 #[async_trait]
 pub trait LlmGateway: Send + Sync {
+    /// Monotonic clock used by maintained streaming adapters.
+    fn stream_clock(&self) -> std::sync::Arc<dyn crate::llm::stream_timing::StreamClock> {
+        crate::llm::stream_timing::system_clock()
+    }
+
     /// Query advertised context capacity without changing subsequent requests.
     ///
     /// Third-party gateways default to not advertised.
@@ -257,8 +262,16 @@ pub struct StreamProgress {
 }
 
 /// Provider-neutral final generation metrics.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 pub struct StreamMetrics {
+    /// Client milliseconds from first dispatch to first semantic token.
+    pub time_to_first_token_ms: Option<u64>,
+    /// First semantic kind: thinking, content, or tool_call.
+    pub first_token_kind: Option<String>,
+    /// Client milliseconds from first dispatch to terminal success or failure.
+    pub request_duration_ms: Option<u64>,
+    /// Provider usage and durations in their original shape and units.
+    pub provider_usage: Option<Value>,
     pub provider: String,
     pub total_duration_ns: Option<u64>,
     pub load_duration_ns: Option<u64>,

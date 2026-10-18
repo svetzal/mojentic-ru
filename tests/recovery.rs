@@ -2910,8 +2910,9 @@ async fn review_raw_broker_stream_events_remain_single_send_legacy() {
         let broker = LlmBroker::new("qwen3", Arc::new(gateway), None);
         let messages = [LlmMessage::user("question")];
         let events: Vec<_> = broker.generate_stream_events(&messages, None, None).collect().await;
-        assert_eq!(events.len(), 1);
-        let mojentic::llm::stream_events::StreamEvent::Error(error) = &events[0] else {
+        assert_eq!(events.len(), 2);
+        assert!(matches!(events[0], mojentic::llm::StreamEvent::Metrics(_)));
+        let mojentic::llm::stream_events::StreamEvent::Error(error) = &events[1] else {
             panic!("legacy terminal error")
         };
         let mojentic::llm::stream_events::StreamEventError::ProviderError { status, error } = error
@@ -2976,7 +2977,13 @@ async fn recovery_metadata_frozen_ollama_matches_original_and_compatibility() {
         ..Default::default()
     };
     let messages = [LlmMessage::user("question")];
-    let inner = OllamaGateway::with_host(&server.url);
+    struct FixedClock;
+    impl mojentic::llm::stream_timing::StreamClock for FixedClock {
+        fn now(&self) -> Duration {
+            Duration::ZERO
+        }
+    }
+    let inner = OllamaGateway::with_host(&server.url).with_stream_clock(Arc::new(FixedClock));
     let old: Vec<_> = inner.complete_stream("qwen3", &messages, None, &config).collect().await;
     let capture = Arc::new(Capture::default());
     let gateway = RecoveryGateway::new(inner, policy(1, &capture)).expect("gateway");
@@ -3068,7 +3075,13 @@ async fn recovery_metadata_frozen_ollama_matches_original_and_compatibility() {
         })
         .collect();
     assert_eq!(progress, old_progress);
-    assert_eq!(metrics, old_metrics);
+    let mut provider_only = old_metrics.clone();
+    for metrics in &mut provider_only {
+        metrics.time_to_first_token_ms = None;
+        metrics.first_token_kind = None;
+        metrics.request_duration_ms = None;
+    }
+    assert_eq!(metrics, provider_only);
     assert_eq!(
         progress[1],
         StreamProgress {
@@ -3095,6 +3108,10 @@ async fn recovery_metadata_frozen_ollama_matches_original_and_compatibility() {
             prompt_eval_duration_ns: Some(2000000000),
             eval_count: Some(12),
             eval_duration_ns: Some(6000000000),
+            time_to_first_token_ms: None,
+            first_token_kind: None,
+            request_duration_ms: None,
+            provider_usage: None,
             tokens_per_second: Some(2.0)
         }]
     );
@@ -3249,7 +3266,10 @@ async fn recovery_metadata_unsupported_adapters_emit_no_ollama_telemetry() {
             RecoveryStreamEvent::Progress { .. } | RecoveryStreamEvent::Metrics { .. }
         )));
         let chunks: Vec<_> = gateway.complete_stream("m", &[], None, &config).collect().await;
-        assert!(chunks.iter().all(|c| matches!(c, Ok(StreamChunk::Content(_)))));
+        assert!(chunks
+            .iter()
+            .all(|c| matches!(c, Ok(StreamChunk::Content(_) | StreamChunk::Metrics(_)))));
+        assert!(chunks.iter().any(|c| matches!(c, Ok(StreamChunk::Metrics(m)) if m.request_duration_ms.is_some() && m.eval_count.is_none() && m.total_duration_ns.is_none())));
         assert_eq!(server.sends.load(Ordering::SeqCst), 2);
     }
     for provider in [Provider::Omlx, Provider::OpenAi] {
@@ -3375,7 +3395,13 @@ async fn recovery_rejected_terminal_telemetry_raw_and_compatibility() {
         let body = format!("{prefix}{terminal}");
         let server = fixture(vec![(200, body.clone(), false, false); 3]).await;
         let config = CompletionConfig::default();
-        let inner = OllamaGateway::with_host(&server.url);
+        struct FixedClock;
+        impl mojentic::llm::stream_timing::StreamClock for FixedClock {
+            fn now(&self) -> Duration {
+                Duration::ZERO
+            }
+        }
+        let inner = OllamaGateway::with_host(&server.url).with_stream_clock(Arc::new(FixedClock));
         let old: Vec<_> = inner.complete_stream("qwen3", &[], None, &config).collect().await;
         let expected_progress: Vec<_> = old
             .iter()
@@ -3387,7 +3413,13 @@ async fn recovery_rejected_terminal_telemetry_raw_and_compatibility() {
         let expected_metrics: Vec<_> = old
             .iter()
             .filter_map(|c| match c {
-                Ok(StreamChunk::Metrics(m)) => Some(m.clone()),
+                Ok(StreamChunk::Metrics(m)) => Some({
+                    let mut provider = m.clone();
+                    provider.time_to_first_token_ms = None;
+                    provider.first_token_kind = None;
+                    provider.request_duration_ms = None;
+                    provider
+                }),
                 _ => None,
             })
             .collect();
@@ -3468,7 +3500,13 @@ async fn recovery_rejected_terminal_telemetry_raw_and_compatibility() {
             chunks
                 .iter()
                 .filter_map(|c| match c {
-                    Ok(StreamChunk::Metrics(m)) => Some(m.clone()),
+                    Ok(StreamChunk::Metrics(m)) => Some({
+                        let mut provider = m.clone();
+                        provider.time_to_first_token_ms = None;
+                        provider.first_token_kind = None;
+                        provider.request_duration_ms = None;
+                        provider
+                    }),
                     _ => None,
                 })
                 .collect::<Vec<_>>(),
@@ -3563,7 +3601,7 @@ async fn recovery_terminal_invalid_fields_do_not_fabricate_telemetry() {
             .complete_stream("m", &[], None, &CompletionConfig::default())
             .collect()
             .await;
-        assert!(matches!(chunks.as_slice(), [Err(_)]));
+        assert!(matches!(chunks.as_slice(), [Ok(StreamChunk::Metrics(_)), Err(_)]));
         assert!(!chunks.iter().any(|c| matches!(c, Ok(StreamChunk::ToolCalls(_)))));
         assert_eq!(server.sends.load(Ordering::SeqCst), 2);
     }

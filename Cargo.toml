@@ -11,6 +11,16 @@ documentation = "https://svetzal.github.io/mojentic-ru/api/mojentic"
 readme = "README.md"
 keywords = ["llm", "ai", "ollama", "openai", "agents"]
 categories = ["api-bindings", "asynchronous"]
+# Ship the public implementation, examples, executable contracts and user docs.
+# Keep execution logs and Foundry state out even when they are tracked locally.
+include = [
+    "/src/**", "/examples/**", "/tests/**", "/book/src/**",
+    "/scripts/verify_package.py",
+    "/Cargo.toml", "/README.md", "/LICENSE", "/CHANGELOG.md",
+    "/CONFORMANCE-3.0.0.md", "/RECOVERY-CONFORMANCE.md", "/PARITY-3.0.0.md",
+    "/audit/readiness-cycles-1-8.md",
+    "/TRANSIENT-RECOVERY-2026-10.md",
+]
 
 [dependencies]
 # Core async runtime

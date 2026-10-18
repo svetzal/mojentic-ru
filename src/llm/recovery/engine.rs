@@ -3,6 +3,7 @@ use super::{
     frames::Frames,
     *,
 };
+use crate::llm::stream_timing::{retain_timing, StreamTiming};
 use crate::llm::{
     gateway::{StreamMetrics, StreamProgress},
     models::LlmGatewayResponse,
@@ -24,7 +25,8 @@ pub enum RecoveryStreamEvent {
         identity: Identity,
         progress: StreamProgress,
     },
-    /// Provider-reported final metrics; absent when unsupported, never estimated.
+    /// Original provider-reported final metrics; absent when unsupported, never estimated.
+    /// Final client timing is on the terminal report/error, preserving cancellation checkpoints.
     Metrics {
         identity: Identity,
         metrics: StreamMetrics,
@@ -75,6 +77,7 @@ struct Attempt<'a> {
     history: Vec<Failure>,
     first_failure: Option<Instant>,
     sent_current: bool,
+    stream_timing: Option<StreamTiming>,
     raw: Vec<u8>,
     delivered: std::sync::Arc<std::sync::Mutex<SemanticProgress>>,
 }
@@ -90,6 +93,7 @@ impl<'a> Attempt<'a> {
             history: vec![],
             first_failure: None,
             sent_current: false,
+            stream_timing: None,
             raw: Vec::new(),
             delivered: Default::default(),
         }
@@ -196,6 +200,7 @@ impl<'a> Attempt<'a> {
             _ => {}
         }
         RecoveryError {
+            stream_metrics: None,
             outcome,
             failure: Box::new(self.current.clone()),
             history: self.history.clone(),
@@ -407,7 +412,7 @@ impl<'a> Attempt<'a> {
                 else { self.number += 1; self.sent_current = true; }
                 self.cancel(); return Err(self.end(Outcome::Cancelled));
             },
-            response = std::future::poll_fn(|cx| { dispatched = true; execution.as_mut().poll(cx) }) => response,
+            response = std::future::poll_fn(|cx| { if !dispatched { if let Some(timing) = &self.stream_timing { timing.dispatch(); } } dispatched = true; execution.as_mut().poll(cx) }) => response,
         };
         self.number += 1;
         self.sent_current = true;
@@ -454,6 +459,7 @@ impl<'a> Attempt<'a> {
     }
     fn report(&self) -> RecoveryReport {
         RecoveryReport {
+            stream_metrics: None,
             identity: self.current.identity.clone().unwrap_or(Identity {
                 logical_request_id: self.logical,
                 attempt_id: Uuid::nil(),
@@ -687,6 +693,7 @@ pub(super) fn stream<G: RecoveryProvider>(
         client: gateway.client.clone(),
         policy: gateway.policy.clone(),
         provider: gateway.inner.recovery_provider(),
+        timing: StreamTiming::new(gateway.inner.stream_clock()),
     };
     let call = RecoveryCall {
         cancellation: call.cancellation.child_token(),
@@ -698,6 +705,8 @@ pub(super) fn stream<G: RecoveryProvider>(
         let worker_call = call.clone();
         let worker_delivered = delivered.clone();
         tokio::spawn(async move {
+            let timing = owner.timing.clone();
+            let mut provider_metrics = StreamMetrics { provider: format!("{:?}", owner.provider).to_lowercase(), ..Default::default() };
             let mut source = stream_owned(owner, request, worker_call.clone(), worker_delivered);
             loop {
                 // Reserve delivery capacity before advancing the provider stream. In
@@ -710,7 +719,17 @@ pub(super) fn stream<G: RecoveryProvider>(
                         Err(_) => break,
                     },
                 };
-                let Some(event) = source.next().await else { break; };
+                let Some(mut event) = source.next().await else { break; };
+                match &mut event {
+                    RecoveryStreamEvent::Metrics { metrics, .. } => provider_metrics = metrics.clone(),
+                    RecoveryStreamEvent::Completed(result) => {
+                        let metrics = timing.finish(provider_metrics.clone());
+                        retain_timing(&mut result.value.evidence, &metrics);
+                        result.report.stream_metrics = Some(Box::new(metrics));
+                    },
+                    RecoveryStreamEvent::Failed(error) => error.stream_metrics = Some(Box::new(timing.finish(provider_metrics.clone()))),
+                    _ => {},
+                }
                 let terminal = matches!(event, RecoveryStreamEvent::Completed(_) | RecoveryStreamEvent::Failed(_));
                 if let Some(permit) = permit { permit.send(event); }
                 else if terminal { let _ = sender.send(event).await; }
@@ -738,6 +757,7 @@ struct StreamOwner {
     client: reqwest::Client,
     policy: RecoveryPolicy,
     provider: Provider,
+    timing: StreamTiming,
 }
 fn stream_owned(
     gateway: StreamOwner,
@@ -748,6 +768,7 @@ fn stream_owned(
     Box::pin(async_stream::stream! {
         let mut state = Attempt::new(&gateway.policy, gateway.provider, Operation::Streaming);
         state.delivered = delivered;
+        state.stream_timing = Some(gateway.timing.clone());
         loop {
             let response = match state.send(&gateway.client, &request, &call).await {
                 Ok(response) => response,
@@ -774,6 +795,7 @@ fn stream_owned(
                     // Account for all semantic evidence in a received chunk before yielding any part.
                     let mut output = Vec::new();
                     for line in lines.push(&chunk) {
+                        if let Ok(text) = std::str::from_utf8(&line) { gateway.timing.observe_line(text); }
                         let (events, result) = frames.parse(&line, &mut state.current.progress.observed, state.current.identity.as_ref());
                         output.extend(events);
                         if let Err(cause) = result { state.decode_failure(cause); failed = true; break; }

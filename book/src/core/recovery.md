@@ -283,8 +283,9 @@ version predates `typed-errors-v1`; existing successful optional-field behavior
 is covered alongside legacy length behavior. Local executable cases live in
 `tests/contracts/typed_errors_v1.json` and run via
 `cargo test --all-features --test recovery typed_errors_v1`. Scripted HTTP fixtures
-verify Rust's boundary behavior; paired external consumer/provider verification
-is still required and tracked in `CONFORMANCE-3.0.0.md`.
+verify Rust’s boundary behavior and run again from the packaged artifact.
+External counterpart verification is not a publication prerequisite for this
+library; see `CONFORMANCE-3.0.0.md`.
 
 
 HTTP 500 and 502 are retryable under the default policy when no semantic output
@@ -298,6 +299,11 @@ choices through actual loopback HTTP adapters and public broker/session APIs:
 `cargo test --all-features --test recovery recovery_status_selection_v1`.
 It checks successful output, typed failures, immutable wire payloads, attempt
 identity and safe lifecycle fields. Existing partial reasoning, content and tool
-interruption cases continue to prohibit replay. Provider/consumer verification
-against the same executable set is still missing; the conformance record tracks
-that initiative coordination gap separately from local boundary tests.
+interruption cases continue to prohibit replay. The public suites and a fresh
+packaged consumer verify this identical executable set. Dependent adoption and
+post-publication installation remain coordinated release work.
+
+Final client stream measurements are available through `RecoveryReport.stream_metrics`
+and `RecoveryError.stream_metrics`. They span admitted retries, preserve the first
+semantic token and retain duration on failure. Raw provider telemetry is unchanged;
+see [client timing](streaming.md#client-timing) for the event and compatibility APIs.

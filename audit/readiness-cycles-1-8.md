@@ -1,0 +1,809 @@
+# Historical Rust readiness cycles 1–8
+
+This is the preserved execution history through delivered trunk 8ac38ea.
+All counterpart-verification publication prerequisites and whole-release caveats
+below describe their historical increments. They are superseded by Stacey's
+library self-validation rule and the current CONFORMANCE-3.0.0.md assessment.
+Scratch paths in this history identify archived execution evidence; they are
+not committed artifacts or links readers must follow. Historical commands and
+coverage reconciliation remain evidence of those runs;
+current certification uses the current source's renewed checks.
+
+# Rust 3.0.0 scoped conformance
+
+## Current correction: cycle 8 OpenAI request observation
+
+Baseline: `552cf7738ebcfbe1f721ea10ab00511ece5282e4` plus the uncommitted
+working-tree correction to `tests/model_metadata.rs` and verification records
+in worktree `mojentic-3-0-ru-c8-3f29a7`.
+Verifier SHA-256: `1cc51637a0638015d77f35078759c35a700aca22108f0fb2b67209460adcc056`.
+This identity is the tested executable source; documentation result updates
+follow verification. Tracked runtime source is byte-identical to the baseline.
+Initiative brief SHA-256 was verified:
+`ea6a0efa56bfb3cd74b5ce728f80cc33c6fbd853114bec94b8aabe79f5d28e6e`.
+
+Reused contract: **model-metadata-section1-v1**,
+`tests/contracts/model_metadata_section1_v1.json`, unchanged SHA-256
+`617c0df913416e8cbfa5873256d427857c1f998103b9b04a4e2b3a456d07ac07`.
+The mapping and proof method are in
+[the verification record](tests/contracts/MODEL-METADATA-SECTION1.md#cycle-8-openai-request-observation-correction).
+Every registry case executes both the real direct OpenAI and recovery-wrapped
+public lookup, asserts exact results and observes zero HTTP requests across all
+methods and paths. The local TCP observer does not filter on HTTP method or
+path. A permanent negative control rejects a real POST despite its ignored
+HTTP failure. A temporary POST in the real OpenAI metadata implementation
+caused the targeted registry verifier to fail on the observed request (exit
+101); restoring that file byte-for-byte passed all nine metadata tests (exit 0).
+No unreachable-host success is used to infer absence of requests.
+
+Rust 2021, formatting, stable toolchain selection, Tokio, public API, runtime
+behavior, feature flags, dependencies, version and the 56% coverage floor are
+preserved. No MSRV or workspace resolver is declared; adding an MSRV remains a
+separate recommendation. Cargo.lock was absent and ignored at baseline and is
+only generated locally for execution. No advisory policy, Git ref, sibling
+repository or other campaign gap was changed. The absent
+`../RELEASE-3.0.0.md` remains a coordination limitation; the supplied brief was
+read and hash-verified. Stacey's binding coverage reconciliation is preserved:
+renewed passing evidence permits progress, and no further reproduction of the
+historical unexplained failure is requested.
+
+### Cycle 8 verification results
+
+Commands use `/home/svetzal/.cargo/bin` on PATH,
+`CARGO_HOME=/tmp/mojentic-c2-cargo` and
+`CARGO_TARGET_DIR=/tmp/mojentic-ru-c8-target`; output is captured with
+`foundry capture`. One `.hone-gates.json` was discovered in this repository.
+All seven discovered gates and the four additional applicable CI/repository
+checks passed (exit 0); the targeted metadata verifier also passed.
+
+| Command | Exit | Result |
+| --- | --- | --- |
+| `cargo test --all-features --test model_metadata` | 0 | Nine passed, including ignored-POST negative control |
+| `cargo fmt --check` | 0 | Passed |
+| `cargo clippy --all-targets --all-features -- -D warnings` | 0 | Passed |
+| `cargo test --verbose --all-features` | 0 | 706 passed, including nine metadata tests and 20 doctests; 24 existing ignored doctests |
+| `cargo build --verbose --all-features` | 0 | Passed |
+| `cargo tarpaulin --all-features --fail-under 56` | 0 | 70.70%, 3410/4823 lines; metadata negative control passed under instrumentation |
+| `cargo deny check` | 0 | Advisories, bans, licenses and sources passed; existing duplicate-version warnings |
+| `cargo audit` | 0 | 267 locked dependencies scanned; no vulnerabilities reported |
+| `cargo test` | 0 | 706 passed; 24 existing ignored doctests |
+| `cargo doc --no-deps --all-features` | 0 | Passed with two existing rustdoc warnings |
+| `mdbook build book` | 0 | HTML emitted; existing `truncate-long-entries` configuration diagnostic |
+| `cargo fetch` | 0 | CI setup dependency fetch passed |
+
+Rustdoc warnings remain the unresolved `connect` link in
+`src/realtime/broker.rs` and unclosed `dyn` tag in `src/examples/react/events.rs`.
+Installed mdBook reports `Failed to deserialize output.html` for the existing
+search configuration and still writes HTML with exit 0. These checks are not
+claimed warning-free. Heading-only `examples.md` and `use_cases.md` generated
+by mdBook were removed after the check. No gate, advisory policy or dependency
+was changed. Behavioral proof JSON, actual rejection/correction exits (101/0),
+complete logs and unchanged runtime/contract identities were validated.
+
+Suggested commit message (not executed):
+`test: observe all OpenAI registry lookup requests`.
+
+### Paired verification remains unfinished
+
+Rust implementation/local consumer verifier: baseline and working-tree identity
+above; `cargo test --all-features --test model_metadata` passed (nine tests).
+External OpenAI/Ollama/oMLX provider identities, commands and results for this
+same executable v1 hash: **missing**. Microgentic consumer verification of the
+same set/hash, tested commit, command and result: **missing**. The initiative's
+recorded microgentic `e71b387e` / Mojentic pin `4ca1ed2` was not inspected or
+verified here. Initiative coordination must arrange both sides' required-gate
+verification; fixtures and independently authored mocks are not paired proof.
+No cross-repository compatibility, release readiness or publication is claimed.
+All six-port publication and consumer migration holds remain. Only mojentic-ru
+is changed, and changes remain uncommitted for Foundry.
+
+## Historical correction: model-metadata section 1
+
+Tested Rust baseline: `50387e33ba46e5b67737f70b6918bd6581b1b96b` plus this
+uncommitted working-tree correction at that time. This section retains its
+historical identities and results; the cycle 8 record above is current.
+The initiative brief SHA-256 was verified as
+`ea6a0efa56bfb3cd74b5ce728f80cc33c6fbd853114bec94b8aabe79f5d28e6e`.
+The coordinating repository was clean for the relevant inputs at
+`4b08dcd1d87f520a4c70928c33a2bc84c228093d`.
+
+The binding input is MODEL-METADATA-2026-10.md **section 1**. First-token timing,
+packaging, registry migration and coordinated publication are outside this
+correction. Existing request-fidelity, native reasoning and completed recovery
+behavior are preserved. Edition 2021, stable CI toolchain, Tokio, feature flags,
+formatting, dependencies and versions are unchanged. No MSRV or workspace
+resolver is declared; adding an MSRV remains a separately authorized recommendation.
+The absent, gitignored Cargo.lock is generated only for local gate execution.
+No Git refs or sibling repository files were changed.
+
+### Characterization and executable mapping
+
+Before implementation, the gateway trait offered no metadata operation.
+Ollama completion requests use `/api/chat` and caller `num_ctx` only;
+oMLX uses the configured `/v1` host and bearer authentication. Existing OpenAI
+completion capability lookup uses exact entries followed by pattern/default
+fallback. RecoveryGateway delegates model listing/embeddings but previously had
+no metadata delegation. These paths were inspected before changing the boundary.
+The new operation has a compatibility default returning `Ok(None)`; its oMLX
+boundary probe first failed because this default supplied no window, then passed
+with the real HTTP implementation. Exact selected capacity/provenance and auth
+were exercised, not a marker or case-count change.
+
+| Named test in `tests/model_metadata.rs` | Exact behavior verified |
+| --- | --- |
+| `section1_configured_authenticated_boundary` | Configured host, bearer key, GET `/v1/models`, selected id, 262144 tokens, `max_model_len`, absent model parameter |
+| `section1_http_contract_exact_outcomes_direct_and_wrapped` | Both Ollama architecture prefixes, model selection, optional fields, not-advertised results, malformed/nonpositive/noninteger windows, transport JSON errors, 401/404/429/500/502 statuses, captured unknown-model 404; same outcomes through recovery wrappers |
+| `section1_registry_exact_lookup_is_request_free` | Exact registered OpenAI values/provenance, unknown models including familiar prefixes yield None; no requests, including with unreachable host; direct and wrapped |
+| `section1_effective_precedence_and_clamping` | Explicit configuration precedes model parameter, each clamps to maximum, absent controls use advertised upper bound, absent window remains None even with config |
+| `section1_transport_failure_direct_and_wrapped` | Existing HTTP error variant survives direct and wrapped Ollama/oMLX lookup |
+| `section1_lookup_preserves_subsequent_completion_payload` | Exact completion requests before/after metadata, all three adapters direct/wrapped, unset and explicit context/output/temperature controls; response behavior retained |
+| `section1_existing_third_party_gateway_is_source_compatible` | Existing implementation compiles without new method and returns None |
+| `section1_contract_reuses_coordinating_captures` | Contract's embedded provider bodies remain byte-identical to coordinating captures |
+
+The preservation tests characterize the existing `stream: false` field on
+recovery completion requests and its omission on direct oMLX/OpenAI requests;
+this difference is retained. Metadata does not use completion recovery/admission
+or mutate config or request state. Pure helper results are application inputs,
+not changes to later requests. Without configured/model `num_ctx`, the result is
+an upper bound because the server's context setting is unknown.
+
+### Contract identity and paired verification gap
+
+Executable artifact: `tests/contracts/model_metadata_section1_v1.json`, version
+**model-metadata-section1-v1**, SHA-256:
+`617c0df913416e8cbfa5873256d427857c1f998103b9b04a4e2b3a456d07ac07`.
+Provider citations, source specification hash and compatibility limits are in
+`tests/contracts/MODEL-METADATA-SECTION1.md`. The existing JSON-fixture mechanism
+is reused; no applicable section-1 executable set was present in the coordinating
+checkout. The captured Ollama 0.40.5 and oMLX 0.7.0rc1 bodies are reused verbatim;
+edge inputs exercise the agreed section-1 semantics without new contract policy.
+OpenAI registry values and completion inference remain unchanged.
+
+Local provider-adapter verification command:
+`cargo test --all-features --test model_metadata` (exit **0**, all eight named
+behavioral tests pass). The same verifier runs in default/all-feature tests and
+the existing tarpaulin required gate; no new gate opt-in is needed.
+
+**External provider and microgentic verification are missing and unfinished.**
+Fixture-derived doubles establish local conformance only. No live provider
+implementation ran this executable set/hash, so there is no tested provider
+commit or provider verification command/result from this run. Captures are
+historical evidence, not renewed provider verification. No microgentic commit
+was tested against this set/hash and no consumer command/result is available.
+The initiative records microgentic at `e71b387e`, retaining Mojentic pin `4ca1ed2`
+and local metadata/timing modules; neither identity was verified here. Initiative
+coordination must arrange both sides' verification of this identical version/hash
+in their required gates, record tested commits/commands/results, and preserve
+benchmark continuity and the owner hold. No cross-repository compatibility,
+consumer migration, whole-3.0 certification or publication readiness is claimed.
+
+### Frozen implementation and verifier identities
+
+SHA-256 values below identify the uncommitted source tested, alongside the
+baseline commit and contract hash. Documentation-only result updates follow gates.
+
+```text
+b52db0c75eb501208deab98e840393759e0ffed29ba76e3fd74cdde0d7238f58  src/llm/gateway.rs
+cc529729358f3602a76143eaabf3612b2c84cabc19f8ba8158c81ca34b3d79f8  src/llm/gateways/ollama.rs
+1ca5b9bff6ff207941eb9f6820efeb51b6787764e6297be96af0a2666917e78e  src/llm/gateways/omlx.rs
+aa453a329763c80ddb66a56cdf3c7f6ba0572f6d6277e86e272f3e35e0554ba0  src/llm/gateways/openai.rs
+621481427425d9f3d656a0fa3f29189316a2c8d0aa45c277390423d6e7df22ec  src/llm/gateways/openai_model_registry.rs
+feac5313c4ed2ca1fb6c8d46f5899351d515c72bbdf0f188ba97bd4013b3013e  src/llm/recovery/adapter.rs
+64607798f10ea5c7391780d7f8d7ec68bac0c7665a60502cd582f4c79fc3596e  src/llm/mod.rs
+50171be5e176982d9c7df56d4105c8b8d7397ecb34aa1cfbb000d47d7b0f185a  tests/model_metadata.rs
+```
+
+### Section-1 verification results
+
+All commands used `/home/svetzal/.cargo/bin` on PATH and writable
+`CARGO_HOME=/tmp/mojentic-c2-cargo`; output was captured with `foundry capture`.
+Results refer to the frozen source and contract identities above.
+
+| Exact command | Exit | Result |
+| --- | --- | --- |
+| `cargo fmt --check` | 0 | Passed |
+| `cargo clippy --all-targets --all-features -- -D warnings` | 0 | Passed |
+| `cargo test --verbose --all-features` | 0 | 705 passed, including 8 metadata verifier tests and 20 doctests; 24 existing ignored doctests |
+| `cargo build --verbose --all-features` | 0 | Passed |
+| `cargo tarpaulin --all-features --fail-under 56` | 0 | 70.70%, 3410/4823 lines; 8 metadata, 66 recovery and 12 request-fidelity tests passed under instrumentation |
+| `cargo deny check` | 0 | Advisories, bans, licenses and sources passed; existing duplicate-version warnings |
+| `cargo audit` | 0 | 267 locked dependencies scanned; no vulnerabilities reported |
+| `cargo test` | 0 | 705 passed; 24 existing ignored doctests |
+| `cargo doc --no-deps --all-features` | 0 | Passed; two existing rustdoc warnings |
+| `mdbook build book` | 0 | HTML emitted, exit 0; existing search-configuration diagnostic |
+| `cargo fetch` | 0 | CI setup dependency fetch passed |
+| `cargo test --all-features --test model_metadata` | 0 | Final frozen-source targeted verifier: all 8 named tests passed |
+
+The book example was also extracted and compiled against the built library with
+`rustc --edition=2021 --crate-type lib` (exit 0; expected unused-example warning).
+No live server is required to compile the example.
+
+Rustdoc retains the pre-existing unresolved `connect` link in
+`src/realtime/broker.rs` and unclosed `dyn` tag in `src/examples/react/events.rs`.
+Installed mdBook retains the pre-existing `truncate-long-entries` search-setting
+diagnostic and still emits HTML with exit 0. These checks are not claimed
+warning-free. Generated heading-only `examples.md` and `use_cases.md` placeholders
+were removed after the book build. No dependency, gate or advisory policy was
+changed. The final source/contract hashes and behavioral rejection/correction
+evidence were validated; the actual probe exits were 101 and 0.
+
+All eleven discovered project/applicable CI checks passed. The targeted contract
+verifier also passed. Changes remain uncommitted for Foundry; no publication,
+tagging or Git finalization occurred. Suggested commit message:
+`Add provider-advertised model context metadata`.
+
+Stacey's binding reconciliation is preserved: renewed passing coverage evidence
+permits progress, the historical unexplained failure remains low severity, and
+further reproduction is not requested. The coverage engine, assertions,
+timeouts, test scope and **56%** floor remain unchanged.
+
+## Historical correction: request fidelity, model-metadata sections 3–3.6
+
+Tested baseline: `e80c0a454cbb2677e70ebd56a78795457acef8f6` plus the
+uncommitted correction in this worktree. This section supersedes current-source
+claims below; historical results remain historical. Publication holds remain.
+Only Rust is changed. No dependency, version, edition, runtime, default feature,
+advisory policy, recovery admission rule or Git ref is changed.
+
+The initiative brief was read and verified as SHA-256
+`ea6a0efa56bfb3cd74b5ce728f80cc33c6fbd853114bec94b8aabe79f5d28e6e`.
+The binding input is `MODEL-METADATA-2026-10.md` sections 3–3.6 from the
+coordinating repository. Its other sections are not certified by this correction.
+Rust edition remains 2021, with no workspace resolver declaration or declared
+MSRV; CI uses stable Rust and this run uses rustc 1.99.0 / cargo 1.99.0.
+Tokio and all feature semantics are preserved. Declaring an MSRV remains a
+separate recommendation, requiring authorization rather than an inferred change.
+`Cargo.lock` is absent at baseline and gitignored; the checks generate a local
+lockfile without editing dependency declarations.
+
+### Characterization and resulting behavior
+
+Before migration, ChatSession injected temperature `1.0` in both send paths;
+four broker trace call sites cast it to `f64`, and tracer events required a
+number. Ollama `chat_body`, OpenAI `chat_body`/parameter adaptation, and oMLX
+`chat_body` serve ordinary, structured, legacy-stream, event-stream and
+prepared recovery requests. These shared paths remain shared.
+
+`temperature`, `num_ctx` and `max_tokens` now default to `None`. The separate
+signed `num_predict` config field and its negative-to-usize cast are removed.
+Ollama maps selected output limits to `options.num_predict`; OpenAI uses its
+registry's `max_tokens` or `max_completion_tokens`; oMLX uses `max_tokens`.
+Zero selections remain selections. Unsupported context/top-k controls remain
+omitted on the same adapters as before. Fixed OpenAI temperature is rewritten
+only for an explicit selection; a model accepting none omits it. Dropped
+non-reasoning effort warns. Native reasoning/profile validation is preserved.
+ChatSession carries the full completion config through both send paths and tool
+continuations; `max_context` remains local. Tracing represents caller intent
+with optional temperature and accepts older numeric trace fields.
+
+### Executable contract and source identities
+
+Reuse **request-fidelity-v1**, unchanged from
+`mojentic-ex/test/contracts/request_fidelity_v1.json` at inspected clean source
+`ff479d92067b6ffbd99d3cd5533f96e13ebc09b0`. That checkout was read only; its
+tests were not run here. Artifact SHA-256:
+`6f02088311f50707b9c12154d888f844928c23d359043cb2e5d5654bf7e5eaea`.
+The contract declares the 3.0.0 unreleased API and explicit migration from 2.1's
+former defaults, not binary compatibility with removed 2.1 Rust fields.
+The local copy is `tests/contracts/request_fidelity_v1.json`; the verifier is
+`tests/request_fidelity.rs`. Both run in the required `cargo test` gates.
+
+The frozen source identities below identify the tested uncommitted implementation;
+Foundry owns commit finalization:
+
+- Verifier SHA-256 (`sha256sum tests/request_fidelity.rs`):
+  `80f7b30a1becf5a3f8f5f8e3cffd2da1d0fe9927e0bdea85790fcf5a3048bb6b`.
+- Artifact plus verifier (`cat tests/contracts/request_fidelity_v1.json tests/request_fidelity.rs | sha256sum`):
+  `0d10f57a95588676592b6d5dbb5c5a84620e07e1dac6bd858965f1d6e695815e`.
+- Source manifest (`LC_ALL=C rg --files src | LC_ALL=C sort | xargs sha256sum | sha256sum`):
+  `22b367b58f4cdb55b0fceb08161ab1d1a5eeb563fd06b025673d5b76cd6ea830`.
+- Generated local lockfile (`sha256sum Cargo.lock`):
+  `390c599335be1aed77a5ff897c5f053631e31611d89ac66e2b06cd056e29034d`.
+- Binding metadata document SHA-256 equals the artifact's `source_sha256`:
+  `a085da1c0d110f9d587a24ace6ac2854b653e1ac28905b3829d94d665b2c906e`.
+
+| Binding behavior | Named executable test |
+| --- | --- |
+| Default omission through actual HTTP; rejecting original and corrected probe | `unset_controls_cross_http_boundary` |
+| All seven artifact cases plus explicit former defaults, ordinary/structured/legacy/event streams, actual field values/names/absence, tracer caller intent and missing response model/usage | `artifact_cases_through_broker_all_http_entrypoints` |
+| The same cases through session send/stream; local budget does not become provider context | `artifact_cases_through_session_send_and_stream` |
+| Artifact 503 then success, ordinary/structured/recovery streams, actual HTTP bytes equal across attempts and to wire observation, same logical id and different real attempt ids | `artifact_cases_recovery_replays_bytes_and_real_attempt_identities` |
+| Recovery-enabled broker structured output and session ordinary/legacy streams against the same cases and artifact-derived responses | `artifact_cases_recovery_through_broker_and_session` |
+| Tool call/Unicode arguments derived from artifact, tool execution/results/history and unchanged controls across both session tool-round requests | `artifact_tool_continuations_preserve_session_controls_and_history` |
+| Fixed/unsupported/unset temperature, named reasoning effort and correct output-limit field for chat/reasoning/search registry families | `openai_model_restrictions_preserve_selected_output_limits` |
+| All six native effort mappings alongside combined sampling/context/output intent | `native_reasoning_mappings_keep_request_fidelity` |
+| Non-reasoning effort omitted and warning observed | `dropped_openai_reasoning_warns_at_http_boundary` |
+| Artifact-derived HTTP errors (400/503), no implicit retry, older response without optional finish evidence | `artifact_error_and_optional_response_fields_through_broker` |
+| Default session and explicit temperature zero builder | `session_default_and_temperature_builder_preserve_absence_and_zero` |
+| Older numeric trace and new absent field serialization | `trace_temperature_reads_old_numeric_and_new_absent_fields` |
+
+The proof probe rejected the original production HTTP body (cargo exit 101) and
+passed with the corrected source (exit 0). It checks the request body and decoded
+answer, not a marker or call count. The complete matrix additionally checks
+replay and tool behavior at the real HTTP boundary. Scripted responses derive
+from the shared artifact; they are not independently authored provider mocks.
+Additional variants remove optional evidence or insert the artifact's tool call.
+
+Provider references: [Ollama chat](https://docs.ollama.com/api/chat) and
+[options](https://docs.ollama.com/modelfile#valid-parameters-and-values),
+[OpenAI Chat Completions](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create),
+and [pinned oMLX provider source](https://github.com/jundot/omlx/blob/53ab0e66d75fe46e3cfa7ed7a7762d3bbcf21e9c/omlx/server.py).
+The coordinated metadata contract section 3.4 records oMLX's successful omission
+capture; no new live provider claim is made here. The full pre-existing recovery
+and reasoning tests continue to guard unrelated characterized behavior.
+
+### Unfinished counterpart verification and publication holds
+
+**External provider and microgentic verification is unfinished initiative work.**
+No live Ollama/oMLX/OpenAI server source/version was exercised against this
+contract here; their verification commands/results and tested server identities
+are unavailable. The artifact's Elixir origin was identified and hashed, but
+its required gates were not run in this Rust-only task. No paired agreement is
+claimed from documentation or a common JSON schema.
+
+The initiative's microgentic finding identifies clean
+`e71b387e616cc8e7af813f9742715885fcce5254`, still pinned to Rust
+`4ca1ed279c02eab37827a1ed07c30e961155ecf3`, with local metadata/timing modules.
+Neither consumer identity was tested here. Coordination must run this exact
+request-fidelity-v1 artifact hash through that consumer and actual providers,
+cover supported API versions/errors/optional fields/behavior, include the same
+verification in each repository's required gates, and report source identities,
+commands and results alongside Rust's results. The post-release registry migration
+and benchmark-continuity hold remain. No sibling repository was modified.
+
+Stacey's coverage reconciliation remains binding: renewed passing evidence
+permits progress, the unexplained historical failure remains low severity, and
+further reproduction was not requested or performed. The 56% floor, engine,
+timeouts and existing assertions remain intact.
+
+### Current verification
+
+All commands ran with `/home/svetzal/.cargo/bin` on PATH and writable
+`CARGO_HOME=/tmp/mojentic-c2-cargo`. Verbose tests/builds and the remaining gates
+were run through `foundry capture`. Results are for the frozen source identities
+above, not substituted historical executions.
+
+| Exact command | Exit | Result |
+| --- | --- | --- |
+| `cargo fmt --check` | 0 | Passed |
+| `cargo clippy --all-targets --all-features -- -D warnings` | 0 | Passed |
+| `cargo test --verbose --all-features` | 0 | 697 passed, including all 12 request-fidelity verifier tests and 20 doctests; 24 pre-existing ignored doctests |
+| `cargo build --verbose --all-features` | 0 | Passed |
+| `cargo tarpaulin --all-features --fail-under 56` | 0 | 70.33%, 3350/4763 lines; all 12 verifier and 66 recovery tests passed under instrumentation |
+| `cargo deny check` | 0 | Advisories, bans, licenses and sources passed; existing duplicate-version warnings |
+| `cargo audit` | 0 | Passed; 267 locked dependencies scanned, no vulnerabilities reported |
+| `cargo test` | 0 | 697 passed; 24 pre-existing ignored doctests |
+| `cargo doc --no-deps --all-features` | 0 | Passed; two existing rustdoc warnings |
+| `mdbook build book` | 0 | HTML emitted; existing search-configuration diagnostic |
+| `cargo fetch` | 0 | Passed; CI setup dependency fetch |
+
+The targeted verifier command `cargo test --test request_fidelity` also passed
+(exit 0). The required all-feature/default/coverage gates execute that same
+artifact-backed verifier without a separate opt-in or independently authored
+fixture set. Contract and source hashes were rechecked after the gate sweep.
+
+The existing rustdoc warnings are an unresolved `connect` link in
+`src/realtime/broker.rs` and an unclosed `dyn` HTML tag in
+`src/examples/react/events.rs`. The installed mdBook emits
+`Failed to deserialize output.html` for the pre-existing `truncate-long-entries`
+search setting, then emits HTML and exits 0. These checks are not claimed
+warning-free. Generated `examples.md` and `use_cases.md` heading-only placeholders
+were removed after the build; the actual migration guide remains in the book.
+No gate, timeout, dependency or advisory policy was weakened or changed.
+
+All eleven discovered project/applicable CI checks exited 0. This completes the
+local request-fidelity correction; counterpart conformance and coordinated
+publication remain unfinished as stated above. Changes remain uncommitted for
+Foundry. Suggested commit message: `Preserve caller intent in completion requests`.
+
+
+## Historical correction: public HTTP recovery evidence (amendment item 9)
+
+Tested baseline: `17ad0cb1a6b5895f5dbe9f758189d61b266bb336` plus the
+uncommitted evidence correction. This section supersedes current-source claims
+in the historical sections below. No production behavior changed. Completed
+admission, capability and typed-error work and the existing broker/session
+reasoning, content and tool-fragment interruption matrix are preserved.
+Publication holds and other unverified initiative decisions remain in force.
+Stacey's renewed-passing-evidence reconciliation and unchanged 56% coverage floor
+remain binding; the historical unexplained failure remains low severity and was
+not reproduced.
+
+Executable set **recovery-status-selection-v1** uses
+`tests/contracts/recovery_status_selection_v1.json` (version 1), SHA-256
+`8250dd928817d3634eb239f90dbeee908398f8fcbba8623ba2913278fba19b30`.
+`tests/recovery.rs::recovery_status_selection_v1` executes its cases using the
+existing loopback HTTP fixture, HTTP adapters and public entrypoints. There are
+144 conversations: three adapters, two statuses, three policy selections and
+eight entrypoint/operation pairs (gateway and broker ordinary/structured/streaming;
+session ordinary/streaming). The fixture supplies the status, response and policy
+selection matrix; it is an executable local specification, not a jointly verified
+external provider contract.
+
+```sh
+cargo test --all-features --test recovery recovery_status_selection_v1
+cat tests/contracts/recovery_status_selection_v1.json tests/recovery.rs | sha256sum
+```
+
+Both 500 and 502 recover under the default selections with explicit Allow
+admission and a deterministic clock (20ms base, 10ms selected delay). Each has
+paired refusals changing only the caller's status set or HTTP category selection. Assertions
+compare captured HTTP bodies with observer bytes, compare paired initial payloads,
+verify byte-identical resends, stable logical IDs, distinct attempt IDs and exact
+wire attempt 1/2 progression. Lifecycle failures assert phase, operation, category,
+HTTP status, eligibility, reason, acceptance, progress, identity and exact delay;
+successful broker/session calls assert delivered content or structured values.
+Session history commits an assistant turn only on success. Scripted successes
+omit optional provider metadata; existing optional-field, 503, permanent-error,
+admission and interruption regressions remain in the full required gates.
+No protocol version changes: this introduces local executable set v1; no earlier
+version of this set exists. Existing capability and typed-errors v1 artifacts are
+unchanged.
+
+Proof first used real OpenAI HTTP and ChatSession with 502 excluded: the expected
+successful reply was rejected with Category::Http, ineligible/Permanent (exit 101).
+Restoring default caller policy passed the same conversation (exit 0), including
+payload/identity/lifecycle assertions. This demonstrated a caller-input correction;
+it did not demonstrate a production defect or justify changing the retry engine.
+
+The targeted Rust verification command above exited 0 on the final executable
+source. Its fixture-followed-by-verifier SHA-256 is
+`cab2704f1535979af73fb6c7fbaaab413119ea3e2f129bfa13040833e7a4614e`.
+The source bundle (Cargo.toml, tracked src files in git order, verifier, artifact)
+has SHA-256 `3fe8ad0563301c6bd86f607c9906c6dbfd6563e1c430dce160114fb73f8c67d6`:
+
+```sh
+{ cat Cargo.toml; git ls-files src | xargs cat; cat tests/recovery.rs tests/contracts/recovery_status_selection_v1.json; } | sha256sum
+```
+
+The test verifier alone has SHA-256
+`fdfdfcbd34fea08f497512aeb326fd004016283c1153919eccb6c96abd23d520`.
+Full gate results follow below.
+
+External Ollama/oMLX/OpenAI implementation commits, provider verification commands
+and results against this exact set: **unavailable / not run**. External Rust
+consumer commit, verification command and result: **unavailable / not run**.
+The initiative's microgentic finding (`e71b387`, retained dependency `4ca1ed2`)
+was not verified here. Both sides must execute this same identifiable set in their
+required gates in separately authorized work; missing paired verification remains
+unfinished coordination work. Local scripted responses are not doubles derived
+from jointly verified contracts. No cross-repository compatibility or release
+readiness is claimed, and no sibling repository was modified.
+
+The initiative brief SHA-256 was verified as
+`ea6a0efa56bfb3cd74b5ce728f80cc33c6fbd853114bec94b8aabe79f5d28e6e`.
+The worktree's `../RELEASE-3.0.0.md` link is absent; the supplied verified brief
+and existing conformance contract provenance were used. Rust 2021, implicit
+single-package resolver, Tokio, stable CI toolchain, formatting, features,
+dependencies and runtime behavior are unchanged. Cargo.lock was absent at entry
+and generated only as an ignored gate artifact. MSRV is undeclared; declaring it
+remains a separate policy recommendation. Foundry owns finalization; there is no
+landed correction SHA yet. Verification uses Rust/Cargo 1.99.0,
+cargo-tarpaulin 0.37.2, cargo-audit 0.22.2 and cargo-deny 0.20.2. The generated,
+ignored Cargo.lock used for this sweep has SHA-256
+`390c599335be1aed77a5ff897c5f053631e31611d89ac66e2b06cd056e29034d`.
+
+### Final gate results for this evidence correction
+
+All commands ran in the writable task worktree against the source bundle above.
+Verbose tests/builds used `foundry capture`. The targeted executable set probe
+and all ten final gates/applicable CI checks exited 0:
+
+| Command | Exit | Result |
+| --- | --- | --- |
+| `cargo test --all-features --test recovery recovery_status_selection_v1` | 0 | All 144 scripted HTTP conversations passed |
+| `cargo fmt --check` | 0 | Passed |
+| `cargo clippy --all-targets --all-features -- -D warnings` | 0 | Passed |
+| `cargo test --verbose --all-features` | 0 | 684 tests passed, including 66 recovery tests and 19 doctests; 24 existing ignored doctests |
+| `cargo build --verbose --all-features` | 0 | Passed |
+| `cargo tarpaulin --all-features --fail-under 56` | 0 | 69.95%, 3331/4762 lines; unchanged 56% floor |
+| `cargo deny check` | 0 | Advisories, bans, licenses and sources passed; existing duplicate-version warnings |
+| `cargo audit` | 0 | No vulnerabilities reported; 267 dependencies scanned |
+| `cargo test` | 0 | Same 684 passing tests and 24 existing ignored doctests |
+| `cargo doc --no-deps --all-features` | 0 | Built; existing unresolved connect link and unclosed dyn tag warnings |
+| `mdbook build book` | 0 | HTML emitted; existing truncate-long-entries configuration diagnostic |
+
+The first sweep stopped at cargo-deny's read-only advisory-database lock (exit 1).
+Relocating CARGO_HOME initially exposed mise's attempt to install into a read-only
+location (exit 1). Security verification then used
+`CARGO_HOME=/tmp/mojentic-ru-item9-cargo` and `/home/svetzal/.cargo/bin` first on
+PATH, with writable advisory databases and the existing registry/git caches.
+The full gate sequence was rerun after that environment fix. No repository
+configuration, dependency, advisory suppression or gate was changed. Both coverage
+runs passed at 69.95%; no historical unexplained failure was reproduced.
+The rustdoc warnings and mdBook diagnostic predate this correction and remain
+outside its scope; documentation checks are not claimed warning-free. Generated
+mdBook placeholder source pages were removed after verification.
+
+## Historical typed-error correction (amendment item 8)
+
+This correction starts at `3bf99ad21759c87ae27d8130b2d7de6c5557a7d5` and remains
+uncommitted for Foundry finalization. The capability correction below is a
+historical record, not the current source identity or current gate results.
+Only item 8 is advanced here. Publication holds and all other unverified
+initiative decisions remain in force. Stacey's renewed-passing-evidence coverage
+reconciliation remains binding: the historical unexplained failure is low
+severity and no further reproduction is requested.
+
+Executable contract: **typed-errors-v1**, Rust artifact
+`tests/contracts/typed_errors_v1.json`, SHA-256
+`48d957ccdabc9fa606d9e1fa32f7969c7f0c61259b6072c832eb0778e3450aee`.
+The verifier is `tests/recovery.rs`, reusing the existing loopback HTTP fixture,
+public gateway wrappers, broker and session. It runs in both the required test
+and unchanged tarpaulin gates. The artifact supplies provider response bodies,
+invalid policy selections and capture stages. This Rust-specific executable set
+is distinct from the Elixir set of the same logical name; matching names do not
+establish shared executable verification.
+
+Verification command: `cargo test --all-features --test recovery typed_errors_v1`.
+The matrix covers all three maintained adapters, three operations through gateway
+and broker, and the session's two exposed operations: length, capture at three
+stages, original JSON errors and typed invalid frames. Additional cases reject
+invalid construction before HTTP; exercise optional fields; and preserve legacy
+non-recovery length success. This Rust correction introduces v1;
+no wire protocol version is changed. The detailed mapping is in RECOVERY-CONFORMANCE.md.
+
+Rust provider/consumer boundary wiring is exercised locally against these exact
+scripted cases. These fixtures have **not** been verified against external provider
+implementations and must not be treated as doubles derived from jointly verified
+contracts. OpenAI/Ollama/oMLX provider commits, verification commands and results:
+**unavailable / not run**. External Rust consumer commit, command and results against
+this exact artifact and verifier: **unavailable / not run**. microgentic remains
+initiative work; its reported `e71b387` and retained pin `4ca1ed2` were not tested
+here. Elixir's typed-errors-v1 cases were inspected as reference only, not rerun.
+Missing paired verification is unfinished work for initiative coordination in
+separately authorized repositories. No sibling checkout was changed, and no
+cross-repository compatibility, consumer migration or release readiness is claimed.
+
+Rust 2021, implicit single-package resolver, Tokio, dependency manifest, default
+features, stable CI toolchain, formatting edition, coverage engine and 56% floor
+are unchanged. No declared MSRV or toolchain pin exists; declaring an MSRV remains
+a separate policy recommendation. Cargo.lock was absent at entry and is generated
+only as an ignored verification artifact. No version/ref/publication changes were
+made. The verified initiative brief and authoritative contract hashes are recorded
+in RECOVERY-CONFORMANCE.md.
+
+The tested Rust implementation is the baseline above plus this uncommitted source
+bundle, SHA-256 `cd7d3c365cac50dda6a44eecc493bd5587e91731080f4b825f467eca48cbb69c`:
+
+```sh
+cat src/error.rs src/llm/recovery/{adapter,engine,frames,policy,types}.rs tests/recovery.rs tests/contracts/typed_errors_v1.json | sha256sum
+```
+
+The complete executable set (fixture followed by verifier) has SHA-256
+`8eaeff4048e2d2ecabd50354b9895abe966ba4f4499e74abc61b7c873578c57d`:
+
+```sh
+cat tests/contracts/typed_errors_v1.json tests/recovery.rs | sha256sum
+```
+
+Verification uses Rust/Cargo 1.99.0, cargo-tarpaulin 0.37.2, the existing writable
+Cargo cache, and the generated ignored Cargo.lock SHA-256
+`390c599335be1aed77a5ff897c5f053631e31611d89ac66e2b06cd056e29034d`.
+The unchanged capability artifact retains SHA-256
+`40e8da683ce4bfcfebf9892ca51a53a701488d463977f021922cd6317203aa76`.
+
+### Final verification for item 8
+
+All seven discovered `.hone-gates.json` gates and the additional default-feature
+and applicable CI documentation checks exited 0 on the source bundle above.
+Verbose builds/tests and full diagnostics were captured through `foundry capture`.
+The standalone versioned verifier also exited 0 on that same final source.
+
+| Exact command | Exit | Result |
+| --- | --- | --- |
+| `cargo fmt --check` | 0 | Passed |
+| `cargo clippy --all-targets --all-features -- -D warnings` | 0 | Passed; zero Clippy warnings |
+| `cargo test --verbose --all-features` | 0 | 683 passed, including 19 doctests; 24 pre-existing ignored doctests |
+| `cargo build --verbose --all-features` | 0 | Passed |
+| `cargo tarpaulin --all-features --fail-under 56` | 0 | 69.96%, 3331/4761 lines; unchanged 56% floor |
+| `cargo deny check` | 0 | Advisories, bans, licenses and sources passed; existing duplicate-version warnings |
+| `cargo audit` | 0 | Passed; no vulnerabilities reported |
+| `cargo test` | 0 | 683 passed; 24 pre-existing ignored doctests |
+| `cargo doc --no-deps --all-features` | 0 | Passed with two existing warnings (connect link and dyn HTML tag) |
+| `mdbook build book` | 0 | Exit 0 and HTML emitted; existing truncate-long-entries configuration diagnostic |
+| `cargo test --all-features --test recovery typed_errors_v1` | 0 | 4 tests passed; includes the 144-case boundary matrix, 24 invalid policies, optional fields, legacy length and session proof |
+| `cargo test --all-features --test recovery` | 0 | All 65 recovery tests passed |
+
+The proof-first session probe exited 101 on the original implementation because
+it accepted a length-terminated reply as success. The final corrected probe exits
+0 and asserts the concrete length cause, exact received body, retained history,
+observed but undelivered content, user-turn retention and one HTTP request.
+
+The initial full test run exposed three assertions for the former private wrapper
+and string length cause. They were migrated to direct serde downcasts and the
+concrete length variant, retaining their decoder details, telemetry, history and
+follow-up tool assertions. The subsequent complete gate sweep passed. No gate,
+assertion scope, timeout, dependency, advisory policy or coverage floor was weakened.
+This does not diagnose or reproduce the unrelated historical coverage failure.
+
+Documentation checks are not warning-free: rustdoc retains its existing unresolved
+`connect` link and unclosed `dyn` tag, and mdBook reports its existing unsupported
+`truncate-long-entries` search configuration before writing HTML and exiting 0.
+Generated mdBook placeholder source pages were removed after checking. These
+existing diagnostics remain outside this correction.
+
+Paired external verification remains unavailable as recorded above. The local
+passes establish Rust regression evidence only; all publication and consumer
+migration holds remain in force.
+
+
+## Historical item 3 correction record
+
+
+This increment implements October 12 recovery amendment item 3, **Capabilities**,
+for existing Ollama, oMLX and OpenAI recovery adapters, preserving completed item 2.
+It is not whole-initiative certification. Package version remains 2.1.0. Publication
+holds remain until all six ports are ready; Foundry owns Git finalization.
+
+## Inputs and tested source identity
+
+- Starting/tested commit: `6b5895be44fd9f81196d2004900f2059bc71c3ce`, plus
+  the uncommitted capability implementation and tests identified below.
+- Initiative brief SHA-256, verified before work:
+  `ea6a0efa56bfb3cd74b5ce728f80cc33c6fbd853114bec94b8aabe79f5d28e6e`.
+- Binding root `TRANSIENT-RECOVERY-2026-10.md` SHA-256:
+  `a53a3a4eb118fa4687dd703d6ce918dd40dd6cb4eda796abc6c429a6e932e7a3`.
+  Read with root `RELEASE-3.0.0.md` from the coordinator checkout at
+  `/home/svetzal/Work/Projects/Personal/mojentic-unify`; the isolated worktree's
+  `../RELEASE-3.0.0.md` is absent. No root contract was edited.
+- Reference Elixir source inspected at `ddb2217c8245b041a20fd25f34f5aa6fbfaee2ce`:
+  `lib/mojentic/llm/recovery/capabilities.ex`,
+  `test/contracts/recovery_capabilities_v1.json` and its executable verification
+  `test/mojentic/llm/recovery_capabilities_test.exs`. This is inspection, not a
+  new Elixir test result or a consumer verification.
+- Reused executable declaration contract **recovery-capabilities-v1**:
+  [tests/contracts/recovery_capabilities_v1.json](tests/contracts/recovery_capabilities_v1.json),
+  SHA-256 `40e8da683ce4bfcfebf9892ca51a53a701488d463977f021922cd6317203aa76`.
+  The bytes match the reference exactly. Original inspection dates stay
+  2026-10-16; endpoint documentation was independently rechecked 2026-10-17.
+- Changed production/test source aggregate SHA-256:
+  `8193c5cfaa3217a66ba4614e4a02f852283f3fcea3f8c9935dddd1181ab1067e`.
+  Reproduce from the repository root with:
+
+  ```sh
+  sha256sum src/llm/recovery/adapter.rs src/llm/recovery/capabilities.rs src/llm/recovery/mod.rs src/llm/recovery/types.rs tests/recovery.rs tests/contracts/recovery_capabilities_v1.json | sha256sum
+  ```
+
+Rust 2021, implicit single-package resolver, Tokio, dependencies and feature
+semantics/defaults are unchanged. No workspace, toolchain pin or declared MSRV
+exists; CI selects stable. A declared library MSRV remains a separate policy
+recommendation. Cargo.lock was absent at entry and remains ignored by the library
+policy; the generated verification lock SHA-256 is
+`390c599335be1aed77a5ff897c5f053631e31611d89ac66e2b06cd056e29034d`.
+Cargo.toml SHA-256 remains
+`febc01c4edffd21752b9d3778158466f00caa19e3c8da8474cb9aea8a0bb7d21`.
+Verification uses Rust/Cargo 1.99.0 and cargo-tarpaulin 0.37.2 with the existing engine and 56% floor.
+
+## Item 3 executable mapping
+
+| Decision | Executable evidence |
+| --- | --- |
+| Every maintained recovery adapter exposes five canonical capability declarations | `capability_contract_public_adapters_v1` calls each actual public adapter's `with_recovery`, then `capabilities()` |
+| Values are exact per endpoint, including oMLX unknown local cancellation/idempotency | Same test compares the complete values object with v1 reference cases, not a count or schema |
+| Every value has exact endpoint, citation, inspection date and explanatory evidence | Same test compares the complete `capability_evidence()` object for all fifteen cases; validates required HTTPS citations, dates and nonempty bases |
+| Correct provider selected even when values match | Same test starts with OpenAI: hardcoding Ollama evidence fails on endpoint/citation/basis although all five values match |
+| Exact-attempt termination stays unknown | Exact v1 equality plus typed `Support::Unknown` assertion through each adapter |
+| Request fidelity survives without shared-default assumptions | `immutable_reasoning_tools_schema_and_sampling_all_adapters` keeps payload equality, schema, sampling, native reasoning and history assertions, selecting `thinking`/`reasoning_content` explicitly |
+| Request/retry/cancellation/admission behavior remains unchanged | Existing full `tests/recovery.rs` suite, including item 2 matrices below |
+
+Proof-first acceptance:
+`cargo test --all-features --test recovery capability_contract_public_adapters_v1 -- --exact`.
+The original three-field default failed with exit **101**. After implementing five
+provider-specific declarations it passed with exit **0**. The strengthened exact
+evidence test then rejected deliberate hardcoded Ollama provider selection with
+exit **101** on OpenAI evidence. Restoring selection from the actual inner adapter
+passed the identical command with exit **0**. This proves semantic sensitivity at
+the public adapter boundary; no capability mocks or marker toggle are used.
+
+The v1 set is the supported executable declaration contract. The old unreleased three-key
+Rust serialized capability object is intentionally replaced in this coordinated major
+initiative; it is not a second supported contract version. CHANGELOG and the book
+explain literal/key migration and the idempotency declaration change. The Rust
+`request_cancel` field is retained as a remote cancellation alias, verified by
+the same public-adapter test, and omitted from serialization. All five
+evidence records are required; none is optional. Existing completion request,
+response, error and optional-field cases remain in the recovery suite unchanged.
+No new Anthropic adapter, remote cancel/status request or idempotency header is
+introduced. Values describe inspected endpoint documentation, not a live provider
+certification or permission to resend.
+
+## Preserved item 2 mapping
+
+| Decision / invariant | Named executable evidence |
+| --- | --- |
+| Completed absence of permission stops after one request with distinct outcome and terminal lifecycle reason | `admission_unresolved_http_matrix` |
+| Failed HTTP status, body/cause, history, logical/attempt identity and wire attempt 1 survive; no admission-allowed, delay or retry event follows | `admission_unresolved_http_matrix` |
+| Safe Debug/Display/serialized errors and lifecycle omit sensitive payload; new stable serialized outcome/reason | `admission_unresolved_http_matrix` |
+| Broker/session preserve typed error and history, retain the user turn, deliver no semantic output and execute zero tools | `admission_unresolved_broker_session_http_matrix` |
+| Explicit Allow retries immutable payload once with a new attempt ID; explicit Reject stops distinctly | `admission_explicit_decisions_http_matrix` |
+| Pending is still pending until explicit Allow | `review_explicit_pending_admission_all_adapters` |
+| Pending hook cancellation remains prompt; no later send | `review_pending_and_backoff_cancel_matrix` |
+| Pending hook budget expiry terminates without Allow/RetryStarted or an invented attempt | `admission_pending_budget_http_matrix` |
+| Absent hook preserves ambiguous-local refusal and remote retry rules | `admission_absent_local_remote_http_matrix` |
+
+
+## Boundary coordination gap
+
+Rust provider verification uses the shared v1 bytes and actual public adapters:
+
+```sh
+cargo test --all-features --test recovery capability_contract_public_adapters_v1 -- --exact
+cargo test --all-features --test recovery
+cargo test --verbose --all-features
+```
+
+The all-feature test gate executes the contract probe automatically; no separate
+CI contract runner is necessary. The full recovery suite still tests HTTP wiring,
+request fidelity, errors, optional fields and broker/session journeys. Scripted
+HTTP responses are not live provider verification and do not establish a paired
+consumer agreement.
+
+**Missing paired consumer verification is unfinished initiative work.** No consumer
+commit was tested, and no consumer command/result against this v1 hash is available.
+The initiative records microgentic at `e71b387`, retaining Mojentic Git pin `4ca1ed2`;
+neither consumer revision was verified here. Coordination must provide this same
+contract/hash to the consumer, execute it in that repository's required gates on
+an identified commit, and report its command/results alongside the Rust identity
+above. Elixir's reference test is a port reference, not Rust's consumer. Its tests
+were not rerun in this Rust-only correction. No sibling checkout was modified.
+No cross-repository compatibility, package migration or release readiness is claimed.
+
+## Coverage reconciliation: Stacey's binding decision
+
+Stacey's reconciliation permits progress on renewed passing evidence. The earlier
+unexplained `Test failed during run` remains **low severity**; **further reproduction
+is not requested**. Later passing runs do not diagnose that historical failure.
+The prior request to obtain/reproduce it is superseded by this binding decision.
+The coverage engine, assertions, timeouts, test scope and 56% floor remain intact.
+No speculative runtime/harness correction, suppression or weakened check was made.
+
+## Remaining initiative decisions
+
+| Scope | Status |
+| --- | --- |
+| Recovery amendment item 2 | Preserved; renewed regression suite |
+| Recovery amendment item 3 | Exact values/evidence verified through all three maintained public recovery adapters |
+| Recovery items 1 and 4–8, 500/502 cases, and other recovery decisions | No renewed whole-contract certification; historical map remains in RECOVERY-CONFORMANCE.md |
+| Native reasoning, context-window/first-token support, other audit fixes and packaging | Unverified by this increment |
+| Paired consumers and coordinated publication | Missing; publication holds remain |
+
+## Renewed verification
+
+Commands run using `/home/svetzal/.cargo/bin` on PATH and writable
+`CARGO_HOME=/tmp/mojentic-c2-cargo` for dependency/advisory caches. Verbose
+builds/tests are captured by `foundry capture`. No dependency or advisory policy
+was changed. Results below refer to the source identity above; prior conformance
+results are not substituted for current execution.
+
+| Exact command | Exit | Result |
+| --- | --- | --- |
+| `cargo fmt --check` | 0 | Passed |
+| `cargo clippy --all-targets --all-features -- -D warnings` | 0 | Passed |
+| `cargo test --verbose --all-features` | 0 | 679 passed; 24 existing ignored doctests |
+| `cargo build --verbose --all-features` | 0 | Passed |
+| `cargo tarpaulin --all-features --fail-under 56` | 0 | 69.86% coverage, 3306/4732 lines covered; unchanged 56% floor |
+| `cargo deny check` | 0 | Advisories, bans, licenses and sources passed; existing duplicate-version warnings |
+| `cargo audit` | 0 | Passed; no vulnerabilities reported |
+| `cargo test` | 0 | 679 passed; 24 existing ignored doctests |
+| `cargo test --all-features --test recovery` | 0 | 61 recovery tests passed |
+| `cargo doc --no-deps --all-features` | 0 | Passed; existing unresolved `connect` link and unclosed `dyn` tag warnings |
+| `mdbook build book` | 0 | HTML emitted (exit 0); existing `truncate-long-entries` setting emits a configuration error |
+
+The targeted public-adapter v1 contract probe also passed with exit **0** on
+the final source. The final all-feature test gate executed **679** passing tests
+(including 19 doctests), with 24 pre-existing ignored doctests. All **61** recovery
+tests passed. The first sweep measured 69.84% (3305/4732); the final serialized
+sweep measured 69.86% (3306/4732). Both used the exact required tarpaulin command
+and unchanged 56% floor; neither diagnoses the historical unexplained failure.
+
+All eleven discovered gates/applicable CI checks above exited 0. The final
+source was frozen throughout that sweep. No advisory suppression, dependency,
+coverage-engine, assertion, timeout, gate or CI change was made. mdBook-generated
+placeholder pages were removed after verification. Consumer verification remains
+missing as described above.
+
+The installed mdBook logs `Failed to deserialize output.html` for the existing
+`truncate-long-entries` search setting, then writes HTML and exits 0. This
+configuration diagnostic and the two existing rustdoc warnings remain outside
+the capability correction; documentation checks are not claimed warning-free.

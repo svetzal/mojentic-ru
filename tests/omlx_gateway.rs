@@ -812,6 +812,13 @@ mod stream_events {
             .expect("oMLX supports stream events")
             .collect()
             .await;
+        assert!(events.iter().any(
+            |event| matches!(event, StreamEvent::Metrics(m) if m.request_duration_ms.is_some())
+        ));
+        let events = events
+            .into_iter()
+            .filter(|event| !matches!(event, StreamEvent::Metrics(_)))
+            .collect();
         (events, sent(&captured))
     }
 
@@ -904,7 +911,7 @@ mod stream_events {
         assert!(
             matches!(
                 events.as_slice(),
-                [StreamEvent::Error(StreamEventError::ProviderError { status: Some(404), error })]
+                [StreamEvent::Metrics(_), StreamEvent::Error(StreamEventError::ProviderError { status: Some(404), error })]
                     if error["type"] == "not_found_error"
             ),
             "{events:?}"
@@ -938,7 +945,11 @@ mod legacy_streaming {
         let config = CompletionConfig::default();
         let items: Vec<_> =
             gateway.complete_stream(MODEL, &messages, Some(&tools), &config).collect().await;
-        let chunks = items.into_iter().map(|item| item.expect("no stream error")).collect();
+        let chunks = items
+            .into_iter()
+            .map(|item| item.expect("no stream error"))
+            .filter(|chunk| !matches!(chunk, StreamChunk::Metrics(_)))
+            .collect();
         (chunks, sent(&captured))
     }
 
@@ -1048,7 +1059,7 @@ mod legacy_streaming {
         assert!(
             matches!(
                 items.as_slice(),
-                [Err(MojenticError::GatewayError(message))]
+                [Ok(StreamChunk::Metrics(_)), Err(MojenticError::GatewayError(message))]
                     if message.contains("404") && message.contains("not_found_error")
             ),
             "{items:?}"

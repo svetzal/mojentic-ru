@@ -13,6 +13,7 @@ use crate::llm::gateways::openai_model_registry::{get_model_registry, ModelType}
 use crate::llm::gateways::openai_stream_events::OpenAiEventParser;
 use crate::llm::models::{LlmGatewayResponse, LlmMessage, ResponseEvidence};
 use crate::llm::stream_events::{drive_event_stream, StreamEventError, StreamEventStream};
+use crate::llm::stream_timing::{system_clock, StreamClock, StreamTiming};
 use crate::llm::tools::LlmTool;
 use async_trait::async_trait;
 use futures::stream::Stream;
@@ -20,6 +21,7 @@ use reqwest::Client;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::pin::Pin;
+use std::sync::Arc;
 use tracing::{debug, info, warn};
 
 /// Configuration for connecting to OpenAI API.
@@ -46,11 +48,18 @@ impl Default for OpenAIConfig {
 /// This gateway provides access to OpenAI models through their API,
 /// supporting text generation, structured output, tool calling, and embeddings.
 pub struct OpenAIGateway {
+    clock: Arc<dyn StreamClock>,
     client: Client,
     config: OpenAIConfig,
 }
 
 impl OpenAIGateway {
+    /// Select a monotonic measurement clock. The default uses std::time::Instant.
+    pub fn with_stream_clock(mut self, clock: Arc<dyn StreamClock>) -> Self {
+        self.clock = clock;
+        self
+    }
+
     /// Opt into per-request recovery without changing legacy entrypoints.
     pub fn with_recovery(
         self,
@@ -74,7 +83,11 @@ impl OpenAIGateway {
 
         let client = client_builder.build().unwrap();
 
-        Self { client, config }
+        Self {
+            client,
+            config,
+            clock: system_clock(),
+        }
     }
 
     /// Create gateway with custom API key.
@@ -254,6 +267,10 @@ impl Default for OpenAIGateway {
 
 #[async_trait]
 impl LlmGateway for OpenAIGateway {
+    fn stream_clock(&self) -> Arc<dyn StreamClock> {
+        self.clock.clone()
+    }
+
     async fn get_model_context_window(&self, model: &str) -> Result<Option<ModelContextWindow>> {
         get_model_registry()
             .registered_context_window(model)
@@ -482,65 +499,71 @@ impl LlmGateway for OpenAIGateway {
         tools: Option<&'a [Box<dyn LlmTool>]>,
         config: &'a CompletionConfig,
     ) -> Pin<Box<dyn Stream<Item = Result<StreamChunk>> + Send + 'a>> {
-        Box::pin(async_stream::stream! {
-            info!("Starting OpenAI streaming completion");
-            debug!("Model: {}, Message count: {}", model, messages.len());
+        let timing = StreamTiming::new(self.stream_clock());
+        let measure = timing.clone();
+        let source: Pin<Box<dyn Stream<Item = Result<StreamChunk>> + Send + 'a>> =
+            Box::pin(async_stream::stream! {
+                info!("Starting OpenAI streaming completion");
+                debug!("Model: {}, Message count: {}", model, messages.len());
 
-            // Check if model supports streaming
-            let registry = get_model_registry();
-            let capabilities = registry.get_model_capabilities(model);
-            if !capabilities.supports_streaming {
-                yield Err(MojenticError::GatewayError(format!(
-                    "Model {} does not support streaming",
-                    model
-                )));
-                return;
-            }
-
-            let (mut body, supports_tools) = match self.chat_body(model, messages, config) {
-                Ok(built) => built,
-                Err(e) => {
-                    yield Err(e);
+                // Check if model supports streaming
+                let registry = get_model_registry();
+                let capabilities = registry.get_model_capabilities(model);
+                if !capabilities.supports_streaming {
+                    yield Err(MojenticError::GatewayError(format!(
+                        "Model {} does not support streaming",
+                        model
+                    )));
                     return;
                 }
-            };
-            body["stream"] = serde_json::json!(true);
 
-            // Add tools if provided and supported
-            if let Some(tools) = tools {
-                if supports_tools {
-                    let tool_defs: Vec<_> = tools.iter().map(|t| t.descriptor()).collect();
-                    if let Ok(tools_value) = serde_json::to_value(tool_defs) {
-                        body["tools"] = tools_value;
+                let (mut body, supports_tools) = match self.chat_body(model, messages, config) {
+                    Ok(built) => built,
+                    Err(e) => {
+                        yield Err(e);
+                        return;
+                    }
+                };
+                body["stream"] = serde_json::json!(true);
+
+                // Add tools if provided and supported
+                if let Some(tools) = tools {
+                    if supports_tools {
+                        let tool_defs: Vec<_> = tools.iter().map(|t| t.descriptor()).collect();
+                        if let Ok(tools_value) = serde_json::to_value(tool_defs) {
+                            body["tools"] = tools_value;
+                        }
                     }
                 }
-            }
 
-            // Make streaming API request
-            let response = match self.chat_request(&body).send().await {
-                Ok(r) => r,
-                Err(e) => {
-                    yield Err(e.into());
+                // Make streaming API request
+                measure.dispatch();
+                let response = match self.chat_request(&body).send().await {
+                    Ok(r) => r,
+                    Err(e) => {
+                        yield Err(e.into());
+                        return;
+                    }
+                };
+
+                if !response.status().is_success() {
+                    yield Err(MojenticError::GatewayError(format!(
+                        "OpenAI API error: {}",
+                        response.status()
+                    )));
                     return;
                 }
-            };
 
-            if !response.status().is_success() {
-                yield Err(MojenticError::GatewayError(format!(
-                    "OpenAI API error: {}",
-                    response.status()
-                )));
-                return;
-            }
-
-            let mut parser = OpenAiLegacyParser::default();
-            let chunks = legacy_body_stream(response.bytes_stream(), move |line: &str| {
-                parser.parse_line(line)
+                let mut parser = OpenAiLegacyParser::default();
+                let chunks = legacy_body_stream(response.bytes_stream(), move |line: &str| {
+                    measure.observe_line(line);
+                    parser.parse_line(line)
+                });
+                for await chunk in chunks {
+                    yield chunk;
+                }
             });
-            for await chunk in chunks {
-                yield chunk;
-            }
-        })
+        timing.legacy(source, "openai")
     }
 
     fn complete_stream_events<'a>(
@@ -556,7 +579,12 @@ impl LlmGateway for OpenAIGateway {
         body["stream"] = serde_json::json!(true);
         body["stream_options"] = serde_json::json!({"include_usage": true});
 
-        Ok(drive_event_stream(self.chat_request(&body), OpenAiEventParser::default()))
+        Ok(drive_event_stream(
+            self.chat_request(&body),
+            OpenAiEventParser::default(),
+            self.stream_clock(),
+            "openai",
+        ))
     }
 }
 
@@ -1017,7 +1045,11 @@ mod tests {
         let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url());
         let messages = vec![LlmMessage::user("Hi")];
         let config = CompletionConfig::default();
-        gateway.complete_stream("gpt-4o", &messages, None, &config).collect().await
+        gateway
+            .complete_stream("gpt-4o", &messages, None, &config)
+            .filter(|item| futures::future::ready(!matches!(item, Ok(StreamChunk::Metrics(_)))))
+            .collect()
+            .await
     }
 
     #[tokio::test]
@@ -1094,8 +1126,11 @@ mod tests {
         let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", url);
         let messages = vec![LlmMessage::user("Hi")];
         let config = CompletionConfig::default();
-        let items: Vec<_> =
-            gateway.complete_stream("gpt-4o", &messages, None, &config).collect().await;
+        let items: Vec<_> = gateway
+            .complete_stream("gpt-4o", &messages, None, &config)
+            .filter(|item| futures::future::ready(!matches!(item, Ok(StreamChunk::Metrics(_)))))
+            .collect()
+            .await;
 
         assert!(
             matches!(items.as_slice(), [Ok(StreamChunk::Content(text))] if text == "Caf\u{e9} \u{1f30a}"),
@@ -1116,8 +1151,11 @@ mod tests {
         let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url());
         let messages = vec![LlmMessage::user("Hi")];
         let config = CompletionConfig::default();
-        let items: Vec<_> =
-            gateway.complete_stream("gpt-4o", &messages, None, &config).collect().await;
+        let items: Vec<_> = gateway
+            .complete_stream("gpt-4o", &messages, None, &config)
+            .filter(|item| futures::future::ready(!matches!(item, Ok(StreamChunk::Metrics(_)))))
+            .collect()
+            .await;
 
         assert!(matches!(
             items.as_slice(),
@@ -1308,7 +1346,25 @@ mod tests {
             let stream = gateway
                 .complete_stream_events("gpt-4o", &messages, config)
                 .expect("OpenAI supports stream events");
-            stream.collect().await
+            let events: Vec<_> = stream.collect().await;
+            let metrics: Vec<_> = events
+                .iter()
+                .filter_map(|e| {
+                    if let StreamEvent::Metrics(m) = e {
+                        Some(m)
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            assert_eq!(metrics.len(), 1);
+            assert!(metrics[0].request_duration_ms.is_some());
+            // These tests retain their provider/terminal assertions; section2's
+            // public contract matrix asserts exact client timing separately.
+            events
+                .into_iter()
+                .filter(|event| !matches!(event, StreamEvent::Metrics(_)))
+                .collect()
         }
 
         #[tokio::test]

@@ -9,16 +9,24 @@ context-window/first-token support, and the initiative's specified audit fixes.
 All six ports must be ready before coordinated publication. Preserve publication
 holds and report cross-repository verification gaps to the initiative.
 
-This Foundry correction advances recovery amendment item 3 (Capabilities) for
-existing Ollama, oMLX and OpenAI adapters, with exact executable declarations,
-provider citations, tests and accompanying documentation. Preserve completed
-item 2 admission behavior and Stacey's binding coverage reconciliation: renewed
-passing evidence permits progress; the unexplained failure remains low severity
-and further reproduction is not requested. Do not add an Anthropic adapter.
-Do not bump versions, tag, publish, change dependencies or runtime behavior outside
-that correction. Foundry owns Git finalization; leave changes in the working tree
-without committing, pushing, merging, rebasing, or modifying refs. Other initiative
-decisions remain unverified by this correction; see CONFORMANCE-3.0.0.md.
+This Foundry correction completes the authorized Rust readiness self-assessment
+for RELEASE-3.0.0.md parts 1–5: missing client stream timing, executable public
+HTTP contracts, packaging isolation, fresh packaged-consumer verification,
+and synchronized release records. Preserve completed cycles 1–8, especially
+admission, capability, metadata and request-fidelity behavior. Stacey's binding
+coverage reconciliation permits progress on renewed passing evidence; the
+unexplained historical failure remains low severity and further reproduction
+is not requested. Library readiness is self-validated through public APIs and
+the packaged artifact. External providers, dependents and another port's
+executable snapshot are not prerequisites to publication. Dependents verify
+when adopting the released package; registry adoption and post-publication
+install verification remain held for coordinated release approval.
+
+Do not add Anthropic, bump versions, tag, publish, change dependencies, features,
+Rust edition, formatting edition or Tokio. Foundry owns Git finalization; leave
+changes in the working tree without committing, pushing, merging, rebasing or
+modifying refs. Write only mojentic-ru. See CONFORMANCE-3.0.0.md for the binding
+decision map and actual verification results.
 
 Why this project exists and what problem does it solve: @CHARTER.md
 

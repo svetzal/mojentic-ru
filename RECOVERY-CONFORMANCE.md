@@ -1,3 +1,8 @@
+> Current whole-release certification: see CONFORMANCE-3.0.0.md. Historical
+> external counterpart prerequisites below are superseded by Stacey's library
+> self-validation rule; dependent adoption follows publication. All completed
+> recovery admission, capability and metadata behavior remains covered.
+
 # Rust completion recovery conformance
 
 ## Current correction: October 12 amendment item 9 public-boundary evidence
@@ -210,7 +215,7 @@ though OpenAI/Ollama values are identical; restoring provider selection passed.
 retry payload and native reasoning assertions using explicit provider field
 names, without consulting capability defaults. Requests, retry, cancellation and
 admission logic are unchanged. See CONFORMANCE-3.0.0.md for current source identity,
-gate evidence and the missing paired consumer verification.
+gate evidence and the current library self-validation results.
 
 ## Executed public HTTP assertions
 

@@ -272,12 +272,26 @@ pub enum Outcome {
     BudgetExpired,
     ObserverFailed,
 }
-#[derive(Debug, Clone, Serialize)]
+#[derive(Clone, Serialize)]
 pub struct RecoveryError {
+    /// Client stream timing and original provider metrics, retained on terminal failure.
+    /// Inspect explicitly: default Debug/serialization omit raw provider usage.
+    #[serde(skip_serializing)]
+    pub stream_metrics: Option<Box<crate::llm::gateway::StreamMetrics>>,
     pub outcome: Outcome,
     pub failure: Box<Failure>,
     pub history: Vec<Failure>,
 }
+impl fmt::Debug for RecoveryError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RecoveryError")
+            .field("outcome", &self.outcome)
+            .field("failure", &self.failure)
+            .field("history", &self.history)
+            .finish()
+    }
+}
+
 impl fmt::Display for RecoveryError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
@@ -291,12 +305,26 @@ impl fmt::Display for RecoveryError {
     }
 }
 impl Error for RecoveryError {}
-#[derive(Debug, Clone, Serialize)]
+#[derive(Clone, Serialize)]
 pub struct RecoveryReport {
+    /// Client stream timing and original provider metrics for a completed stream.
+    /// Inspect explicitly: default Debug/serialization omit raw provider usage.
+    #[serde(skip_serializing)]
+    pub stream_metrics: Option<Box<crate::llm::gateway::StreamMetrics>>,
     pub identity: Identity,
     pub progress: Progress,
     pub history: Vec<Failure>,
 }
+impl fmt::Debug for RecoveryReport {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RecoveryReport")
+            .field("identity", &self.identity)
+            .field("progress", &self.progress)
+            .field("history", &self.history)
+            .finish()
+    }
+}
+
 /// Success and its exact wire accounting; response payload is intentionally not serializable here.
 pub struct Recovered<T> {
     pub value: T,

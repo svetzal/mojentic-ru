@@ -1,0 +1,344 @@
+{
+  "version": "rust-stream-timing-v1",
+  "clock": {
+    "dispatch": 100,
+    "first": 125,
+    "terminal": 160
+  },
+  "provider_usage": {
+    "prompt_tokens": 2,
+    "completion_tokens": 3,
+    "time_to_first_token": 0.7,
+    "total_time": 1.2
+  },
+  "providers": {
+    "ollama": [
+      {
+        "name": "thinking-precedence",
+        "body": "{\"message\": {}, \"done\": false}\n{\"message\": {\"content\": \"answer\", \"thinking\": \"reason\", \"tool_calls\": [{\"index\": 0, \"function\": {\"arguments\": \"{\"}}]}, \"done\": false}\n{\"message\": {}, \"done\": true, \"done_reason\": \"stop\", \"total_duration\": 900, \"eval_count\": 2}\n",
+        "first_token_kind": "thinking",
+        "time_to_first_token_ms": 25,
+        "request_duration_ms": 60,
+        "event_success": false,
+        "recovery_success": false
+      },
+      {
+        "name": "content-precedence",
+        "body": "{\"message\": {}, \"done\": false}\n{\"message\": {\"content\": \"answer\", \"tool_calls\": [{\"index\": 0, \"function\": {\"arguments\": \"{\"}}]}, \"done\": false}\n{\"message\": {}, \"done\": true, \"done_reason\": \"stop\", \"total_duration\": 900, \"eval_count\": 2}\n",
+        "first_token_kind": "content",
+        "time_to_first_token_ms": 25,
+        "request_duration_ms": 60,
+        "event_success": false,
+        "recovery_success": false
+      },
+      {
+        "name": "argument-fragment",
+        "body": "{\"message\": {}, \"done\": false}\n{\"message\": {\"tool_calls\": [{\"index\": 0, \"function\": {\"arguments\": \"{\"}}]}, \"done\": false}\n",
+        "first_token_kind": "tool_call",
+        "time_to_first_token_ms": 25,
+        "request_duration_ms": 60,
+        "event_success": false,
+        "recovery_success": false
+      },
+      {
+        "name": "content",
+        "body": "{\"message\": {}, \"done\": false}\n{\"message\": {\"content\": \"answer\"}, \"done\": false}\n{\"message\": {}, \"done\": true, \"done_reason\": \"stop\", \"total_duration\": 900, \"eval_count\": 2}\n",
+        "first_token_kind": "content",
+        "time_to_first_token_ms": 25,
+        "request_duration_ms": 60,
+        "event_success": true,
+        "recovery_success": true
+      },
+      {
+        "name": "empty",
+        "body": "{\"message\": {}, \"done\": false}\n{\"message\": {}, \"done\": false}\n{\"message\": {}, \"done\": true, \"done_reason\": \"stop\", \"total_duration\": 900, \"eval_count\": 2}\n",
+        "first_token_kind": null,
+        "time_to_first_token_ms": null,
+        "request_duration_ms": 60,
+        "event_success": true,
+        "recovery_success": true
+      },
+      {
+        "name": "content-failure",
+        "body": "{\"message\": {}, \"done\": false}\n{\"message\": {\"content\": \"partial\"}, \"done\": false}\n",
+        "first_token_kind": "content",
+        "time_to_first_token_ms": 25,
+        "request_duration_ms": 60,
+        "event_success": false,
+        "recovery_success": false
+      },
+      {
+        "name": "only-first-token-counts",
+        "body": "{\"message\": {\"content\": \"answer\"}, \"done\": false}\n{\"message\": {\"thinking\": \"later thought\"}, \"done\": false}\n{\"message\": {}, \"done\": true, \"done_reason\": \"stop\", \"total_duration\": 900, \"eval_count\": 2}\n",
+        "first_token_kind": "content",
+        "time_to_first_token_ms": 25,
+        "request_duration_ms": 60,
+        "event_success": true,
+        "recovery_success": true
+      },
+      {
+        "name": "empty-failure",
+        "body": "{\"message\": {}, \"done\": false}\n",
+        "first_token_kind": null,
+        "time_to_first_token_ms": null,
+        "request_duration_ms": 60,
+        "event_success": false,
+        "recovery_success": false
+      },
+      {
+        "name": "http-permanent-error",
+        "body": "denied",
+        "first_token_kind": null,
+        "time_to_first_token_ms": null,
+        "request_duration_ms": 60,
+        "event_success": false,
+        "recovery_success": false,
+        "status": 401
+      },
+      {
+        "name": "private-usage-on-failure",
+        "body": "{\"message\": {\"content\": \"partial\"}, \"done\": false, \"usage\": {\"private_detail\": \"timing-private-usage-sentinel\"}}\n{\"message\": {}, \"done\": true, \"done_reason\": \"length\", \"eval_count\": 2}\n",
+        "first_token_kind": "content",
+        "time_to_first_token_ms": 25,
+        "request_duration_ms": 60,
+        "event_success": false,
+        "recovery_success": false,
+        "private_usage": "timing-private-usage-sentinel"
+      },
+      {
+        "name": "tool-header-without-arguments",
+        "body": "{\"message\": {\"tool_calls\": [{\"index\": 0, \"id\": \"inspect-1\", \"function\": {\"name\": \"inspect\"}}]}, \"done\": false}\n",
+        "first_token_kind": null,
+        "time_to_first_token_ms": null,
+        "request_duration_ms": 60,
+        "event_success": false,
+        "recovery_success": false
+      }
+    ],
+    "omlx": [
+      {
+        "name": "thinking-precedence",
+        "body": "data: {\"model\": \"keepalive\", \"choices\": [{\"delta\": {\"content\": \"ignore me\", \"reasoning_content\": \"ignore me\"}}]}\n\ndata: {\"choices\": [{\"delta\": {\"content\": \"answer\", \"tool_calls\": [{\"index\": 0, \"function\": {\"arguments\": \"{\"}}], \"reasoning_content\": \"reason\"}}]}\n\ndata: {\"choices\": [{\"delta\": {}, \"finish_reason\": \"stop\"}], \"usage\": {\"prompt_tokens\": 2, \"completion_tokens\": 3, \"time_to_first_token\": 0.7, \"total_time\": 1.2}}\n\ndata: [DONE]\n\n",
+        "first_token_kind": "thinking",
+        "time_to_first_token_ms": 25,
+        "request_duration_ms": 60,
+        "event_success": false,
+        "recovery_success": false
+      },
+      {
+        "name": "content-precedence",
+        "body": "data: {\"model\": \"keepalive\", \"choices\": [{\"delta\": {\"content\": \"ignore me\", \"reasoning_content\": \"ignore me\"}}]}\n\ndata: {\"choices\": [{\"delta\": {\"content\": \"answer\", \"tool_calls\": [{\"index\": 0, \"function\": {\"arguments\": \"{\"}}]}}]}\n\ndata: {\"choices\": [{\"delta\": {}, \"finish_reason\": \"stop\"}], \"usage\": {\"prompt_tokens\": 2, \"completion_tokens\": 3, \"time_to_first_token\": 0.7, \"total_time\": 1.2}}\n\ndata: [DONE]\n\n",
+        "first_token_kind": "content",
+        "time_to_first_token_ms": 25,
+        "request_duration_ms": 60,
+        "event_success": false,
+        "recovery_success": false
+      },
+      {
+        "name": "argument-fragment",
+        "body": "data: {\"model\": \"keepalive\", \"choices\": [{\"delta\": {\"content\": \"ignore me\", \"reasoning_content\": \"ignore me\"}}]}\n\ndata: {\"choices\": [{\"delta\": {\"tool_calls\": [{\"index\": 0, \"function\": {\"arguments\": \"{\"}}]}}]}\n\n",
+        "first_token_kind": "tool_call",
+        "time_to_first_token_ms": 25,
+        "request_duration_ms": 60,
+        "event_success": false,
+        "recovery_success": false
+      },
+      {
+        "name": "content",
+        "body": "data: {\"model\": \"keepalive\", \"choices\": [{\"delta\": {\"content\": \"ignore me\", \"reasoning_content\": \"ignore me\"}}]}\n\ndata: {\"choices\": [{\"delta\": {\"content\": \"answer\"}}]}\n\ndata: {\"choices\": [{\"delta\": {}, \"finish_reason\": \"stop\"}], \"usage\": {\"prompt_tokens\": 2, \"completion_tokens\": 3, \"time_to_first_token\": 0.7, \"total_time\": 1.2}}\n\ndata: [DONE]\n\n",
+        "first_token_kind": "content",
+        "time_to_first_token_ms": 25,
+        "request_duration_ms": 60,
+        "event_success": true,
+        "recovery_success": true
+      },
+      {
+        "name": "empty",
+        "body": "data: {\"model\": \"keepalive\", \"choices\": [{\"delta\": {\"content\": \"ignore me\", \"reasoning_content\": \"ignore me\"}}]}\n\ndata: {\"choices\": [{\"delta\": {}}]}\n\ndata: {\"choices\": [{\"delta\": {}, \"finish_reason\": \"stop\"}], \"usage\": {\"prompt_tokens\": 2, \"completion_tokens\": 3, \"time_to_first_token\": 0.7, \"total_time\": 1.2}}\n\ndata: [DONE]\n\n",
+        "first_token_kind": null,
+        "time_to_first_token_ms": null,
+        "request_duration_ms": 60,
+        "event_success": true,
+        "recovery_success": true
+      },
+      {
+        "name": "content-failure",
+        "body": "data: {\"model\": \"keepalive\", \"choices\": [{\"delta\": {\"content\": \"ignore me\", \"reasoning_content\": \"ignore me\"}}]}\n\ndata: {\"choices\": [{\"delta\": {\"content\": \"partial\"}}]}\n\n",
+        "first_token_kind": "content",
+        "time_to_first_token_ms": 25,
+        "request_duration_ms": 60,
+        "event_success": false,
+        "recovery_success": false
+      },
+      {
+        "name": "only-first-token-counts",
+        "body": "data: {\"choices\": [{\"delta\": {\"content\": \"answer\"}}]}\n\ndata: {\"choices\": [{\"delta\": {\"reasoning_content\": \"later thought\"}}]}\n\ndata: {\"choices\": [{\"delta\": {}, \"finish_reason\": \"stop\"}], \"usage\": {\"prompt_tokens\": 2, \"completion_tokens\": 3, \"time_to_first_token\": 0.7, \"total_time\": 1.2}}\n\ndata: [DONE]\n\n",
+        "first_token_kind": "content",
+        "time_to_first_token_ms": 25,
+        "request_duration_ms": 60,
+        "event_success": true,
+        "recovery_success": true
+      },
+      {
+        "name": "empty-failure",
+        "body": "data: {\"choices\": [{\"delta\": {}}]}\n\n",
+        "first_token_kind": null,
+        "time_to_first_token_ms": null,
+        "request_duration_ms": 60,
+        "event_success": false,
+        "recovery_success": false
+      },
+      {
+        "name": "http-permanent-error",
+        "body": "denied",
+        "first_token_kind": null,
+        "time_to_first_token_ms": null,
+        "request_duration_ms": 60,
+        "event_success": false,
+        "recovery_success": false,
+        "status": 401
+      },
+      {
+        "name": "private-usage-on-failure",
+        "body": "data: {\"choices\": [{\"delta\": {\"content\": \"partial\"}, \"finish_reason\": \"length\"}], \"usage\": {\"private_detail\": \"timing-private-usage-sentinel\"}}\n\ndata: [DONE]\n\n",
+        "first_token_kind": "content",
+        "time_to_first_token_ms": 25,
+        "request_duration_ms": 60,
+        "event_success": false,
+        "recovery_success": false,
+        "private_usage": "timing-private-usage-sentinel"
+      },
+      {
+        "name": "tool-header-without-arguments",
+        "body": "data: {\"choices\": [{\"delta\": {\"tool_calls\": [{\"index\": 0, \"id\": \"inspect-1\", \"function\": {\"name\": \"inspect\"}}]}}]}\n\n",
+        "first_token_kind": null,
+        "time_to_first_token_ms": null,
+        "request_duration_ms": 60,
+        "event_success": false,
+        "recovery_success": false
+      }
+    ],
+    "openai": [
+      {
+        "name": "thinking-precedence",
+        "body": ": ping\n\ndata: {\"choices\": [{\"delta\": {\"role\": \"assistant\"}}]}\n\ndata: {\"choices\": [{\"delta\": {\"content\": \"answer\", \"tool_calls\": [{\"index\": 0, \"function\": {\"arguments\": \"{\"}}], \"reasoning_content\": \"reason\"}}]}\n\ndata: {\"choices\": [{\"delta\": {}, \"finish_reason\": \"stop\"}], \"usage\": {\"prompt_tokens\": 2, \"completion_tokens\": 3, \"time_to_first_token\": 0.7, \"total_time\": 1.2}}\n\ndata: [DONE]\n\n",
+        "first_token_kind": "thinking",
+        "time_to_first_token_ms": 25,
+        "request_duration_ms": 60,
+        "event_success": false,
+        "recovery_success": false
+      },
+      {
+        "name": "content-precedence",
+        "body": ": ping\n\ndata: {\"choices\": [{\"delta\": {\"role\": \"assistant\"}}]}\n\ndata: {\"choices\": [{\"delta\": {\"content\": \"answer\", \"tool_calls\": [{\"index\": 0, \"function\": {\"arguments\": \"{\"}}]}}]}\n\ndata: {\"choices\": [{\"delta\": {}, \"finish_reason\": \"stop\"}], \"usage\": {\"prompt_tokens\": 2, \"completion_tokens\": 3, \"time_to_first_token\": 0.7, \"total_time\": 1.2}}\n\ndata: [DONE]\n\n",
+        "first_token_kind": "content",
+        "time_to_first_token_ms": 25,
+        "request_duration_ms": 60,
+        "event_success": false,
+        "recovery_success": false
+      },
+      {
+        "name": "argument-fragment",
+        "body": ": ping\n\ndata: {\"choices\": [{\"delta\": {\"role\": \"assistant\"}}]}\n\ndata: {\"choices\": [{\"delta\": {\"tool_calls\": [{\"index\": 0, \"function\": {\"arguments\": \"{\"}}]}}]}\n\n",
+        "first_token_kind": "tool_call",
+        "time_to_first_token_ms": 25,
+        "request_duration_ms": 60,
+        "event_success": false,
+        "recovery_success": false
+      },
+      {
+        "name": "content",
+        "body": ": ping\n\ndata: {\"choices\": [{\"delta\": {\"role\": \"assistant\"}}]}\n\ndata: {\"choices\": [{\"delta\": {\"content\": \"answer\"}}]}\n\ndata: {\"choices\": [{\"delta\": {}, \"finish_reason\": \"stop\"}], \"usage\": {\"prompt_tokens\": 2, \"completion_tokens\": 3, \"time_to_first_token\": 0.7, \"total_time\": 1.2}}\n\ndata: [DONE]\n\n",
+        "first_token_kind": "content",
+        "time_to_first_token_ms": 25,
+        "request_duration_ms": 60,
+        "event_success": true,
+        "recovery_success": true
+      },
+      {
+        "name": "empty",
+        "body": ": ping\n\ndata: {\"choices\": [{\"delta\": {\"role\": \"assistant\"}}]}\n\ndata: {\"choices\": [{\"delta\": {}}]}\n\ndata: {\"choices\": [{\"delta\": {}, \"finish_reason\": \"stop\"}], \"usage\": {\"prompt_tokens\": 2, \"completion_tokens\": 3, \"time_to_first_token\": 0.7, \"total_time\": 1.2}}\n\ndata: [DONE]\n\n",
+        "first_token_kind": null,
+        "time_to_first_token_ms": null,
+        "request_duration_ms": 60,
+        "event_success": true,
+        "recovery_success": true
+      },
+      {
+        "name": "content-failure",
+        "body": ": ping\n\ndata: {\"choices\": [{\"delta\": {\"role\": \"assistant\"}}]}\n\ndata: {\"choices\": [{\"delta\": {\"content\": \"partial\"}}]}\n\n",
+        "first_token_kind": "content",
+        "time_to_first_token_ms": 25,
+        "request_duration_ms": 60,
+        "event_success": false,
+        "recovery_success": false
+      },
+      {
+        "name": "only-first-token-counts",
+        "body": "data: {\"choices\": [{\"delta\": {\"content\": \"answer\"}}]}\n\ndata: {\"choices\": [{\"delta\": {\"reasoning_content\": \"later thought\"}}]}\n\ndata: {\"choices\": [{\"delta\": {}, \"finish_reason\": \"stop\"}], \"usage\": {\"prompt_tokens\": 2, \"completion_tokens\": 3, \"time_to_first_token\": 0.7, \"total_time\": 1.2}}\n\ndata: [DONE]\n\n",
+        "first_token_kind": "content",
+        "time_to_first_token_ms": 25,
+        "request_duration_ms": 60,
+        "event_success": true,
+        "recovery_success": true
+      },
+      {
+        "name": "empty-failure",
+        "body": "data: {\"choices\": [{\"delta\": {}}]}\n\n",
+        "first_token_kind": null,
+        "time_to_first_token_ms": null,
+        "request_duration_ms": 60,
+        "event_success": false,
+        "recovery_success": false
+      },
+      {
+        "name": "http-permanent-error",
+        "body": "denied",
+        "first_token_kind": null,
+        "time_to_first_token_ms": null,
+        "request_duration_ms": 60,
+        "event_success": false,
+        "recovery_success": false,
+        "status": 401
+      },
+      {
+        "name": "private-usage-on-failure",
+        "body": "data: {\"choices\": [{\"delta\": {\"content\": \"partial\"}, \"finish_reason\": \"length\"}], \"usage\": {\"private_detail\": \"timing-private-usage-sentinel\"}}\n\ndata: [DONE]\n\n",
+        "first_token_kind": "content",
+        "time_to_first_token_ms": 25,
+        "request_duration_ms": 60,
+        "event_success": false,
+        "recovery_success": false,
+        "private_usage": "timing-private-usage-sentinel"
+      },
+      {
+        "name": "tool-header-without-arguments",
+        "body": "data: {\"choices\": [{\"delta\": {\"tool_calls\": [{\"index\": 0, \"id\": \"inspect-1\", \"function\": {\"name\": \"inspect\"}}]}}]}\n\n",
+        "first_token_kind": null,
+        "time_to_first_token_ms": null,
+        "request_duration_ms": 60,
+        "event_success": false,
+        "recovery_success": false
+      }
+    ]
+  },
+  "retry_provider_usage": {
+    "ollama": {
+      "failed_body": "{\"message\": {}, \"done\": false, \"usage\": {\"attempt\": \"previous-wire-attempt\"}}\n",
+      "successful_body": "{\"message\": {}, \"done\": false}\n{\"message\": {\"content\": \"answer\"}, \"done\": false}\n{\"message\": {}, \"done\": true, \"done_reason\": \"stop\", \"total_duration\": 900, \"eval_count\": 2}\n"
+    },
+    "omlx": {
+      "failed_body": "data: {\"choices\": [], \"usage\": {\"attempt\": \"previous-wire-attempt\"}}\n\n",
+      "successful_body": "data: {\"model\": \"keepalive\", \"choices\": [{\"delta\": {\"content\": \"ignore me\", \"reasoning_content\": \"ignore me\"}}]}\n\ndata: {\"choices\": [{\"delta\": {\"content\": \"answer\"}}]}\n\ndata: {\"choices\": [{\"delta\": {}, \"finish_reason\": \"stop\"}]}\n\ndata: [DONE]\n\n"
+    },
+    "openai": {
+      "failed_body": "data: {\"choices\": [], \"usage\": {\"attempt\": \"previous-wire-attempt\"}}\n\n",
+      "successful_body": ": ping\n\ndata: {\"choices\": [{\"delta\": {\"role\": \"assistant\"}}]}\n\ndata: {\"choices\": [{\"delta\": {\"content\": \"answer\"}}]}\n\ndata: {\"choices\": [{\"delta\": {}, \"finish_reason\": \"stop\"}]}\n\ndata: [DONE]\n\n"
+    }
+  },
+  "tool_continuation": {
+    "ollama": "{\"message\": {\"tool_calls\": [{\"id\": \"inspect-1\", \"function\": {\"name\": \"inspect\", \"arguments\": {}}}]}, \"done\": false}\n{\"message\": {}, \"done\": true, \"done_reason\": \"stop\"}\n",
+    "omlx": "data: {\"choices\": [{\"delta\": {\"tool_calls\": [{\"id\": \"inspect-1\", \"function\": {\"name\": \"inspect\", \"arguments\": \"{}\"}, \"index\": 0, \"type\": \"function\"}]}, \"finish_reason\": \"tool_calls\"}]}\n\ndata: [DONE]\n\n",
+    "openai": "data: {\"choices\": [{\"delta\": {\"tool_calls\": [{\"id\": \"inspect-1\", \"function\": {\"name\": \"inspect\", \"arguments\": \"{}\"}, \"index\": 0, \"type\": \"function\"}]}, \"finish_reason\": \"tool_calls\"}]}\n\ndata: [DONE]\n\n"
+  }
+}

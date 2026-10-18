@@ -130,8 +130,67 @@ gateway records nothing.
 
 The gateways' lower-level `complete_stream` also yields `StreamChunk::Thinking`,
 `StreamChunk::Progress` and `StreamChunk::Metrics` for Ollama. The events API
-does not expose these. Thinking text is not assistant content.
+exposes client timing through `StreamEvent::Metrics`, with provider facts on
+terminal evidence; it has no thinking or frame-progress event. Thinking text
+is not assistant content.
 
 The oMLX gateway's `complete_stream` yields `StreamChunk::Thinking` for
-reasoning deltas, but no progress or metrics chunks. See
+reasoning deltas and terminal client `Metrics` chunks, with original provider
+usage retained. It does not emit Ollama frame-progress counters. See
 [oMLX Gateway](omlx.md#streaming).
+
+## Client timing
+
+Every dispatched stream reports client milliseconds in `StreamMetrics`:
+`time_to_first_token_ms`, `first_token_kind` and `request_duration_ms`. The first
+kind is `thinking`, `content` or `tool_call`. A single frame uses that precedence;
+argument fragments count before a complete tool call can be decoded. Empty and
+keepalive-only streams have no first-token value or kind. Duration is available
+on both success and failure. Dropping a stream cancels it; no terminal metric is
+promised to a consumer that stops polling.
+
+Measurements use a monotonic clock and start when the request is dispatched,
+so constructing an unpolled stream adds no latency. Admitted retries share that
+clock, including admission and backoff. Sending tool results is a new completion
+with a fresh clock. No measurement estimates provider inference time.
+
+Raw `complete_stream` emits `StreamChunk::Metrics` before a dispatched error or
+at completion. `complete_stream_events` emits nonterminal `StreamEvent::Metrics`
+immediately before `Completed` or `Error`; keep polling for the terminal outcome.
+Completed and incomplete-completion evidence also carry client fields in metadata.
+Preserve the metrics event when collecting errors that have no provider evidence.
+Provider usage and durations keep their original fields and units; client timing
+does not replace oMLX's usage timings or Ollama's nanosecond durations.
+
+```rust,no_run
+use futures::StreamExt;
+use mojentic::llm::{CompletionConfig, LlmGateway, LlmMessage, StreamEvent};
+use mojentic::llm::gateways::OmlxGateway;
+# async fn example() -> Result<(), Box<dyn std::error::Error>> {
+let gateway = OmlxGateway::new();
+let messages = [LlmMessage::user("Hello")];
+let config = CompletionConfig::default();
+let mut stream = gateway.complete_stream_events("my-model", &messages, &config)?;
+while let Some(event) = stream.next().await {
+    match event {
+        StreamEvent::Metrics(metrics) => println!("{:?} ms", metrics.time_to_first_token_ms),
+        StreamEvent::Content(text) => print!("{text}"),
+        StreamEvent::Completed(_) => break,
+        StreamEvent::Error(error) => return Err(error.into()),
+        _ => {},
+    }
+}
+# Ok(())
+# }
+```
+
+Recovery's native stream keeps its original provider `Metrics` events. Inspect
+`Completed(result).report.stream_metrics` or `Failed(error).stream_metrics` for
+final client measurements, including interrupted output. Their raw provider usage
+requires explicit inspection and is omitted from default safe recovery summaries.
+The compatibility `complete_stream` maps final metrics to `StreamChunk::Metrics`.
+Broker/session text APIs continue yielding text; enable tracing to read each
+completion's client fields and `stream_metrics` from response evidence, including
+separate completed tool turns. A custom `with_stream_clock(Arc<dyn StreamClock>)`
+on a maintained gateway supports deterministic measurements; its clock must be
+monotonic. Recovery retains the inner gateway's measurement clock.

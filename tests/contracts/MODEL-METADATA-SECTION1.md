@@ -39,13 +39,11 @@ completion controls and 3.0 unset controls are preserved before and after
 lookup. This is not a 2.1 provider wire-protocol version claim; section 1 does
 not specify multiple metadata protocol versions.
 
-Provider-side executable verification and microgentic consumer verification
-against this exact set/hash are missing. No external tested commit, command or
-result exists from this run. Captures and fixture-derived doubles establish
-local conformance only. The initiative must supply this artifact and verifier
-semantics to both sides and record their tested commits and required-gate
-results; missing paired verification remains unfinished work. No external
-repository was changed, and publication and consumer-migration holds remain.
+Stacey's library self-validation rule supersedes external paired-verification
+prerequisites for publication. The library's public integration tests and fresh
+packaged consumer execute this same contract. No live provider or external
+consumer verification is claimed; dependents verify when adopting the released
+package. See CONFORMANCE-3.0.0.md for current whole-release results.
 
 ## Cycle 8: OpenAI request observation correction
 
@@ -79,8 +77,8 @@ sent that failing POST and ignored its error: the registry verifier rejected it
 This proves observation of a request through the real gateway boundary rather
 than a manually changed count. The temporary mutation is not part of the change.
 
-This is Rust-side local conformance only. External provider and microgentic
-consumer commits, commands and results for this identical v1 hash remain
-missing; initiative coordination must arrange paired verification in their
-required gates. Existing provider captures and local doubles do not close that
-gap. All publication and consumer migration holds remain.
+This is local library conformance. External provider and microgentic commits
+were not tested here. Stacey's library self-validation rule supersedes the
+historical demand for their verification before publication. A fresh packaged
+consumer now verifies this identical v1 contract in this repository's readiness
+gates; external dependent adoption follows the coordinated release.

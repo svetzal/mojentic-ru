@@ -24,6 +24,7 @@ use crate::llm::models::{LlmGatewayResponse, LlmMessage, ResponseEvidence};
 use crate::llm::stream_events::{
     drive_event_stream, FrameParser, StreamEvent, StreamEventError, StreamEventStream,
 };
+use crate::llm::stream_timing::{system_clock, StreamClock, StreamTiming};
 use crate::llm::tools::LlmTool;
 use async_trait::async_trait;
 use futures::stream::Stream;
@@ -31,6 +32,7 @@ use percent_encoding::{utf8_percent_encode, AsciiSet, NON_ALPHANUMERIC};
 use reqwest::{Client, Method, RequestBuilder, Response};
 use serde_json::Value;
 use std::pin::Pin;
+use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, info, warn};
 
@@ -163,11 +165,18 @@ fn timeout_from_env(value: Option<String>) -> Duration {
 /// # }
 /// ```
 pub struct OmlxGateway {
+    clock: Arc<dyn StreamClock>,
     client: Client,
     config: OmlxConfig,
 }
 
 impl OmlxGateway {
+    /// Select a monotonic measurement clock. The default uses std::time::Instant.
+    pub fn with_stream_clock(mut self, clock: Arc<dyn StreamClock>) -> Self {
+        self.clock = clock;
+        self
+    }
+
     /// Opt into per-request recovery without changing legacy entrypoints.
     pub fn with_recovery(
         self,
@@ -185,6 +194,7 @@ impl OmlxGateway {
     pub fn with_config(config: OmlxConfig) -> Self {
         Self {
             client: Client::new(),
+            clock: system_clock(),
             config,
         }
     }
@@ -423,6 +433,10 @@ fn legacy_chunks(parser: &mut OpenAiLegacyParser, line: &str) -> Vec<StreamChunk
 
 #[async_trait]
 impl LlmGateway for OmlxGateway {
+    fn stream_clock(&self) -> Arc<dyn StreamClock> {
+        self.clock.clone()
+    }
+
     async fn get_model_context_window(&self, model: &str) -> Result<Option<ModelContextWindow>> {
         let response = success(self.request(Method::GET, "/models", false).send().await?).await?;
         let body: Value = response.json().await?;
@@ -568,51 +582,57 @@ impl LlmGateway for OmlxGateway {
         tools: Option<&'a [Box<dyn LlmTool>]>,
         config: &'a CompletionConfig,
     ) -> Pin<Box<dyn Stream<Item = Result<StreamChunk>> + Send + 'a>> {
-        Box::pin(async_stream::stream! {
-            info!("Starting oMLX streaming completion");
-            debug!("Model: {}, Message count: {}", model, messages.len());
+        let timing = StreamTiming::new(self.stream_clock());
+        let measure = timing.clone();
+        let source: Pin<Box<dyn Stream<Item = Result<StreamChunk>> + Send + 'a>> =
+            Box::pin(async_stream::stream! {
+                info!("Starting oMLX streaming completion");
+                debug!("Model: {}, Message count: {}", model, messages.len());
 
-            let mut body = match chat_body(model, messages, config) {
-                Ok(body) => body,
-                Err(e) => {
-                    yield Err(e);
-                    return;
-                }
-            };
-            body["stream"] = serde_json::json!(true);
-            if let Some(tools) = tools {
-                match tool_definitions(tools) {
-                    Ok(definitions) => body["tools"] = definitions,
+                let mut body = match chat_body(model, messages, config) {
+                    Ok(body) => body,
                     Err(e) => {
                         yield Err(e);
                         return;
                     }
+                };
+                body["stream"] = serde_json::json!(true);
+                if let Some(tools) = tools {
+                    match tool_definitions(tools) {
+                        Ok(definitions) => body["tools"] = definitions,
+                        Err(e) => {
+                            yield Err(e);
+                            return;
+                        }
+                    }
                 }
-            }
 
-            let response = match self.chat_request(&body).send().await {
-                Ok(response) => response,
-                Err(e) => {
-                    yield Err(e.into());
-                    return;
-                }
-            };
-            let response = match success(response).await {
-                Ok(response) => response,
-                Err(e) => {
-                    yield Err(e);
-                    return;
-                }
-            };
+                measure.dispatch();
+                let response = match self.chat_request(&body).send().await {
+                    Ok(response) => response,
+                    Err(e) => {
+                        yield Err(e.into());
+                        return;
+                    }
+                };
+                let response = match success(response).await {
+                    Ok(response) => response,
+                    Err(e) => {
+                        yield Err(e);
+                        return;
+                    }
+                };
 
-            let mut parser = OpenAiLegacyParser::default();
-            let chunks = legacy_body_stream(response.bytes_stream(), move |line: &str| {
-                legacy_chunks(&mut parser, line)
+                let mut parser = OpenAiLegacyParser::default();
+                let chunks = legacy_body_stream(response.bytes_stream(), move |line: &str| {
+                    measure.observe_line(line);
+                    legacy_chunks(&mut parser, line)
+                });
+                for await chunk in chunks {
+                    yield chunk;
+                }
             });
-            for await chunk in chunks {
-                yield chunk;
-            }
-        })
+        timing.legacy(source, "omlx")
     }
 
     fn complete_stream_events<'a>(
@@ -627,7 +647,12 @@ impl LlmGateway for OmlxGateway {
         body["stream"] = serde_json::json!(true);
         body["stream_options"] = serde_json::json!({"include_usage": true});
 
-        Ok(drive_event_stream(self.chat_request(&body), OmlxEventParser::default()))
+        Ok(drive_event_stream(
+            self.chat_request(&body),
+            OmlxEventParser::default(),
+            self.stream_clock(),
+            "omlx",
+        ))
     }
 }
 
@@ -747,7 +772,7 @@ mod tests {
         assert!(
             matches!(
                 items.as_slice(),
-                [Ok(StreamChunk::Thinking(thinking)), Ok(StreamChunk::Content(content))]
+                [Ok(StreamChunk::Thinking(thinking)), Ok(StreamChunk::Content(content)), Ok(StreamChunk::Metrics(_))]
                     if thinking == "\u{1f914} hmm" && content == "caf\u{e9}"
             ),
             "{items:?}"

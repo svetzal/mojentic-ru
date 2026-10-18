@@ -24,6 +24,8 @@ pub type StreamEventStream<'a> = Pin<Box<dyn Stream<Item = StreamEvent> + Send +
 pub enum StreamEvent {
     /// Visible assistant content, in the order the provider sent it.
     Content(String),
+    /// Client timing emitted immediately before terminal evidence, including errors.
+    Metrics(crate::llm::gateway::StreamMetrics),
     /// Terminal success: the provider finished with `stop` and closed the stream.
     ///
     /// The evidence holds the finish reason, usage and provider model when
@@ -36,7 +38,7 @@ pub enum StreamEvent {
 impl StreamEvent {
     /// Whether this event ends the stream.
     pub fn is_terminal(&self) -> bool {
-        !matches!(self, StreamEvent::Content(_))
+        matches!(self, StreamEvent::Completed(_) | StreamEvent::Error(_))
     }
 }
 
@@ -134,11 +136,16 @@ pub(crate) trait FrameParser {
 pub(crate) fn drive_event_stream<'a, P>(
     request: reqwest::RequestBuilder,
     mut parser: P,
+    clock: std::sync::Arc<dyn crate::llm::stream_timing::StreamClock>,
+    provider: &'static str,
 ) -> StreamEventStream<'a>
 where
     P: FrameParser + Send + 'a,
 {
-    Box::pin(async_stream::stream! {
+    let timing = crate::llm::stream_timing::StreamTiming::new(clock);
+    let measure = timing.clone();
+    let mut source: StreamEventStream<'a> = Box::pin(async_stream::stream! {
+        measure.dispatch();
         let response = match request.send().await {
             Ok(response) => response,
             Err(error) => {
@@ -165,6 +172,7 @@ where
                 }
             };
             for line in lines.push(&chunk) {
+                if let Ok(text) = std::str::from_utf8(&line) { measure.observe_line(text); }
                 let events = match std::str::from_utf8(&line) {
                     Ok(text) => parser.parse_line(text.trim_end_matches('\r')),
                     Err(_) => vec![invalid_event("frame is not valid UTF-8")],
@@ -182,6 +190,24 @@ where
         yield StreamEvent::Error(StreamEventError::IncompleteStream(
             parser.partial_evidence().map(Box::new),
         ));
+    });
+    Box::pin(async_stream::stream! {
+        while let Some(mut event) = source.next().await {
+            if event.is_terminal() {
+                let metrics = timing.finish(crate::llm::gateway::StreamMetrics { provider: provider.into(), ..Default::default() });
+                let evidence = match &mut event {
+                    StreamEvent::Completed(evidence) => Some(evidence),
+                    StreamEvent::Error(StreamEventError::IncompleteCompletion(evidence)) => Some(evidence.as_mut()),
+                    StreamEvent::Error(StreamEventError::IncompleteStream(Some(evidence))) => Some(evidence.as_mut()),
+                    _ => None,
+                };
+                if let Some(evidence) = evidence {
+                    crate::llm::stream_timing::retain_timing(evidence, &metrics);
+                }
+                yield StreamEvent::Metrics(metrics);
+            }
+            yield event;
+        }
     })
 }
 
