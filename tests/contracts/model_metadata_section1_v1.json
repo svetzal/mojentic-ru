@@ -401,6 +401,50 @@
         "model_num_ctx": null
       },
       "error": null
+    },
+    {
+      "name": "num-ctx-only",
+      "provider": "ollama",
+      "model": "selected",
+      "status": 200,
+      "body": "{\"parameters\": \"temperature 1\\nnum_ctx                        32768\\nstop \\\"<|im_end|>\\\"\", \"model_info\": {\"general.architecture\": \"test\"}}",
+      "expected": {
+        "max_context_tokens": 32768,
+        "field": "parameters.num_ctx",
+        "model_num_ctx": 32768
+      },
+      "error": null
+    },
+    {
+      "name": "num-ctx-only-missing-info",
+      "provider": "ollama",
+      "model": "selected",
+      "status": 200,
+      "body": "{\"parameters\": \"num_ctx 8192\"}",
+      "expected": {
+        "max_context_tokens": 8192,
+        "field": "parameters.num_ctx",
+        "model_num_ctx": 8192
+      },
+      "error": null
+    },
+    {
+      "name": "zero-num-ctx-only",
+      "provider": "ollama",
+      "model": "selected",
+      "status": 200,
+      "body": "{\"parameters\": \"num_ctx 0\", \"model_info\": {\"general.architecture\": \"test\"}}",
+      "expected": null,
+      "error": null
+    },
+    {
+      "name": "malformed-parameters",
+      "provider": "ollama",
+      "model": "selected",
+      "status": 200,
+      "body": "{\"parameters\": 7, \"model_info\": {\"general.architecture\": \"test\"}}",
+      "expected": null,
+      "error": "gateway"
     }
   ],
   "registry": [

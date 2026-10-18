@@ -31,7 +31,7 @@ and invalid advertised windows return the existing gateway errors.
 | Gateway | Lookup | Provenance |
 | --- | --- | --- |
 | oMLX | `GET /v1/models` at the configured host, with configured bearer key; exact `id` selection | `max_model_len` |
-| Ollama | `POST /api/show` with `{"model": model}`, configured host, headers and timeout | `model_info.<architecture>.context_length` |
+| Ollama | `POST /api/show` with `{"model": model}`, configured host, headers and timeout | `model_info.<architecture>.context_length`, or `parameters.num_ctx` when the model advertises no `context_length` |
 | OpenAI | Exact entry in the bundled model registry; no HTTP request | `registry` |
 
 OpenAI's completion capability inference for unknown model names is unchanged;
@@ -39,6 +39,13 @@ metadata never uses that inference to guess a context window. Third-party
 `LlmGateway` implementations inherit `Ok(None)` without needing a new method.
 `RecoveryGateway` delegates metadata lookup to its wrapped adapter; lookup does
 not opt into completion retries or change admission behavior.
+
+An Ollama model whose `parameters` carry a `num_ctx` line but whose `model_info`
+has no `context_length` still has a usable window: Ollama runs it at that
+`num_ctx` when a request sends none. Since 3.0.1 the lookup returns that value
+as `max_context_tokens` with `field` `parameters.num_ctx` and the same value in
+`model_num_ctx`, instead of `None`. When both are present, `max_context_tokens`
+stays the `context_length` and `model_num_ctx` carries the parameter, as before.
 
 Ollama's effective-window helper first requires an advertised window. It clamps
 an explicit `config.num_ctx` to that maximum, otherwise clamps the model's

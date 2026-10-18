@@ -142,6 +142,16 @@ impl Default for OllamaGateway {
     }
 }
 
+/// The positive `num_ctx` line of an `/api/show` `parameters` text, if any.
+fn num_ctx_parameter(parameters: &str) -> Option<std::num::NonZeroUsize> {
+    parameters.lines().find_map(|line| {
+        let mut parts = line.split_whitespace();
+        (parts.next() == Some("num_ctx"))
+            .then(|| parts.next().and_then(|n| n.parse().ok()))
+            .flatten()
+    })
+}
+
 #[async_trait]
 impl LlmGateway for OllamaGateway {
     fn stream_clock(&self) -> Arc<dyn StreamClock> {
@@ -167,29 +177,39 @@ impl LlmGateway for OllamaGateway {
         if !body.is_object() {
             return Err(MojenticError::GatewayError("Invalid response format".into()));
         }
-        let Some(info) = body.get("model_info") else {
-            return Ok(None);
+        let model_num_ctx = match body.get("parameters") {
+            Some(parameters) => num_ctx_parameter(
+                parameters
+                    .as_str()
+                    .ok_or_else(|| MojenticError::GatewayError("Invalid parameters".into()))?,
+            ),
+            None => None,
         };
-        let info = info
-            .as_object()
-            .ok_or_else(|| MojenticError::GatewayError("Invalid model_info".into()))?;
-        let Some((key, value)) = info.iter().find(|(key, _)| key.ends_with(".context_length"))
-        else {
-            return Ok(None);
+        let advertised = match body.get("model_info") {
+            Some(info) => info
+                .as_object()
+                .ok_or_else(|| MojenticError::GatewayError("Invalid model_info".into()))?
+                .iter()
+                .find(|(key, _)| key.ends_with(".context_length")),
+            None => None,
         };
-        let mut window = ModelContextWindow::advertised(value, format!("model_info.{key}"))?;
-        if let Some(parameters) = body.get("parameters") {
-            let parameters = parameters
-                .as_str()
-                .ok_or_else(|| MojenticError::GatewayError("Invalid parameters".into()))?;
-            window.model_num_ctx = parameters.lines().find_map(|line| {
-                let mut parts = line.split_whitespace();
-                (parts.next() == Some("num_ctx"))
-                    .then(|| parts.next().and_then(|n| n.parse().ok()))
-                    .flatten()
-            });
+        match (advertised, model_num_ctx) {
+            (Some((key, value)), model_num_ctx) => {
+                let mut window =
+                    ModelContextWindow::advertised(value, format!("model_info.{key}"))?;
+                window.model_num_ctx = model_num_ctx.map(|num_ctx| num_ctx.get());
+                Ok(Some(window))
+            }
+            // Ollama runs the model at its `num_ctx` parameter when a request
+            // sends none, so that parameter is the model's window when
+            // `model_info` advertises no `context_length`.
+            (None, Some(num_ctx)) => Ok(Some(ModelContextWindow {
+                max_context_tokens: num_ctx,
+                field: "parameters.num_ctx".into(),
+                model_num_ctx: Some(num_ctx.get()),
+            })),
+            (None, None) => Ok(None),
         }
-        Ok(Some(window))
     }
 
     async fn complete(

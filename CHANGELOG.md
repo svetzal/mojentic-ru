@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `OllamaGateway::get_model_context_window` returns a window for a model whose
+  `parameters` carry a positive `num_ctx` line while `model_info` has no
+  `context_length`: `max_context_tokens` is that `num_ctx`, `field` is
+  `parameters.num_ctx` and `model_num_ctx` carries the same value. Ollama runs
+  such a model at that size when a request sends none, so the window was
+  usable but reported as not advertised (svetzal/mojentic-ru#1). A `num_ctx`
+  of zero still counts as absent, and a `parameters` field that is not text is
+  a gateway error.
+
 ## [3.0.0] - 2026-10-18
 
 ### Fixed
