@@ -1,4 +1,4 @@
-//! Integration test: OpenAI tool-calling HTTP round-trip via mockito.
+//! Integration test: OpenAI tool-calling round-trip via an in-process HTTP transport.
 //!
 //! Scenario exercised (using shared cross-port fixtures):
 //!   1. User asks "What's the weather in Paris?"
@@ -6,12 +6,14 @@
 //!   3. Broker executes the tool locally, returns tool-result.json
 //!   4. LLM produces a final text response
 //!
-//! The test uses mockito to intercept HTTP at the boundary, verifying that
+//! The test injects a transport at the HTTP execution boundary, verifying that
 //! `LlmBroker` + `OpenAIGateway` together produce the correct final answer.
 //!
 //! Fixture files are byte-identical across all four mojentic ports (ts/py/ex/ru).
 //! If you change a fixture, update all four ports.
 
+#[path = "support/mod.rs"]
+pub mod boundary;
 use async_trait::async_trait;
 use futures::StreamExt;
 use mojentic::error::Result;
@@ -75,7 +77,7 @@ impl LlmTool for GetWeatherTool {
 
 #[tokio::test]
 async fn test_openai_tool_call_round_trip() {
-    let mut server = mockito::Server::new_async().await;
+    let mut server = boundary::Fixture::new_async().await;
 
     // Compute the expected serialized form of the tool result content.
     // The broker calls serde_json::to_string(&output) where output is parsed
@@ -93,7 +95,7 @@ async fn test_openai_tool_call_round_trip() {
     // PartialJson checks that the actual request body's JSON contains all specified fields.
     let first_mock = server
         .mock("POST", "/chat/completions")
-        .match_body(mockito::Matcher::PartialJson(json!({
+        .match_body(boundary::Matcher::PartialJson(json!({
             "tools": [{"function": {"name": "get_weather"}}]
         })))
         .with_status(200)
@@ -111,7 +113,7 @@ async fn test_openai_tool_call_round_trip() {
     // The `arguments` value is a JSON *string* (not an object), proving correct serialization.
     let second_mock = server
         .mock("POST", "/chat/completions")
-        .match_body(mockito::Matcher::PartialJson(json!({
+        .match_body(boundary::Matcher::PartialJson(json!({
             "messages": [
                 {"role": "user", "content": "What's the weather in Paris?"},
                 {
@@ -135,7 +137,10 @@ async fn test_openai_tool_call_round_trip() {
         .with_body(RESPONSE_2)
         .create();
 
-    let gateway = Arc::new(OpenAIGateway::with_api_key_and_base_url("test-key", server.url()));
+    let gateway = Arc::new(
+        OpenAIGateway::with_api_key_and_base_url("test-key", server.url())
+            .with_transport(server.transport()),
+    );
     // Use "gpt-4" which is known to support tools per the model registry.
     let broker = LlmBroker::new("gpt-4", gateway, None);
 
@@ -170,7 +175,7 @@ async fn test_openai_tool_call_round_trip() {
 
 #[tokio::test]
 async fn test_openai_tool_call_max_iterations_exceeded() {
-    let mut server = mockito::Server::new_async().await;
+    let mut server = boundary::Fixture::new_async().await;
 
     // Every HTTP call returns another tool_call — the broker should stop at limit
     let looping_mock = server
@@ -181,7 +186,10 @@ async fn test_openai_tool_call_max_iterations_exceeded() {
         .expect_at_least(1)
         .create();
 
-    let gateway = Arc::new(OpenAIGateway::with_api_key_and_base_url("test-key", server.url()));
+    let gateway = Arc::new(
+        OpenAIGateway::with_api_key_and_base_url("test-key", server.url())
+            .with_transport(server.transport()),
+    );
     let broker = LlmBroker::new("gpt-4", gateway, None);
 
     let calls = Arc::new(std::sync::Mutex::new(Vec::new()));
@@ -223,7 +231,7 @@ const SPLIT_TOOL_STREAM: &str = concat!(
 );
 
 async fn assert_split_stream_tool_round_trip(omlx: bool) {
-    let mut server = mockito::Server::new_async().await;
+    let mut server = boundary::Fixture::new_async().await;
     let path = if omlx {
         "/v1/chat/completions"
     } else {
@@ -231,7 +239,7 @@ async fn assert_split_stream_tool_round_trip(omlx: bool) {
     };
     let first = server
         .mock("POST", path)
-        .match_body(mockito::Matcher::PartialJson(json!({
+        .match_body(boundary::Matcher::PartialJson(json!({
             "stream": true,
             "messages": [{"role": "user", "content": "Weather?"}]
         })))
@@ -241,7 +249,7 @@ async fn assert_split_stream_tool_round_trip(omlx: bool) {
         .create();
     let follow_up = server
         .mock("POST", path)
-        .match_body(mockito::Matcher::PartialJson(json!({
+        .match_body(boundary::Matcher::PartialJson(json!({
             "stream": true,
             "messages": [
                 {"role": "user", "content": "Weather?"},
@@ -257,9 +265,12 @@ async fn assert_split_stream_tool_round_trip(omlx: bool) {
         .expect(1)
         .create();
     let gateway: Arc<dyn LlmGateway> = if omlx {
-        Arc::new(OmlxGateway::with_host(server.url()))
+        Arc::new(OmlxGateway::with_host(server.url()).with_transport(server.transport()))
     } else {
-        Arc::new(OpenAIGateway::with_api_key_and_base_url("test-key", server.url()))
+        Arc::new(
+            OpenAIGateway::with_api_key_and_base_url("test-key", server.url())
+                .with_transport(server.transport()),
+        )
     };
     let broker = LlmBroker::new("gpt-4", gateway, None);
     let calls = Arc::new(std::sync::Mutex::new(Vec::new()));

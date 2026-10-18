@@ -1,3 +1,5 @@
+#[path = "support/mod.rs"]
+pub mod boundary;
 use mojentic::llm::{
     gateway::LlmGateway,
     gateways::{OmlxConfig, OmlxGateway},
@@ -5,7 +7,7 @@ use mojentic::llm::{
 
 #[tokio::test]
 async fn section1_configured_authenticated_boundary() {
-    let mut server = mockito::Server::new_async().await;
+    let mut server = boundary::Fixture::new_async().await;
     let artifact = contract();
     let case = artifact["cases"]
         .as_array()
@@ -23,7 +25,8 @@ async fn section1_configured_authenticated_boundary() {
         host: server.url(),
         api_key: Some("metadata-key".into()),
         ..Default::default()
-    });
+    })
+    .with_transport(server.transport());
     let window = gateway
         .get_model_context_window("selected")
         .await
@@ -64,17 +67,26 @@ fn gateway(provider: &str, host: &str, wrapped: bool) -> Arc<dyn LlmGateway> {
         }};
     }
     match provider {
-        "ollama" => wrap!(OllamaGateway::with_config(OllamaConfig {
-            host: host.into(),
-            timeout: Some(Duration::from_secs(2)),
-            headers: HashMap::from([("authorization".into(), "Bearer metadata-key".into())]),
-        })),
-        "omlx" => wrap!(OmlxGateway::with_config(OmlxConfig {
-            host: host.into(),
-            api_key: Some("metadata-key".into()),
-            timeout: Some(Duration::from_secs(2)),
-        })),
-        "openai" => wrap!(OpenAIGateway::with_api_key_and_base_url("metadata-key", host)),
+        "ollama" => wrap!({
+            let transport = boundary::transport_for(host);
+            OllamaGateway::with_config(OllamaConfig {
+                host: host.into(),
+                timeout: Some(Duration::from_secs(2)),
+                headers: HashMap::from([("authorization".into(), "Bearer metadata-key".into())]),
+            })
+            .with_transport(transport)
+        }),
+        "omlx" => wrap!({
+            let transport = boundary::transport_for(host);
+            OmlxGateway::with_config(OmlxConfig {
+                host: host.into(),
+                api_key: Some("metadata-key".into()),
+                timeout: Some(Duration::from_secs(2)),
+            })
+            .with_transport(transport)
+        }),
+        "openai" => wrap!(OpenAIGateway::with_api_key_and_base_url("metadata-key", host)
+            .with_transport(boundary::transport_for(host))),
         _ => panic!("unknown contract provider"),
     }
 }
@@ -87,7 +99,7 @@ async fn section1_http_contract_exact_outcomes_direct_and_wrapped() {
         for wrapped in [false, true] {
             let provider = case["provider"].as_str().expect("provider");
             let model = case["model"].as_str().expect("model");
-            let mut server = mockito::Server::new_async().await;
+            let mut server = boundary::Fixture::new_async().await;
             let (method, path) = if provider == "ollama" {
                 ("POST", "/api/show")
             } else {
@@ -96,7 +108,7 @@ async fn section1_http_contract_exact_outcomes_direct_and_wrapped() {
             let mut mock =
                 server.mock(method, path).match_header("authorization", "Bearer metadata-key");
             if provider == "ollama" {
-                mock = mock.match_body(mockito::Matcher::Json(json!({"model":model})));
+                mock = mock.match_body(boundary::Matcher::Json(json!({"model":model})));
             }
             let request = mock
                 .with_status(case["status"].as_u64().expect("status") as usize)
@@ -128,50 +140,38 @@ async fn section1_http_contract_exact_outcomes_direct_and_wrapped() {
     }
 }
 
-// Observe the TCP boundary rather than enumerating HTTP methods in mockito.
-// Every accepted connection is read and answered, regardless of method or path.
 struct RequestObserver {
     url: String,
-    stop: tokio::sync::oneshot::Sender<()>,
-    task: tokio::task::JoinHandle<Vec<String>>,
+    fixture: boundary::Fixture,
 }
-
 impl RequestObserver {
     async fn start() -> Self {
-        use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.expect("bind observer");
-        let url = format!("http://{}", listener.local_addr().expect("observer address"));
-        let (stop, mut stopped) = tokio::sync::oneshot::channel();
-        let task = tokio::spawn(async move {
-            let mut requests = Vec::new();
-            loop {
-                tokio::select! {
-                    // Drain queued connections before honoring shutdown.
-                    biased;
-                    accepted = listener.accept() => {
-                        let (stream, _) = accepted.expect("accept observed connection");
-                        let mut stream = BufReader::new(stream);
-                        let mut line = String::new();
-                        tokio::time::timeout(Duration::from_secs(2), stream.read_line(&mut line))
-                            .await.expect("request line timeout").expect("read request line");
-                        requests.push(line.trim_end().to_owned());
-                        // A failure response detects callers that ignore HTTP errors too.
-                        stream.get_mut().write_all(
-                            b"HTTP/1.1 503 Service Unavailable\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
-                        ).await.expect("write failure response");
-                    }
-                    _ = &mut stopped => break,
-                }
-            }
-            requests
+        let fixture = boundary::Fixture::new();
+        fixture.respond(|_| {
+            http::Response::builder()
+                .status(503)
+                .body(reqwest::Body::from(""))
+                .expect("failure")
+                .into()
         });
-        Self { url, stop, task }
+        Self {
+            url: fixture.url(),
+            fixture,
+        }
     }
-
     async fn assert_request_free(self) {
-        self.stop.send(()).expect("stop observer");
-        let requests = self.task.await.expect("observer task");
+        let requests = self.fixture.requests();
+        let requests: Vec<_> = requests
+            .iter()
+            .map(|r| {
+                format!(
+                    "{} {}{} HTTP/1.1",
+                    r.method(),
+                    r.url().path(),
+                    r.url().query().map_or(String::new(), |q| format!("?{q}"))
+                )
+            })
+            .collect();
         assert!(requests.is_empty(), "unexpected outbound HTTP requests: {requests:?}");
     }
 }
@@ -205,13 +205,17 @@ async fn section1_registry_exact_lookup_is_request_free() {
 )]
 async fn section1_request_observer_rejects_ignored_post_failure() {
     let observer = RequestObserver::start().await;
-    // Exercise real HTTP I/O, then deliberately discard the HTTP failure.
-    let _ = reqwest::Client::new()
+    // The recorder sees every attempted method, even if its error is discarded.
+    let request = reqwest::Client::new()
         .post(format!("{}/ignored-failure?probe=1", observer.url))
-        .timeout(Duration::from_secs(2))
-        .send()
+        .build()
+        .expect("request");
+    let _ = observer
+        .fixture
+        .transport()
+        .execute(request)
         .await
-        .expect("observer response")
+        .expect("response")
         .error_for_status();
     observer.assert_request_free().await;
 }
@@ -240,7 +244,9 @@ fn section1_effective_precedence_and_clamping() {
 async fn section1_transport_failure_direct_and_wrapped() {
     for provider in ["ollama", "omlx"] {
         for wrapped in [false, true] {
-            let result = gateway(provider, "http://127.0.0.1:0", wrapped)
+            let server = boundary::Fixture::new();
+            server.fail(std::io::ErrorKind::ConnectionRefused);
+            let result = gateway(provider, &server.url(), wrapped)
                 .get_model_context_window("selected")
                 .await;
             assert!(matches!(result, Err(MojenticError::HttpError(_))), "{provider}: {result:?}");
@@ -256,7 +262,7 @@ async fn section1_lookup_preserves_subsequent_completion_payload() {
     for provider in ["ollama", "omlx", "openai"] {
         for wrapped in [false, true] {
             for config_case in metadata["completion_configs"].as_array().expect("configs") {
-                let mut server = mockito::Server::new_async().await;
+                let mut server = boundary::Fixture::new_async().await;
                 let gateway = gateway(provider, &server.url(), wrapped);
                 let path = match provider {
                     "ollama" => "/api/chat",
@@ -276,7 +282,7 @@ async fn section1_lookup_preserves_subsequent_completion_payload() {
                 };
                 let completion = server
                     .mock("POST", path)
-                    .match_body(mockito::Matcher::Json(body))
+                    .match_body(boundary::Matcher::Json(body))
                     .with_body(fidelity["responses"][response].as_str().expect("contract response"))
                     .expect(2)
                     .create_async()

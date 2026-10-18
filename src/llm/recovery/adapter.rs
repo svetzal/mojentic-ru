@@ -16,6 +16,11 @@ use std::pin::Pin;
 /// Implemented by completion adapters that can freeze their encoded HTTP request.
 #[doc(hidden)]
 pub trait RecoveryProvider: LlmGateway {
+    fn recovery_transport(
+        &self,
+    ) -> Option<std::sync::Arc<dyn crate::llm::transport::HttpTransport>> {
+        None
+    }
     fn recovery_provider(&self) -> Provider;
     fn prepare_recovery(
         &self,
@@ -46,7 +51,7 @@ pub trait RecoveryProvider: LlmGateway {
 pub struct RecoveryGateway<G> {
     pub(crate) inner: G,
     pub(crate) policy: RecoveryPolicy,
-    pub(crate) client: reqwest::Client,
+    pub(crate) client: crate::llm::transport::Client,
 }
 impl<G: RecoveryProvider> RecoveryGateway<G> {
     pub fn new(inner: G, policy: RecoveryPolicy) -> Result<Self> {
@@ -55,6 +60,10 @@ impl<G: RecoveryProvider> RecoveryGateway<G> {
             .retry(reqwest::retry::never())
             .redirect(reqwest::redirect::Policy::none())
             .build()?;
+        let mut client = crate::llm::transport::Client::from(client);
+        if let Some(transport) = inner.recovery_transport() {
+            client = client.with_transport(transport);
+        }
         Ok(Self {
             inner,
             policy,

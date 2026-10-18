@@ -295,7 +295,7 @@ makes that failure ineligible (`Reason::Permanent`) and prevents resend, even if
 admission would allow it. Eligibility still does not bypass admission or budgets.
 
 The local `recovery-status-selection-v1` executable set verifies those paired
-choices through actual loopback HTTP adapters and public broker/session APIs:
+choices through public adapters with injected in-process HTTP transports and public broker/session APIs:
 `cargo test --all-features --test recovery recovery_status_selection_v1`.
 It checks successful output, typed failures, immutable wire payloads, attempt
 identity and safe lifecycle fields. Existing partial reasoning, content and tool

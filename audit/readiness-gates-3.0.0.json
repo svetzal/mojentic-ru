@@ -1,20 +1,20 @@
 {
-  "cycle": 10,
-  "base_commit": "602d8a8d0262c57ac95cb97df950ea392de2f3ae",
+  "cycle": 11,
+  "correction": "deterministic in-process boundary verification",
+  "base_commit": "3b8ee82b7c2878d537e83d051356600371f87034",
   "working_tree_correction": true,
-  "started_at": "2026-10-18T00:45:50.690443+00:00",
-  "toolchain": "rustc 1.99.0 (b940084d7 2026-09-28)",
+  "toolchain": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
   "source_hashes": {
-    "Cargo.toml": "99262be549ca21294b9799ac8841bb6cd337c9f3478af531e937069fff737f73",
-    "scripts/verify_package.py": "01cfecc0febc2a010877ec9293d3939f6c60a28fc18e6f6b3aa533327431a9ac",
-    "src/agents/async_aggregator_agent.rs": "ddb25c22fd87b966f5e6f0adcc39e6402dea646b9bc8fb896082008d303b8f32",
+    "Cargo.toml": "bfa736416d61cc977aea031caccfe867da0958f7c3657e7a87301128192d8506",
+    "scripts/verify_package.py": "19e0219ba7fb0107f10d89e3be0ba8777edefb04a5e97eab2cec3b3d1d78a70c",
+    "src/agents/async_aggregator_agent.rs": "6f192ec5f94a760eb298c9862a061fcd979a7264bac9b667d72de2cd19d56c06",
     "src/agents/async_llm_agent.rs": "f8a19a4d893f3a89837a55cd1e827f152bc47d04ee5f9159d1c8446cb8139fd1",
     "src/agents/base_agent.rs": "b52d7928973345383b22a992d82857d397566d85f36519f17e16aadd7a0abf48",
     "src/agents/base_async_agent.rs": "abe6f9268dce452ad609a998f3c32c1a2da6aa9413478598c8e36935c67c029f",
     "src/agents/iterative_problem_solver.rs": "3fc49d9b90be6f8e42185d4887d50b24d1a4d3fa17e8a2726e88f3369f5008b7",
     "src/agents/mod.rs": "a81edbebcfe9ec3f570776d5594f4eb414829052a72eb93c92ba192666c44c52",
-    "src/agents/simple_recursive_agent.rs": "f1062c0a36e18baba632678c87de1d499f0d7c57ee6faa2a057fa8189ce54faa",
-    "src/async_dispatcher.rs": "96cd22ad9f2543092a8a2194675ef736ed561cd9349928b20d59c2ad09f92ff8",
+    "src/agents/simple_recursive_agent.rs": "a18f88ccc1e3b647f466062c11a0daeacbc5e74b1c6f0e1a82335cb32140db40",
+    "src/async_dispatcher.rs": "03c15aa46ac8f5f2a361a816108e1f379cc59d8810ad4eccd6257f7d069591ce",
     "src/context/mod.rs": "354d50a9b167e57c570bf0857054dcc8fc855e5f22a95dc270500b31ce901a44",
     "src/context/shared_working_memory.rs": "bd6e41fc96416be12dd1cde3fe747c6e65c008a38f080f75997b08426598d018",
     "src/error.rs": "8016b7b51fbef05119ebb80c59f69aa13e031aab786916b62f070a1e84fab09b",
@@ -28,31 +28,31 @@
     "src/examples/react/summarization_agent.rs": "82e1c56944ae1642086a83d932ceffcf8fe1459981800590cbd42a380360cb3d",
     "src/examples/react/thinking_agent.rs": "7a7f1088df95579e5c19166453d1192f0e2b687d1d9cc2bc4f9397299e20fba0",
     "src/examples/react/tool_call_agent.rs": "8632f6ded030d5cbb5c328eb065def66d603164c13f91574cf6f68739f1562ec",
-    "src/lib.rs": "c8a3891ab74c022dae401f4474a7de4f708733e48a75fc4fdbf1d5b346eecf00",
-    "src/llm/broker.rs": "80443744ac055096d4067438c2fd5c019cc0de3ed2769888f025ea315f81d0d4",
+    "src/lib.rs": "1af6d33624acc0375975cdb633528f932fe58b54c9a2d9df95d8928c1b9b59a2",
+    "src/llm/broker.rs": "9392b4034fa6187a8e286198fd44329ae9f5548ac77c7d8113d16e76a3b026ac",
     "src/llm/chat_session.rs": "b45b6eb0dd59c65a41e918915f8e17f73310491211092cbe648988a420f2c0ee",
     "src/llm/gateway.rs": "c170c2a3423d1d47b97c727cf1237c5439374976a9740a65d00d6ababa56cc7d",
     "src/llm/gateways/mod.rs": "960a884aee3ec220e8b91b8cf88e7af0e70931dea67180787aed4360e1ac2a72",
-    "src/llm/gateways/ollama.rs": "0a8a31a6c795fb630ee0832681dabb17be4755a4c52071aed4da2400757a0d90",
+    "src/llm/gateways/ollama.rs": "5198a56cb51da8362428f09dbe1097767a4ecda21a1bf7572b7859153c4c2483",
     "src/llm/gateways/ollama_stream_events.rs": "98f0201ca4fed4a4010c4a68f0bcd5cb4e575ce9181090c8571ee63e9c07f1fb",
-    "src/llm/gateways/omlx.rs": "e289e3828469ef19e6a6efd3420136daf888d120c7102171c2c60c7896e635bc",
-    "src/llm/gateways/openai.rs": "0094a7b581ff9ebb7482f78f40b23c99b7925154ddbcdfd8530f535a7ce44d40",
+    "src/llm/gateways/omlx.rs": "d08b8c0ae23f5e307b855fc0c06d8ed581fb9cf58cd22202bcd325a92d2567d7",
+    "src/llm/gateways/openai.rs": "ef0a0724173409838ae7567c995600b8da1cdd3c96faa16351ac370cb95b2659",
     "src/llm/gateways/openai_legacy_stream.rs": "1b5473140325c84a04a9c1a07e7214df1c8d1f849e1b8d6e2f856305c1f7d168",
     "src/llm/gateways/openai_messages_adapter.rs": "691c13d623d2c53d15b83bf83ef2ee7117592355e7cd8b2bc81fd29b68c3b143",
     "src/llm/gateways/openai_model_registry.rs": "621481427425d9f3d656a0fa3f29189316a2c8d0aa45c277390423d6e7df22ec",
     "src/llm/gateways/openai_stream_events.rs": "d3cbfef8bdb4936f22ce7423a039e3fe0de28f5127fd2c1206a4233cc050315f",
     "src/llm/gateways/tokenizer_gateway.rs": "43b8958786b3bd83b379c95d4abd64df94123c6623c4b0db2f1768de2025a0a5",
-    "src/llm/mod.rs": "493a0fbfb66327f56fc9077d0363a7b2826bfd79c6d8c539267615be84499095",
+    "src/llm/mod.rs": "1a318dcd8558223ab66e83627395f7ef5b4dd9ed2272dbf8fffca67d7b115bcb",
     "src/llm/models.rs": "bff4c679c1aa8d2c3ca9be40b187d42858bd806aa884428eb9cc2b3859b0080f",
     "src/llm/reasoning.rs": "d2bd8de6dbe33fd4eacd2f905da634a17ce5b47552fccf9ba5c1be63c58a7117",
-    "src/llm/recovery/adapter.rs": "74b5a861d5ed0e2b45e27be7d7f1705f95537ff665ab7a89528d8acf13e81394",
+    "src/llm/recovery/adapter.rs": "0c3f393560c9365d551c1df9f6b78e61dd2550c78b6c5be82a457dec8cdd082f",
     "src/llm/recovery/capabilities.rs": "9ad78a6c2f52f8327b7291bb139c876b68130c6c315591fb1e984a94532cb356",
-    "src/llm/recovery/engine.rs": "e39cc11e538d21b8b22545a44d880794cf7d6dd7ce8e3c0e121a87994e73eac0",
+    "src/llm/recovery/engine.rs": "b9fce930216b45ffbe4fa061c3121fd6427c6d91cfd6507b3807303c33e45271",
     "src/llm/recovery/frames.rs": "eab9c92bf7e157a8005898d3573fe659ac63e87fe3953ded376448d6c451afe6",
     "src/llm/recovery/mod.rs": "f5e07fc28979f80f461eb637a0001ee85a68dff2c4a50988350e2708338a0464",
     "src/llm/recovery/policy.rs": "828dd45af10db784609b380cac52ccbf542f703bd887da875a4d1bfac418f82d",
     "src/llm/recovery/types.rs": "5b8e39aa575ba94c3f551fc66a5a06293ef261c2243dccf95618ee2935ec7161",
-    "src/llm/stream_events.rs": "b696afd78e97ba31d2ba20958ef47041029944c093395dcd11b16733f6f22d3f",
+    "src/llm/stream_events.rs": "ddc41e58e57580113d95433febec8dd2adf1b0a73ebe2fa626d40f209acb5a97",
     "src/llm/stream_timing.rs": "e863d4d4bdfd17a0d212d8faf10f33b884b9c61ce190ee5630a5277ff53dc752",
     "src/llm/tools/ask_user_tool.rs": "353c143170fe098bd52b48c912ba0e254a4aa869a409041454f4554adaccc58e",
     "src/llm/tools/current_datetime_tool.rs": "cf131dc5f79fcdad0bf20ae3382749f9bb9804c42307a6c5325acaa48b57cbb7",
@@ -73,7 +73,8 @@
     "src/llm/tools/tell_user_tool.rs": "ec1d7afc4a16ffd41f7d121712530cd4f989066f893c0a0cc2d068464e405a97",
     "src/llm/tools/tool.rs": "73aa41fe0562adbfc40d8714633730562f4f2d3a91071ffbd2395da47ade0ad5",
     "src/llm/tools/tool_wrapper.rs": "024f8c35af90c520d894068b258328237eafef98a813dc4b0c7adedaee59717f",
-    "src/llm/tools/web_search_tool.rs": "1a1a375e5ec3ed6d96ef0f4df07f761360a01329544847241e7538850c235370",
+    "src/llm/tools/web_search_tool.rs": "6ef35ce1ab32690a9dae6d7ecc590df24e72db8053d11e7944fc7247ef0e8e92",
+    "src/llm/transport.rs": "b28be1de84e4505bca9972de2ad7e083d456db00e58276fac6d0fa41ceb6e0f2",
     "src/realtime/broker.rs": "b857e5a68c905878579111c827643f53e669a203a6f41278e9bea209514af55a",
     "src/realtime/codec.rs": "c540e697ef98df5fff586b4b2198b34d8b825c14fb727bd5c8b3263842f17bee",
     "src/realtime/config.rs": "c00ae6229ba70a29cd396aa9b00d124343f435b21d4af55118b6dbffdb2a9d23",
@@ -90,13 +91,13 @@
     "src/tracer/null_tracer.rs": "f5f23f5d2a4bac38c234cf9a457cbbe57122003bdac40cb01e8a16a47aff9ce8",
     "src/tracer/tracer_events.rs": "42c5dcb8a9fe2398f6fa09a04acd591e700cf3c6fecf09a1859e5d02259e8b5d",
     "src/tracer/tracer_system.rs": "752cf43ad9e22fab69190f39303c69bfa99ba3e9ee7f19e6f52413df9618ac9f",
-    "tests/contracts/MODEL-METADATA-SECTION1.md": "5e75d0ab71d96a998355f42b7299c598ff49eaadf4a9fba7718cc379cd202fb2",
-    "tests/contracts/STREAM-TIMING.md": "d5d6e289677c807039fddcd68e277ed88700f0ad2e348a61e0eefe86a1b050b2",
-    "tests/contracts/model_metadata_section1_v1.json": "617c0df913416e8cbfa5873256d427857c1f998103b9b04a4e2b3a456d07ac07",
+    "tests/contracts/MODEL-METADATA-SECTION1.md": "50345d0cd1a9e5a6fda8ca365e62edb9292d50549a3fa62ac5d08b4157e21ef5",
+    "tests/contracts/STREAM-TIMING.md": "52c253ba8491390d91a6d6b29b34a1f4a15a9953d38673e05d184fc75f68da9d",
+    "tests/contracts/model_metadata_section1_v1.json": "cd7b798a9b21fd339c749a14702b1ac53bb774dde9427f52db26a91dc4803e52",
     "tests/contracts/recovery_capabilities_v1.json": "40e8da683ce4bfcfebf9892ca51a53a701488d463977f021922cd6317203aa76",
     "tests/contracts/recovery_status_selection_v1.json": "8250dd928817d3634eb239f90dbeee908398f8fcbba8623ba2913278fba19b30",
     "tests/contracts/request_fidelity_v1.json": "6f02088311f50707b9c12154d888f844928c23d359043cb2e5d5654bf7e5eaea",
-    "tests/contracts/stream_timing_v1.json": "efb8271a85620c75db34f7c504a65d42fdc97e9868d08a280ce558aa0c092fba",
+    "tests/contracts/stream_timing_v1.json": "c794e476216781941bf0cf52d2904a1e974ed72cc495d937d29944c51a77462b",
     "tests/contracts/typed_errors_v1.json": "48d957ccdabc9fa606d9e1fa32f7969c7f0c61259b6072c832eb0778e3450aee",
     "tests/fixtures/ollama/README.md": "280fb1f2156bc5ac3a2fb37e61924e5a6688637d2c65432a388659159f5579eb",
     "tests/fixtures/ollama/error_model_not_found.json": "f5302087e61a9af18abef1b9315b226aa8dfab326ed1751d4bff12b05e1b9dab",
@@ -122,121 +123,242 @@
     "tests/fixtures/openai_tool_round_trip/response-1-tool-call.json": "f42bf55219888b2f98d151e34f3f185cbf719b4bc81120b9459f67c2789fdd72",
     "tests/fixtures/openai_tool_round_trip/response-2-final.json": "e604fef4ab9efbf166557770f0b31327fd4d574a7ada37a4e3f8840daaf9ecde",
     "tests/fixtures/openai_tool_round_trip/tool-result.json": "fdb92cd22a5acb10caf27bf6154e0f50b2c249275f7187c038f6f4f7292ce6c7",
-    "tests/model_metadata.rs": "1cc51637a0638015d77f35078759c35a700aca22108f0fb2b67209460adcc056",
-    "tests/omlx_gateway.rs": "a06325ee3f0b8e8166e04f8e0c253db2b78c9e77bd95bd630c31aa50a2c49ca4",
-    "tests/openai_tool_round_trip.rs": "b14fb3b96feefe1ff6f27c512b5a39e5aff0a573328cbafc0bb95bb58777b993",
-    "tests/reasoning_contract.rs": "779e45c16fa5265e4487fa3dcc4b074988b9588e368cab7a112eed894981e269",
-    "tests/recovery.rs": "6a78af7ebc787566eed623eed7f02a2672dea73f1fb22ad5b6511cb3f2cac801",
-    "tests/request_fidelity.rs": "80f7b30a1becf5a3f8f5f8e3cffd2da1d0fe9927e0bdea85790fcf5a3048bb6b",
-    "tests/stream_timing.rs": "86375c4efa2deda9a2eaa79dd41d530b2db7fef0a568876c878f8eaef640c71c"
+    "tests/model_metadata.rs": "e8b48e2251e138bd393110b6c8f82481dbcf97ad4ac8bece8b3db34e4c217e90",
+    "tests/omlx_gateway.rs": "6d37ebf2681e1c77b761482edace142facc79e0de7609a2d4f6e15e25c53974a",
+    "tests/openai_tool_round_trip.rs": "2836448380268ef5a18f0ac8660dd72a83b1efad7ef057a460fbcee857549ac2",
+    "tests/reasoning_contract.rs": "96f5d78f1ecc260b9b90b3e23f6f0c5ee21d3c32f40c839cb13368718616ced6",
+    "tests/recovery.rs": "42ae529b82030736a06114b229a9f09f7104fc6c35307520dba0373f49689d45",
+    "tests/request_fidelity.rs": "8256c4efd737af42a85be98e1d37c8c6987949609d86dea6d0e52ede03fbaddf",
+    "tests/stream_timing.rs": "75f2dd385d707786050e9ec5615a662bb0a53bbc87ef7724c698070175d0c187",
+    "tests/support/mod.rs": "c3e24695c4f3f3f8e399a79a3a13345d35df921f1d12b4ee05b83f224afc0395",
+    "tests/transport_boundary.rs": "9d253baae5c7d613ff70f25e760cdf4512c5030fa49ac5d8e0ffaa421e8abc9f"
   },
+  "source_snapshot_sha256": "7c385264f8ae9943349348761d45e90c7b024371a2c9242a570c0412f215616e",
   "contracts": {
-    "tests/contracts/stream_timing_v1.json": "efb8271a85620c75db34f7c504a65d42fdc97e9868d08a280ce558aa0c092fba",
-    "tests/contracts/recovery_capabilities_v1.json": "40e8da683ce4bfcfebf9892ca51a53a701488d463977f021922cd6317203aa76",
-    "tests/contracts/typed_errors_v1.json": "48d957ccdabc9fa606d9e1fa32f7969c7f0c61259b6072c832eb0778e3450aee",
-    "tests/contracts/request_fidelity_v1.json": "6f02088311f50707b9c12154d888f844928c23d359043cb2e5d5654bf7e5eaea",
-    "tests/contracts/recovery_status_selection_v1.json": "8250dd928817d3634eb239f90dbeee908398f8fcbba8623ba2913278fba19b30",
-    "tests/contracts/model_metadata_section1_v1.json": "617c0df913416e8cbfa5873256d427857c1f998103b9b04a4e2b3a456d07ac07"
-  },
-  "proof": {
-    "kind": "behavioral",
-    "source_change": "src/llm/broker.rs: retain terminal response evidence before returning the original gateway transport error; leave failed assistant output uncommitted",
-    "rejecting": {
-      "command": "cargo test --all-features --test stream_timing section2_transport_interruption",
-      "exit_code": 101
+    "model_metadata_section1_v1.json": {
+      "version": "model-metadata-section1-v1",
+      "sha256": "cd7b798a9b21fd339c749a14702b1ac53bb774dde9427f52db26a91dc4803e52"
     },
-    "corrected": {
-      "command": "cargo test --all-features --test stream_timing section2_transport_interruption",
-      "exit_code": 0
+    "recovery_capabilities_v1.json": {
+      "version": null,
+      "sha256": "40e8da683ce4bfcfebf9892ca51a53a701488d463977f021922cd6317203aa76"
     },
-    "rejecting_source": "Original src/llm/broker.rs at 602d8a8d0262c57ac95cb97df950ea392de2f3ae",
-    "corrected_source_sha256": "80443744ac055096d4067438c2fd5c019cc0de3ed2769888f025ea315f81d0d4"
+    "recovery_status_selection_v1.json": {
+      "version": 1,
+      "sha256": "8250dd928817d3634eb239f90dbeee908398f8fcbba8623ba2913278fba19b30"
+    },
+    "request_fidelity_v1.json": {
+      "version": "request-fidelity-v1",
+      "sha256": "6f02088311f50707b9c12154d888f844928c23d359043cb2e5d5654bf7e5eaea"
+    },
+    "stream_timing_v1.json": {
+      "version": "rust-stream-timing-v1",
+      "sha256": "c794e476216781941bf0cf52d2904a1e974ed72cc495d937d29944c51a77462b"
+    },
+    "typed_errors_v1.json": {
+      "version": "typed-errors-v1",
+      "sha256": "48d957ccdabc9fa606d9e1fa32f7969c7f0c61259b6072c832eb0778e3450aee"
+    }
   },
   "results": [
     {
+      "name": "format",
       "command": "cargo fmt --check",
+      "required": true,
       "exit_code": 0,
-      "duration_seconds": 0.376
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "d49b0ce29411427e4796ec2c230dbf691ad49a37cf8ac2191bd8692a891f0566",
+      "environment_attempts": [],
+      "test_results": [],
+      "coverage": []
     },
     {
+      "name": "lint",
       "command": "cargo clippy --all-targets --all-features -- -D warnings",
+      "required": true,
       "exit_code": 0,
-      "duration_seconds": 22.807
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "18a67e46cf6fdacd07bd26689d9c1f4371eacad85d71aee56f85cd45ce19764a",
+      "environment_attempts": [],
+      "test_results": [],
+      "coverage": []
     },
     {
+      "name": "test",
       "command": "cargo test --verbose --all-features",
+      "required": true,
       "exit_code": 0,
-      "duration_seconds": 84.772
+      "stdout_sha256": "e3ffbc29dd85a798c39f0faa4e44c4321e2a7081119712f5102fedca18e51f80",
+      "stderr_sha256": "1fa028440cac1fa44c325afd6d04a33d81282442285dc86d1e161675e2755a55",
+      "environment_attempts": [],
+      "test_results": [
+        "test result: ok. 542 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.59s",
+        "test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.55s",
+        "test result: ok. 50 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.25s",
+        "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.03s",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.74s",
+        "test result: ok. 66 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 26.77s",
+        "test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 17.41s",
+        "test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.71s",
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s",
+        "test result: ok. 20 passed; 0 failed; 24 ignored; 0 measured; 0 filtered out; finished in 1.63s"
+      ],
+      "coverage": []
     },
     {
+      "name": "build",
       "command": "cargo build --verbose --all-features",
+      "required": true,
       "exit_code": 0,
-      "duration_seconds": 33.972
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "fdf28a2329580277e78124b06dba593a8099f573260ad597287224804a5e9742",
+      "environment_attempts": [],
+      "test_results": [],
+      "coverage": []
     },
     {
+      "name": "coverage",
       "command": "cargo tarpaulin --all-features --fail-under 56",
+      "required": true,
       "exit_code": 0,
-      "duration_seconds": 472.885
+      "stdout_sha256": "24c48d73b996ad345d306b9c62bdd62ef4576b2472cc487bc409b7416fb61e3c",
+      "stderr_sha256": "af9c68f8c28cf3f4cc227df6d8deeaa86b15a7f2710ab7374f8764881c0fe98b",
+      "environment_attempts": [],
+      "test_results": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s",
+        "test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.97s",
+        "test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.35s",
+        "test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.97s",
+        "test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.79s",
+        "test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 87.40s",
+        "test result: ok. 50 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.16s",
+        "test result: ok. 66 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 90.08s",
+        "test result: ok. 542 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 35.12s"
+      ],
+      "coverage": [
+        "2026-10-18T23:27:55.034609Z  INFO cargo_tarpaulin::report: Coverage Results:",
+        "|| Uncovered Lines:",
+        "71.94% coverage, 3646/5068 lines covered"
+      ]
     },
     {
+      "name": "security-deny",
       "command": "cargo deny check",
+      "required": false,
       "exit_code": 0,
-      "duration_seconds": 1.207
+      "stdout_sha256": "f1a0fca39d4280363937aabd77783990ea6480bd9ca257816de3b68fc8efa845",
+      "stderr_sha256": "b2bf91636bc35c722ea8cd8d2bd8815b9b32f38020462e65172c056c92ab60e1",
+      "environment_attempts": [
+        {
+          "exit_code": 1,
+          "environment": "shared read-only advisory cache",
+          "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stderr_sha256": "96c2a1a011efea6e922bc506398ca5eff38e6f36d080fd068ee8f0805235c70d"
+        },
+        {
+          "exit_code": 1,
+          "environment": "writable Cargo home; mise tool discovery could not use its read-only cache",
+          "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stderr_sha256": "e217817e614663ee057d8c7798bd550b006d72e2f347b7ef6dfa53b5a887ce20"
+        },
+        {
+          "exit_code": 0,
+          "environment": "writable scratch Cargo home; existing Cargo binaries",
+          "stdout_sha256": "f1a0fca39d4280363937aabd77783990ea6480bd9ca257816de3b68fc8efa845",
+          "stderr_sha256": "b2bf91636bc35c722ea8cd8d2bd8815b9b32f38020462e65172c056c92ab60e1"
+        }
+      ],
+      "test_results": [],
+      "coverage": []
     },
     {
+      "name": "security-audit",
       "command": "cargo audit",
+      "required": false,
       "exit_code": 0,
-      "duration_seconds": 1.371
-    },
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "dde3bc2572158591feab645ddc0465c2d111c7f52b929efc40eb341299bd9f35",
+      "environment_attempts": [
+        {
+          "exit_code": 1,
+          "environment": "shared read-only advisory cache",
+          "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stderr_sha256": "005da953b110e965550d53f00961cd78d9981fb36bfa075bb3aa5da38df50ee3"
+        },
+        {
+          "exit_code": 1,
+          "environment": "writable Cargo home; mise tool discovery could not use its read-only cache",
+          "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stderr_sha256": "143473acd1108f8d945967c3e74939be0251775aee1a38ee7240df228ce07282"
+        },
+        {
+          "exit_code": 0,
+          "environment": "writable scratch Cargo home; existing Cargo binaries",
+          "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "stderr_sha256": "dde3bc2572158591feab645ddc0465c2d111c7f52b929efc40eb341299bd9f35"
+        }
+      ],
+      "test_results": [],
+      "coverage": []
+    }
+  ],
+  "additional_results": [
     {
       "command": "cargo test",
       "exit_code": 0,
-      "duration_seconds": 87.148
-    },
-    {
-      "command": "cargo test --no-default-features",
-      "exit_code": 0,
-      "duration_seconds": 90.651
+      "stdout_sha256": "1006dd2fc9393ac9f72c48e7aea10454966c4ae7309c5c617692f079f87e69d5",
+      "stderr_sha256": "e410fba5cb091ca066b71f78cbe892305fc40f72af00d2122b45144d06c2fa9a"
     },
     {
       "command": "cargo doc --no-deps --all-features",
       "exit_code": 0,
-      "duration_seconds": 25.111
+      "diagnostics": "Existing unresolved connect link and unclosed dyn HTML tag; no warnings suppressed",
+      "stdout_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderr_sha256": "2b499613c1e2b9085aef4052767c8bfddf90c7e1a442bb174bf611aa5f90e9bd"
     },
     {
-      "command": "mdbook build book",
+      "command": "CARGO_TARGET_DIR=target python3 scripts/verify_package.py",
       "exit_code": 0,
-      "duration_seconds": 0.483
-    },
-    {
-      "command": "python3 scripts/verify_package.py",
-      "exit_code": 0,
-      "duration_seconds": 120.339
+      "verification_record": "audit/package-readiness-3.0.0.json",
+      "archive_sha256": "d1bb82b604f4b8c96b1a451714fb0eb5e79e20360063f7723124e37324876ae1"
     }
   ],
-  "environment": {
-    "CARGO_HOME": "/tmp/mojentic-c2-cargo",
-    "CARGO_TARGET_DIR": null
+  "proof": {
+    "kind": "behavioral",
+    "source_change": "src/llm/transport.rs and gateway/recovery execution: inject the public HTTP transport; tests/transport_boundary.rs supplies a contract body followed by UnexpectedEof instead of normal EOF, preserving terminal transport-error semantics.",
+    "rejecting": {
+      "command": "cargo test --offline --all-features --test transport_boundary",
+      "exit_code": 101,
+      "log_sha256": "a1a33e3335dbbcf891cda748cb076753d423841e29811f90aa4c0f74e725f7f4"
+    },
+    "corrected": {
+      "command": "cargo test --offline --all-features --test transport_boundary",
+      "exit_code": 0,
+      "log_sha256": "3c1494a1e8e0a1454276cab90f225bc570a9baeaab746c312ad02063d182d303"
+    }
   },
-  "prior_cycle": "audit/readiness-cycle-9.json",
-  "finished_at": "2026-10-18T01:01:31.871717+00:00",
-  "verification_note": "Full cycle-10 sweep on unchanged executable sources; same versioned HTTP interruption cases verified from source and fresh extracted package.",
-  "certification": {
-    "scope": "Rust library RELEASE-3.0.0 parts 1-5",
-    "ready_for_coordinated_release_approval": true,
-    "publication": "held",
-    "registry_adoption": "held",
-    "post_publication_install": "held",
-    "archive_sha256": "2f1fa8b6dc15186aea231e28db645323168c6f2cb4f510cceb0f8a7b8dbe7725",
-    "provider_tests_passed": 716,
-    "provider_preexisting_ignored_doctests": 24,
-    "packaged_consumer_tests_passed": 154,
-    "coverage_percent": 71.33,
-    "covered_lines": 3565,
-    "measured_lines": 4998,
-    "verified_at": "2026-10-18T01:01:34.344294+00:00"
+  "root_contract": {
+    "coordinating_revision": "36f1cd9a2c89b8ad48384ab15a8ad25c4bb387ad",
+    "sha256": "141d4ee5fcfbc18c940a7e7fe8d5ba9e381abc41a6d03f300f541e0fd5236f9d"
   },
-  "execution_evidence": "Complete capture logs and behavioral proof archived by Foundry; audit records retain commands, actual exit codes and exact tested source identities.",
-  "resolved_lock_sha256": "390c599335be1aed77a5ff897c5f053631e31611d89ac66e2b06cd056e29034d",
-  "source_snapshot_sha256": "351d9c0ad63cc6374c671185081afbe4b4027eb907f67db5c9f2b60c1d7a23de"
+  "provider_public_consumer": {
+    "source_revision": "base_commit plus source_snapshot_sha256",
+    "result": "passed identical executable contract tests",
+    "packaged_consumer": "audit/package-readiness-3.0.0.json",
+    "same_tested_sources": true
+  },
+  "external_verification": "External providers and dependent repositories were not run; coordination gap only, no external agreement claimed.",
+  "invariants": {
+    "edition": "2021",
+    "runtime": "Tokio unchanged",
+    "features": "unchanged",
+    "public_items": "preserved; additive HTTP transport injection",
+    "version": "unchanged",
+    "coverage_floor": 56,
+    "coverage_engine": "existing tarpaulin Ptrace",
+    "lockfile_policy": "Cargo.lock remains ignored; regenerated offline without mockito"
+  },
+  "resolved_lock_sha256": "a108eb513136498e25153e9c9c9d0e60d8bf21cbbb559f21d6cdb7657d059505",
+  "finished_at": "2026-10-18T23:29:12.343424+00:00",
+  "verification_note": "Code, fixtures and verifiers match the extracted consumer. Documentation and result prose finalized after execution; no executable changes afterwards. Cycles 1\u20138 remain in audit/readiness-cycles-1-8.md; prior gate record remains in Git."
 }

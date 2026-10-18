@@ -169,8 +169,12 @@ request successful or create another inference request.
 
 ## Deterministic conformance evidence
 
-Use scripted HTTP transports or fake provider boundaries. No live model is needed.
-Run the cases through public entrypoints and each applicable adapter.
+Use in-process scripted transports (the HTTP library's own test transport,
+which opens no socket) or fake provider boundaries, with an injected clock and
+sleeper. Do not use a local or loopback HTTP server, and do not assert
+wall-clock thresholds (revised 2026-10-18; see `AGENTS.md`, "Tests Are the
+Executable Spec"). No live model is needed. Run the cases through public
+entrypoints and each applicable adapter.
 
 | Case | Required proof |
 | --- | --- |
@@ -207,3 +211,69 @@ Record request/response traces for every attempt, including final HTTP failures.
 Test ambiguous admission rejection, interruption, and cancellation in that cell.
 Do not rerun Generation45 or any other stopped benchmark.
 Do not infer model efficacy or the original 504's origin from fake-provider results.
+
+## Amendment, October 12, 2026: robustness decisions
+
+Stacey approved these decisions on October 12, 2026, after the whole-mission
+review of the Swift port. They apply to all six ports. The rule: every port is
+equally robust. A port may differ only where its language has a different
+idiom for the same guarantee. Public API changes are allowed to meet these
+decisions. This root file is the authoritative copy of the contract. Copies
+in the port repositories can be out of date.
+
+Robustness decisions (the same behavior in every port):
+
+- **Admission without a hook.** When no admission hook is configured, an
+  eligible failure from a remote provider (OpenAI, Anthropic) may retry. An
+  eligible failure from a local provider (Ollama, oMLX) returns
+  admission-required, unless acceptance is `no`. Elixir and Rust behave this
+  way. A port that refuses every retry without a hook does not conform.
+- **Admission without a decision.** An admission hook that ends without allow
+  or reject never authorizes a resend. Report it with its own stable reason.
+  Do not report it as a caller rejection.
+- **Capabilities.** Every adapter that supports recovery, Anthropic included,
+  exposes the five Elixir capabilities: local request cancellation, remote
+  request cancellation, request status, idempotency, and exact-attempt
+  termination. Each value cites the provider documentation that was inspected
+  and the inspection date. Report `supported` only when that documentation
+  describes the facility for the exact endpoint. Report `unsupported` when it
+  describes no such facility. Report `unknown` when the documentation is
+  absent or ambiguous. Exact-attempt termination stays `unknown`, because no
+  adapter has evidence for one attempt. Tests assert every value for every
+  adapter.
+- **Provider metadata.** Safe accessors return a provider code only from an
+  allowlist, and a provider request ID only when it is not an echo of an
+  outbound credential or payload value. Otherwise they return nothing, and the
+  raw value is available only through explicit inspection. Read each
+  provider's own field names (for example, Anthropic `request-id` and
+  `error.type`). Tests echo a credential into each field.
+- **Retry-After dates.** Accept all three HTTP-date forms: IMF-fixdate, RFC 850
+  and asctime. RFC 9110 section 5.6.7 requires this of recipients. Treating a
+  valid obsolete form as invalid can shorten the provider's minimum delay.
+- **Operation and provider.** Expose both as closed types, with one vocabulary
+  for every adapter in the port. The vocabulary distinguishes at least
+  ordinary, structured and streaming operations. The case names follow the
+  port's own API naming.
+- **oMLX keepalive frames.** Recovery stream decoders skip oMLX data frames
+  whose `model` is `keepalive`, as the legacy stream paths do. Such a frame is
+  raw progress only. It changes no frame index and no provider metadata.
+- **Typed errors.** An invalid recovery policy fails with its typed policy
+  error on every entrypoint. Capture and length causes stay typed through the
+  broker and session.
+- **Evidence at the public boundary.** Partial-stream interruption (reasoning,
+  content and tool fragments) is tested through the broker and session
+  streams, not only the gateway. Tests assert the safe fields of lifecycle
+  events (phase, category, eligibility, reason, acceptance, delay, operation).
+  Tests prove that a caller's retryable status and category selection changes
+  eligibility, and they exercise HTTP 500 and 502.
+
+Idiomatic differences (the same guarantee, implemented in the port's idiom):
+
+- **Default formatting.** Every default formatting and reflection path omits
+  private evidence: Swift `Mirror` (through `CustomReflectable`), Elixir
+  `Inspect`, Python `repr`, Rust `Debug`, Kotlin `toString`, and TypeScript
+  `util.inspect` and `toJSON`. Test each path with sentinel values.
+- **Cancellation scope.** How a paused consumer's cancellation reaches local
+  resources follows the language's concurrency model. For example, Swift uses
+  a task-local scope and Rust uses an explicit token.
+- **Naming.** Type, case and method names follow each language's conventions.

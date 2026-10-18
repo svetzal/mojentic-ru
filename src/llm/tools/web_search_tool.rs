@@ -1,5 +1,7 @@
 use crate::error::Result;
 use crate::llm::tools::{FunctionDescriptor, LlmTool, ToolDescriptor};
+#[cfg(test)]
+use crate::test_boundary as boundary;
 use async_trait::async_trait;
 use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use regex::Regex;
@@ -42,7 +44,7 @@ pub struct SearchResult {
 /// ```
 #[derive(Clone)]
 pub struct WebSearchTool {
-    client: reqwest::Client,
+    client: crate::llm::transport::Client,
 }
 
 impl WebSearchTool {
@@ -53,13 +55,26 @@ impl WebSearchTool {
             .build()
             .expect("Failed to create HTTP client");
 
-        Self { client }
+        Self {
+            client: client.into(),
+        }
     }
 
     /// Creates a new WebSearchTool with a custom HTTP client (for testing)
     #[cfg(test)]
     pub fn with_client(client: reqwest::Client) -> Self {
-        Self { client }
+        Self {
+            client: client.into(),
+        }
+    }
+
+    /// Replace HTTP execution while preserving search parsing and error behavior.
+    pub fn with_transport(
+        mut self,
+        transport: std::sync::Arc<dyn crate::llm::transport::HttpTransport>,
+    ) -> Self {
+        self.client = self.client.with_transport(transport);
+        self
     }
 
     /// Perform the web search
@@ -205,7 +220,6 @@ impl LlmTool for WebSearchTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use mockito::Server;
 
     fn sample_html() -> String {
         r#"
@@ -332,53 +346,39 @@ mod tests {
         assert!(result.unwrap_err().to_string().contains("query parameter cannot be empty"));
     }
 
-    #[tokio::test]
-    async fn test_perform_search_success() {
-        let mut server = Server::new_async().await;
+    #[test]
+    fn test_perform_search_success() {
+        let mut server = boundary::Fixture::new();
         let mock = server
-            .mock("GET", mockito::Matcher::Any)
+            .mock("GET", boundary::Matcher::Any)
             .with_status(200)
             .with_body(sample_html())
-            .create_async()
-            .await;
+            .create();
 
-        let client = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(10))
-            .build()
-            .unwrap();
+        let tool = WebSearchTool::new().with_transport(server.transport());
+        let args = HashMap::from([("query".to_string(), json!("rust"))]);
+        let result =
+            futures::executor::block_on(tool.run(&args, &crate::llm::tools::ToolRunCtx::default()))
+                .expect("search");
+        assert_eq!(result.as_array().expect("results").len(), 3);
+        assert_eq!(result[0]["title"], "The Rust Programming Language");
 
-        let tool = WebSearchTool::with_client(client);
-
-        // Override BASE_URL for testing by constructing URL directly
-        let url = format!("{}?q=rust", server.url());
-        let response = tool.client.get(&url).send().await.unwrap();
-        let html = response.text().await.unwrap();
-        let results = tool.parse_results(&html).unwrap();
-
-        assert_eq!(results.len(), 3);
-        assert_eq!(results[0].title, "The Rust Programming Language");
-
-        mock.assert_async().await;
+        mock.assert();
     }
 
-    #[tokio::test]
-    async fn test_perform_search_http_error() {
-        let mut server = Server::new_async().await;
-        let mock = server.mock("GET", mockito::Matcher::Any).with_status(500).create_async().await;
+    #[test]
+    fn test_perform_search_http_error() {
+        let mut server = boundary::Fixture::new();
+        let mock = server.mock("GET", boundary::Matcher::Any).with_status(500).create();
 
-        let client = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(10))
-            .build()
-            .unwrap();
+        let tool = WebSearchTool::new().with_transport(server.transport());
+        let args = HashMap::from([("query".to_string(), json!("test"))]);
+        let error =
+            futures::executor::block_on(tool.run(&args, &crate::llm::tools::ToolRunCtx::default()))
+                .expect_err("HTTP failure");
+        assert!(error.to_string().contains("500"));
 
-        let tool = WebSearchTool::with_client(client);
-
-        let url = format!("{}?q=test", server.url());
-        let response = tool.client.get(&url).send().await.unwrap();
-
-        assert_eq!(response.status(), 500);
-
-        mock.assert_async().await;
+        mock.assert();
     }
 
     #[test]

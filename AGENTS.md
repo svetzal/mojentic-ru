@@ -393,3 +393,20 @@ cargo audit
 ---
 
 *Last Updated: November 2025 • Rust 1.80+ • Tokio 1.x*
+
+## Deterministic public-boundary verification
+
+Tests exercise the public gateway, broker and session APIs using in-process
+transport or gateway doubles derived from the versioned executable contracts.
+They never open sockets, start servers, contact registries or live services,
+sleep in real time, or assert wall-clock thresholds. Inject clocks and sleepers;
+Tokio test clocks may be paused using the existing tokio-test test-util support.
+Gateway wrappers still require boundary contract verification. Integration checks
+exercise wiring and the full user journey through the same public API.
+
+Both sides of a changed application or repository boundary must execute the
+same identifiable contract set, including errors, optional fields and supported
+old/new forms. Record its version/hash, tested revisions and actual results on
+each side. Derive doubles from those contracts. An independent mock or schema
+match alone is insufficient. Report external verification gaps for coordination;
+do not edit an unauthorized repository or claim its verification.

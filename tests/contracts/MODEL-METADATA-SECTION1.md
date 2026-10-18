@@ -1,7 +1,7 @@
 # Model metadata section 1 executable contract
 
 Version: `model-metadata-section1-v1`. SHA-256 of `model_metadata_section1_v1.json`:
-`617c0df913416e8cbfa5873256d427857c1f998103b9b04a4e2b3a456d07ac07`.
+`cd7b798a9b21fd339c749a14702b1ac53bb774dde9427f52db26a91dc4803e52`.
 
 Normative source: MODEL-METADATA-2026-10.md section 1, coordinating repository
 `svetzal/mojentic-unify` at `4b08dcd1d87f520a4c70928c33a2bc84c228093d`.
@@ -82,3 +82,9 @@ were not tested here. Stacey's library self-validation rule supersedes the
 historical demand for their verification before publication. A fresh packaged
 consumer now verifies this identical v1 contract in this repository's readiness
 gates; external dependent adoption follows the coordinated release.
+
+Current correction: the observer is an injected in-process `HttpTransport`.
+It records every encoded method/path before supplying HTTP 503. The registry
+lookup assertions and ignored-POST negative control retain their exact metadata
+and request-line assertions. The cycle-8 TCP mechanism above is historical and
+is superseded; current verification opens no connections.

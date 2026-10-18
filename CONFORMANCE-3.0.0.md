@@ -27,6 +27,68 @@ The sibling-relative release path is absent in this isolated checkout; the
 binding originals above were read from the coordinating checkout without editing
 it. The older local recovery copy is historical; the root amendment governs.
 
+## Current correction: deterministic public HTTP execution
+
+Current source baseline is `3b8ee82b7c2878d537e83d051356600371f87034` plus
+the uncommitted correction identified by source hashes in
+`audit/readiness-gates-3.0.0.json`. The root recovery contract copy now matches
+coordinating revision `36f1cd9a2c89b8ad48384ab15a8ad25c4bb387ad` exactly:
+SHA-256 `141d4ee5fcfbc18c940a7e7fe8d5ba9e381abc41a6d03f300f541e0fd5236f9d`.
+Earlier cycle execution descriptions below are historical. Their contract
+decisions and assertions remain binding; their socket fixtures are replaced.
+
+The seven suites are `recovery`, `reasoning_contract`, `model_metadata`,
+`request_fidelity`, `stream_timing`, `omlx_gateway` and `openai_tool_round_trip`.
+Embedded gateway, stream and web-search assertions also use in-process responses.
+No assertion-bearing case was deleted. The removed socket helper plumbing had
+no separate domain decision; its UTF-8, cancellation and timeout-configuration
+assertions now run on split/pending body streams. Paused Tokio clocks eliminate
+real sleeps in dispatcher/agent tests without changing runtime features.
+
+| Binding behavior | Preserved assertion-bearing replacement |
+| --- | --- |
+| Recovery parts 1/amendments 2–9 | `review_broker_session_failure_evidence_matrix` asserts categories, provider/operation, exact status/headers/body, attempt UUID/number, lifecycle order and original typed EOF/protocol causes; admission matrices assert explicit allow/reject/unresolved and budget termination |
+| Request fidelity and attempt identity | `artifact_cases_recovery_replays_bytes_and_real_attempt_identities` asserts byte-identical replay requests, same logical UUID and different attempt UUIDs; native history/schema tests preserve images/tools/controls |
+| Reasoning and tool accounting | `reasoning_contract` asserts native effort/profile encoding and reasoning retention through tool continuation; round-trip cases assert serialized arguments, tool IDs/results and final content; recovery cases require exactly one tool execution |
+| Metadata, absence and compatibility | `section1_http_contract_exact_outcomes_direct_and_wrapped` asserts exact selected model/window/source or None and typed errors; the registry observer inspects every encoded request; explicit old controls and unset/zero new controls remain asserted |
+| Streaming interruption/timing/session safety | `section2_transport_interruption_*` supplies the same semantic frames then UnexpectedEof, asserts original EOF, exact kind and 25/60 ms timing, evidence before error and unchanged prior history with no assistant commit |
+| Supported old/new metric shapes | `section2_old_metric_documents_remain_readable` asserts absent optional timing fields in old documents and rejects missing required provider; all section-2 cases assert new exact values |
+
+`rust-stream-timing-v1` retains its semantic decisions and frames. Its transport
+delivery description is updated; current artifact SHA-256 is `c794e476216781941bf0cf52d2904a1e974ed72cc495d937d29944c51a77462b`.
+All other versioned JSON artifacts remain unchanged; the table below records their actual current hashes (including corrected stale metadata prose).
+The same tests and fixtures are copied from the archive into the extracted
+consumer; hashes and actual verification results are recorded in
+`audit/package-readiness-3.0.0.json`. Cargo package, metadata and consumer tests
+run offline with cached dependencies. Production uses reqwest unless a caller
+explicitly supplies a transport. Edition 2021, formatting, Tokio, features,
+public items, version and the 56% coverage floor are preserved. `mockito` is
+removed; dev-only `http` names the response type already required transitively
+by reqwest. The ignored Cargo.lock was regenerated offline and no longer contains
+mockito or its unused dependencies. The absent MSRV
+remains a recommendation for separate authorized work.
+
+Current verification: all seven `.hone-gates.json` commands passed (exit 0),
+including **71.94% coverage (3646/5068 lines)** against the unchanged 56% floor.
+The all-feature test run passed 717 tests with 24 existing ignored doctests;
+`cargo test` with default features also passed. The fresh offline extracted
+consumer passed the same 155 public integration tests. Archive SHA-256:
+`d1bb82b604f4b8c96b1a451714fb0eb5e79e20360063f7723124e37324876ae1`.
+The provider source/contract snapshot is
+`7c385264f8ae9943349348761d45e90c7b024371a2c9242a570c0412f215616e`.
+
+`cargo doc --no-deps --all-features` exited 0 with the existing unresolved
+`connect` link and unclosed `dyn` HTML warnings. Security commands initially
+failed to lock the shared read-only advisory cache; retries with a writable
+scratch Cargo home and existing binaries passed. `cargo-deny` retains duplicate
+dependency warnings; the advisory scan found no vulnerabilities. No policy or
+advisory suppression was changed. Attempt exit codes and output hashes are
+recorded in `audit/readiness-gates-3.0.0.json`.
+
+External provider implementations and dependent repositories were not executed.
+Their verification remains a coordination gap; this evidence proves the local
+Rust provider/public-consumer and extracted distribution boundary only.
+
 ## Distribution boundary and contract identities
 
 Stacey's library self-validation rule governs this assessment. The provider is
@@ -46,12 +108,12 @@ in historical section-1 and recovery records.
 
 | Executable contract | Artifact / verifier | SHA-256 |
 | --- | --- | --- |
-| model-metadata-section1-v1 | tests/contracts/model_metadata_section1_v1.json | `617c0df913416e8cbfa5873256d427857c1f998103b9b04a4e2b3a456d07ac07` |
+| model-metadata-section1-v1 | tests/contracts/model_metadata_section1_v1.json | `cd7b798a9b21fd339c749a14702b1ac53bb774dde9427f52db26a91dc4803e52` |
 | request-fidelity-v1 | tests/contracts/request_fidelity_v1.json | `6f02088311f50707b9c12154d888f844928c23d359043cb2e5d5654bf7e5eaea` |
 | recovery-capabilities-v1 | tests/contracts/recovery_capabilities_v1.json | `40e8da683ce4bfcfebf9892ca51a53a701488d463977f021922cd6317203aa76` |
 | recovery-status-selection-v1 | tests/contracts/recovery_status_selection_v1.json | `8250dd928817d3634eb239f90dbeee908398f8fcbba8623ba2913278fba19b30` |
 | typed-errors-v1 | tests/contracts/typed_errors_v1.json | `48d957ccdabc9fa606d9e1fa32f7969c7f0c61259b6072c832eb0778e3450aee` |
-| rust-stream-timing-v1 | tests/contracts/stream_timing_v1.json | `efb8271a85620c75db34f7c504a65d42fdc97e9868d08a280ce558aa0c092fba` |
+| rust-stream-timing-v1 | tests/contracts/stream_timing_v1.json | `c794e476216781941bf0cf52d2904a1e974ed72cc495d937d29944c51a77462b` |
 | Rust native-reasoning public executable set | tests/reasoning_contract.rs, versioned by tested source hash | See audit/package-readiness-3.0.0.json |
 
 The timing set adapts the binding TypeScript `ts-stream-first-token-v1` semantics

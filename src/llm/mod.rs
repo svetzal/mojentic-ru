@@ -17,3 +17,5 @@ pub use stream_events::{StreamEvent, StreamEventError, StreamEventStream};
 pub use tools::{FunctionDescriptor, LlmTool, ToolDescriptor, ToolWrapper};
 
 pub mod recovery;
+
+pub mod transport;

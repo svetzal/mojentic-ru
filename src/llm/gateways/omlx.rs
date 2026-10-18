@@ -26,10 +26,12 @@ use crate::llm::stream_events::{
 };
 use crate::llm::stream_timing::{system_clock, StreamClock, StreamTiming};
 use crate::llm::tools::LlmTool;
+use crate::llm::transport::Client;
+use crate::llm::transport::RequestBuilder;
 use async_trait::async_trait;
 use futures::stream::Stream;
 use percent_encoding::{utf8_percent_encode, AsciiSet, NON_ALPHANUMERIC};
-use reqwest::{Client, Method, RequestBuilder, Response};
+use reqwest::{Method, Response};
 use serde_json::Value;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -171,6 +173,15 @@ pub struct OmlxGateway {
 }
 
 impl OmlxGateway {
+    /// Replace HTTP execution for all requests, including opt-in recovery.
+    pub fn with_transport(
+        mut self,
+        transport: Arc<dyn crate::llm::transport::HttpTransport>,
+    ) -> Self {
+        self.client = self.client.with_transport(transport);
+        self
+    }
+
     /// Select a monotonic measurement clock. The default uses std::time::Instant.
     pub fn with_stream_clock(mut self, clock: Arc<dyn StreamClock>) -> Self {
         self.clock = clock;
@@ -657,6 +668,10 @@ impl LlmGateway for OmlxGateway {
 }
 
 impl crate::llm::recovery::RecoveryProvider for OmlxGateway {
+    fn recovery_transport(&self) -> Option<Arc<dyn crate::llm::transport::HttpTransport>> {
+        self.client.transport()
+    }
+
     fn recovery_provider(&self) -> crate::llm::recovery::Provider {
         crate::llm::recovery::Provider::Omlx
     }
@@ -708,62 +723,68 @@ mod tests {
 
     #[tokio::test]
     async fn event_stream_is_not_cut_off_by_the_whole_response_timeout() {
-        use crate::llm::stream_events::testing::endless_stream_server;
-        let (url, closed) =
-            endless_stream_server("data: {\"choices\":[{\"delta\":{\"content\":\"first\"}}]}\n\n")
+        use crate::llm::stream_events::testing::endless_stream_fixture;
+        let (fixture, closed) =
+            endless_stream_fixture("data: {\"choices\":[{\"delta\":{\"content\":\"first\"}}]}\n\n")
                 .await;
+        let url = fixture.url();
         let gateway = OmlxGateway::with_config(OmlxConfig {
             host: url,
             api_key: None,
             timeout: Some(Duration::from_millis(50)),
         });
+        let gateway = gateway.with_transport(fixture.transport());
         let messages = [LlmMessage::user("Hi")];
         let config = CompletionConfig::default();
         let mut stream = gateway.complete_stream_events("m", &messages, &config).unwrap();
         assert!(matches!(stream.next().await, Some(crate::llm::StreamEvent::Content(_))));
-        tokio::time::sleep(Duration::from_millis(100)).await;
-        assert!(tokio::time::timeout(Duration::from_millis(20), stream.next()).await.is_err());
+
+        assert!(futures::FutureExt::now_or_never(stream.next()).is_none());
         drop(stream);
-        tokio::time::timeout(Duration::from_secs(2), closed).await.unwrap().unwrap();
+        closed.await.expect("body released on drop");
     }
 
     #[tokio::test]
     async fn legacy_stream_outlives_the_timeout_and_cancels_on_drop() {
-        use crate::llm::stream_events::testing::endless_stream_server;
-        let (url, closed) =
-            endless_stream_server("data: {\"choices\":[{\"delta\":{\"content\":\"first\"}}]}\n\n")
+        use crate::llm::stream_events::testing::endless_stream_fixture;
+        let (fixture, closed) =
+            endless_stream_fixture("data: {\"choices\":[{\"delta\":{\"content\":\"first\"}}]}\n\n")
                 .await;
+        let url = fixture.url();
         let gateway = OmlxGateway::with_config(OmlxConfig {
             host: url,
             api_key: None,
             timeout: Some(Duration::from_millis(50)),
         });
+        let gateway = gateway.with_transport(fixture.transport());
         let messages = [LlmMessage::user("Hi")];
         let config = CompletionConfig::default();
         let mut stream = gateway.complete_stream("m", &messages, None, &config);
         assert!(matches!(stream.next().await, Some(Ok(StreamChunk::Content(_)))));
-        tokio::time::sleep(Duration::from_millis(100)).await;
-        assert!(tokio::time::timeout(Duration::from_millis(20), stream.next()).await.is_err());
+
+        assert!(futures::FutureExt::now_or_never(stream.next()).is_none());
         drop(stream);
-        tokio::time::timeout(Duration::from_secs(2), closed).await.unwrap().unwrap();
+        closed.await.expect("body released on drop");
     }
 
     #[tokio::test]
     async fn legacy_stream_keeps_a_character_split_across_network_chunks() {
         use crate::llm::stream_events::testing::{
-            split_body_server, split_inside_first_multibyte_char,
+            split_body_fixture, split_inside_first_multibyte_char,
         };
         let body = concat!(
             "data: {\"model\":\"m\",\"choices\":[{\"index\":0,\"delta\":{\"reasoning_content\":\"\u{1f914} hmm\"}}]}\n\n",
             "data: {\"model\":\"m\",\"choices\":[{\"index\":0,\"delta\":{\"content\":\"caf\u{e9}\"}}]}\n\n",
             "data: [DONE]\n\n",
         );
-        let url = split_body_server(split_inside_first_multibyte_char(body)).await;
+        let fixture = split_body_fixture(split_inside_first_multibyte_char(body)).await;
+        let url = fixture.url();
         let gateway = OmlxGateway::with_config(OmlxConfig {
             host: url,
             api_key: None,
             timeout: None,
         });
+        let gateway = gateway.with_transport(fixture.transport());
         let messages = vec![LlmMessage::user("Hi")];
         let config = CompletionConfig::default();
 

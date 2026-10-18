@@ -1,4 +1,6 @@
 //! No model is loaded: exercise native history and controls at the HTTP boundary.
+#[path = "support/mod.rs"]
+pub mod boundary;
 use async_trait::async_trait;
 use futures::StreamExt;
 use mojentic::llm::gateway::ReasoningEffort;
@@ -35,14 +37,18 @@ impl LlmTool for Inspect {
 }
 
 fn gateway(provider: &str, host: String) -> Arc<dyn LlmGateway> {
+    let transport = boundary::transport_for(&host);
     if provider == "ollama" {
-        Arc::new(OllamaGateway::with_host(host))
+        Arc::new(OllamaGateway::with_host(host).with_transport(transport))
     } else {
-        Arc::new(OmlxGateway::with_config(OmlxConfig {
-            host,
-            api_key: None,
-            timeout: Some(Duration::from_secs(5)),
-        }))
+        Arc::new(
+            OmlxGateway::with_config(OmlxConfig {
+                host,
+                api_key: None,
+                timeout: Some(Duration::from_secs(5)),
+            })
+            .with_transport(transport),
+        )
     }
 }
 fn path(provider: &str) -> &'static str {
@@ -87,7 +93,7 @@ async fn broker_retains_exact_reasoning_at_tool_boundaries_when_opted_in() {
     for provider in ["ollama", "omlx"] {
         for streaming in [false, true] {
             for preserve in [false, true] {
-                let mut server = mockito::Server::new_async().await;
+                let mut server = boundary::Fixture::new_async().await;
                 let first = server
                     .mock("POST", path(provider))
                     .match_request(|r| {
@@ -190,7 +196,7 @@ async fn effort_is_faithful_for_ordinary_streaming_and_structured_requests() {
             ReasoningEffort::XHigh,
         ] {
             for mode in ["ordinary", "stream", "structured"] {
-                let mut server = mockito::Server::new_async().await;
+                let mut server = boundary::Fixture::new_async().await;
                 let expected = match effort {
                     ReasoningEffort::Disabled => json!(false),
                     ReasoningEffort::Enabled => json!(true),
@@ -252,7 +258,7 @@ async fn effort_is_faithful_for_ordinary_streaming_and_structured_requests() {
 #[tokio::test]
 async fn qwen_profile_rejects_high_before_http() {
     for provider in ["ollama", "omlx"] {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let mock = server.mock("POST", path(provider)).expect(0).create_async().await;
         let gateway = gateway(provider, server.url());
         let cfg = CompletionConfig {

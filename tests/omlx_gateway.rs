@@ -1,11 +1,13 @@
-//! Integration tests for the oMLX gateway, over HTTP with mockito.
+//! Integration tests for the oMLX gateway, with in-process HTTP transports.
 //!
 //! The responses are live captures from an oMLX server (see
 //! `fixtures/omlx/README.md`). No test talks to a real server.
 
+#[path = "support/mod.rs"]
+pub mod boundary;
 use async_trait::async_trait;
+use boundary::Matcher;
 use futures::stream::StreamExt;
-use mockito::Matcher;
 use mojentic::error::{MojenticError, Result};
 use mojentic::llm::gateway::{CompletionConfig, ReasoningEffort, ResponseFormat, StreamChunk};
 use mojentic::llm::gateways::omlx::RESPONSE_FORMAT_WARNING;
@@ -42,11 +44,15 @@ static ENV_LOCK: Mutex<()> = Mutex::new(());
 
 /// A gateway for `url` built without reading the environment.
 fn gateway(url: String) -> OmlxGateway {
-    OmlxGateway::with_config(OmlxConfig {
-        host: url,
-        api_key: None,
-        timeout: None,
-    })
+    {
+        let transport = boundary::transport_for(&(url));
+        OmlxGateway::with_config(OmlxConfig {
+            host: url,
+            api_key: None,
+            timeout: None,
+        })
+        .with_transport(transport)
+    }
 }
 
 fn user(text: &str) -> Vec<LlmMessage> {
@@ -54,10 +60,10 @@ fn user(text: &str) -> Vec<LlmMessage> {
 }
 
 /// Serve `body` for one chat request and capture the JSON body the gateway sent.
-async fn chat_server(body: &'static str) -> (mockito::ServerGuard, Arc<Mutex<Option<Value>>>) {
+async fn chat_server(body: &'static str) -> (boundary::FixtureGuard, Arc<Mutex<Option<Value>>>) {
     let captured = Arc::new(Mutex::new(None::<Value>));
     let sink = captured.clone();
-    let mut server = mockito::Server::new_async().await;
+    let mut server = boundary::Fixture::new_async().await;
     server
         .mock("POST", CHAT_PATH)
         .match_request(move |request| {
@@ -143,7 +149,7 @@ mod configuration {
 
     #[tokio::test]
     async fn new_uses_the_environment_host_and_key_under_v1() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let mock = server
             .mock("GET", "/v1/models")
             .match_header("authorization", "Bearer env-key")
@@ -157,7 +163,7 @@ mod configuration {
             clear_env();
             std::env::set_var("OMLX_HOST", server.url());
             std::env::set_var("OMLX_API_KEY", "env-key");
-            let gateway = OmlxGateway::new();
+            let gateway = OmlxGateway::new().with_transport(server.transport());
             clear_env();
             gateway
         };
@@ -168,7 +174,7 @@ mod configuration {
 
     #[tokio::test]
     async fn explicit_values_take_precedence_over_the_environment() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let mock = server
             .mock("GET", "/v1/models")
             .match_header("authorization", "Bearer explicit-key")
@@ -186,7 +192,8 @@ mod configuration {
                 host: server.url(),
                 api_key: Some("explicit-key".into()),
                 ..Default::default()
-            });
+            })
+            .with_transport(server.transport());
             clear_env();
             gateway
         };
@@ -197,7 +204,7 @@ mod configuration {
 
     #[tokio::test]
     async fn sends_no_authorization_header_without_a_key() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let mock = server
             .mock("GET", "/v1/models")
             .match_header("authorization", Matcher::Missing)
@@ -213,7 +220,7 @@ mod configuration {
 
     #[tokio::test]
     async fn a_trailing_slash_on_the_host_is_ignored() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let mock = server
             .mock("GET", "/v1/models")
             .with_status(200)
@@ -233,7 +240,7 @@ mod configuration {
 
 #[tokio::test]
 async fn explicit_blank_keys_send_no_authorization_header() {
-    let mut server = mockito::Server::new_async().await;
+    let mut server = boundary::Fixture::new_async().await;
     let mock = server
         .mock("GET", "/v1/models")
         .match_header("authorization", Matcher::Missing)
@@ -248,6 +255,7 @@ async fn explicit_blank_keys_send_no_authorization_header() {
             api_key: Some(key.to_string()),
             timeout: None,
         })
+        .with_transport(server.transport())
         .get_available_models()
         .await
         .unwrap();
@@ -489,7 +497,7 @@ mod response_mapping {
 
     #[tokio::test]
     async fn an_error_status_is_a_gateway_error_with_status_and_body() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         server
             .mock("POST", CHAT_PATH)
             .with_status(404)
@@ -578,7 +586,7 @@ mod tools {
 
     #[tokio::test]
     async fn round_trips_a_tool_result_through_the_broker() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let first = server
             .mock("POST", CHAT_PATH)
             .match_body(Matcher::PartialJson(json!({"messages": [{"role": "user"}]})))
@@ -634,8 +642,8 @@ mod structured_output {
         })
     }
 
-    async fn structured_server(warning: Option<&str>) -> (mockito::ServerGuard, mockito::Mock) {
-        let mut server = mockito::Server::new_async().await;
+    async fn structured_server(warning: Option<&str>) -> (boundary::FixtureGuard, boundary::Mock) {
+        let mut server = boundary::Fixture::new_async().await;
         let mut mock = server.mock("POST", CHAT_PATH).match_body(Matcher::PartialJson(json!({
             "response_format": {
                 "type": "json_schema",
@@ -691,7 +699,7 @@ mod structured_output {
 
     #[tokio::test]
     async fn joins_several_warning_headers() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         server
             .mock("POST", CHAT_PATH)
             .with_header("warning", "299 - \"first\"")
@@ -730,7 +738,7 @@ mod structured_output {
     }
 
     async fn complete_with_warning(format: ResponseFormat) -> HashMap<String, Value> {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         server
             .mock("POST", CHAT_PATH)
             .with_header("warning", "299 - \"grammar unavailable\"")
@@ -777,7 +785,7 @@ mod structured_output {
 
     #[tokio::test]
     async fn a_request_without_a_format_does_not_record_a_warning() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         server
             .mock("POST", CHAT_PATH)
             .with_header("warning", "299 - \"unrelated\"")
@@ -890,7 +898,7 @@ mod stream_events {
 
     #[tokio::test]
     async fn an_error_status_is_a_provider_error_with_the_body() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         server
             .mock("POST", CHAT_PATH)
             .with_status(404)
@@ -1041,7 +1049,7 @@ mod legacy_streaming {
 
     #[tokio::test]
     async fn an_error_status_is_a_gateway_error_with_the_body() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         server
             .mock("POST", CHAT_PATH)
             .with_status(404)
@@ -1076,7 +1084,7 @@ mod models {
 
     #[tokio::test]
     async fn lists_model_ids_sorted() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         server
             .mock("GET", "/v1/models")
             .with_status(200)
@@ -1091,11 +1099,10 @@ mod models {
     }
 
     #[tokio::test]
-    /// mockito is a real HTTP server on a local port, so this drives the
-    /// gateway's real reqwest client through an `application/json` response,
-    /// the way oMLX serves it.
+    /// Decode the captured application/json response through the public gateway
+    /// using the injected HTTP transport.
     async fn lists_the_captured_models_from_a_real_json_response() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         server
             .mock("GET", "/v1/models")
             .with_status(200)
@@ -1111,7 +1118,7 @@ mod models {
 
     #[tokio::test]
     async fn loads_and_unloads_a_model() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let load = server
             .mock("POST", format!("/v1/models/{MODEL}/load").as_str())
             .with_status(200)
@@ -1137,7 +1144,7 @@ mod models {
 
     #[tokio::test]
     async fn encodes_the_model_id_as_one_path_segment() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let load = server
             .mock("POST", "/v1/models/my%20model%3Fv%3D2/load")
             .with_status(200)
@@ -1153,7 +1160,7 @@ mod models {
 
     #[tokio::test]
     async fn unloading_a_model_that_is_not_loaded_is_a_provider_error() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         server
             .mock("POST", format!("/v1/models/{MODEL}/unload").as_str())
             .with_status(400)
@@ -1182,7 +1189,7 @@ mod embeddings {
     #[tokio::test]
     async fn sends_one_request_with_the_whole_text() {
         let long_text = "word ".repeat(20_000);
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let mock = server
             .mock("POST", "/v1/embeddings")
             .match_body(Matcher::Json(json!({"model": "embed-model", "input": long_text})))
@@ -1204,7 +1211,7 @@ mod embeddings {
 
     #[tokio::test]
     async fn a_missing_or_empty_model_is_rejected_before_any_request() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let mock = server.mock("POST", Matcher::Any).expect(0).create_async().await;
         let gateway = gateway(server.url());
 
@@ -1218,7 +1225,7 @@ mod embeddings {
 
     #[tokio::test]
     async fn a_chat_model_is_a_provider_error() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         server
             .mock("POST", "/v1/embeddings")
             .with_status(400)

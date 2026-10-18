@@ -15,9 +15,11 @@ use crate::llm::models::{LlmGatewayResponse, LlmMessage, ResponseEvidence};
 use crate::llm::stream_events::{drive_event_stream, StreamEventError, StreamEventStream};
 use crate::llm::stream_timing::{system_clock, StreamClock, StreamTiming};
 use crate::llm::tools::LlmTool;
+use crate::llm::transport::Client;
+#[cfg(test)]
+use crate::test_boundary as boundary;
 use async_trait::async_trait;
 use futures::stream::Stream;
-use reqwest::Client;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::pin::Pin;
@@ -54,6 +56,15 @@ pub struct OpenAIGateway {
 }
 
 impl OpenAIGateway {
+    /// Replace HTTP execution for all requests, including opt-in recovery.
+    pub fn with_transport(
+        mut self,
+        transport: Arc<dyn crate::llm::transport::HttpTransport>,
+    ) -> Self {
+        self.client = self.client.with_transport(transport);
+        self
+    }
+
     /// Select a monotonic measurement clock. The default uses std::time::Instant.
     pub fn with_stream_clock(mut self, clock: Arc<dyn StreamClock>) -> Self {
         self.clock = clock;
@@ -75,13 +86,13 @@ impl OpenAIGateway {
 
     /// Create a new OpenAI gateway with custom configuration.
     pub fn with_config(config: OpenAIConfig) -> Self {
-        let mut client_builder = Client::builder();
+        let mut client_builder = reqwest::Client::builder();
 
         if let Some(timeout) = config.timeout {
             client_builder = client_builder.timeout(timeout);
         }
 
-        let client = client_builder.build().unwrap();
+        let client = client_builder.build().unwrap().into();
 
         Self {
             client,
@@ -208,7 +219,7 @@ impl OpenAIGateway {
     }
 
     /// A POST to the chat completions endpoint carrying `body`.
-    fn chat_request(&self, body: &Value) -> reqwest::RequestBuilder {
+    fn chat_request(&self, body: &Value) -> crate::llm::transport::RequestBuilder {
         self.client
             .post(format!("{}/chat/completions", self.config.base_url))
             .header("Authorization", format!("Bearer {}", self.config.api_key))
@@ -648,6 +659,10 @@ pub(crate) fn add_response_format(body: &mut Value, config: &CompletionConfig) {
 }
 
 impl crate::llm::recovery::RecoveryProvider for OpenAIGateway {
+    fn recovery_transport(&self) -> Option<Arc<dyn crate::llm::transport::HttpTransport>> {
+        self.client.transport()
+    }
+
     fn recovery_provider(&self) -> crate::llm::recovery::Provider {
         crate::llm::recovery::Provider::OpenAi
     }
@@ -841,14 +856,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_complete_success() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let mock = server
             .mock("POST", "/chat/completions")
             .with_status(200)
             .with_body(r#"{"choices":[{"message":{"role":"assistant","content":"Hello!"}}]}"#)
             .create();
 
-        let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url());
+        let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url())
+            .with_transport(server.transport());
         let messages = vec![LlmMessage::user("Hi")];
         let config = CompletionConfig::default();
 
@@ -862,14 +878,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_complete_with_tool_calls() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let mock = server
             .mock("POST", "/chat/completions")
             .with_status(200)
             .with_body(r#"{"choices":[{"message":{"role":"assistant","content":null,"tool_calls":[{"id":"call_1","type":"function","function":{"name":"get_weather","arguments":"{\"location\": \"NYC\"}"}}]}}]}"#)
             .create();
 
-        let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url());
+        let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url())
+            .with_transport(server.transport());
         let messages = vec![LlmMessage::user("Weather?")];
         let config = CompletionConfig::default();
 
@@ -884,14 +901,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_complete_error() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let mock = server
             .mock("POST", "/chat/completions")
             .with_status(401)
             .with_body("Unauthorized")
             .create();
 
-        let gateway = OpenAIGateway::with_api_key_and_base_url("bad-key", server.url());
+        let gateway = OpenAIGateway::with_api_key_and_base_url("bad-key", server.url())
+            .with_transport(server.transport());
         let messages = vec![LlmMessage::user("Hi")];
         let config = CompletionConfig::default();
 
@@ -903,7 +921,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_complete_json() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let mock = server
             .mock("POST", "/chat/completions")
             .with_status(200)
@@ -912,7 +930,8 @@ mod tests {
             )
             .create();
 
-        let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url());
+        let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url())
+            .with_transport(server.transport());
         let messages = vec![LlmMessage::user("Generate JSON")];
         let schema = serde_json::json!({"type": "object"});
         let config = CompletionConfig::default();
@@ -928,14 +947,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_available_models() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let mock = server
             .mock("GET", "/models")
             .with_status(200)
             .with_body(r#"{"data":[{"id":"gpt-4"},{"id":"gpt-3.5-turbo"}]}"#)
             .create();
 
-        let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url());
+        let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url())
+            .with_transport(server.transport());
         let result = gateway.get_available_models().await;
 
         mock.assert();
@@ -949,14 +969,15 @@ mod tests {
 
     #[tokio::test]
     async fn test_calculate_embeddings() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let mock = server
             .mock("POST", "/embeddings")
             .with_status(200)
             .with_body(r#"{"data":[{"embedding":[0.1,0.2,0.3,0.4]}]}"#)
             .create();
 
-        let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url());
+        let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url())
+            .with_transport(server.transport());
         let result = gateway.calculate_embeddings("test text", None).await;
 
         mock.assert();
@@ -970,7 +991,7 @@ mod tests {
         let text = " hello".repeat(8291);
         let tokenizer = tiktoken_rs::cl100k_base().expect("tokenizer");
         assert_eq!(tokenizer.encode_ordinary(&text).len(), 8291);
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let calls = std::sync::atomic::AtomicUsize::new(0);
         let chunk_lengths = std::sync::Arc::new(Mutex::new(Vec::new()));
         let captured_lengths = chunk_lengths.clone();
@@ -993,7 +1014,8 @@ mod tests {
             })
             .expect(2)
             .create();
-        let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url());
+        let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url())
+            .with_transport(server.transport());
         let result = gateway.calculate_embeddings(&text, None).await.expect("embeddings");
         mock.assert();
         assert_eq!(*chunk_lengths.lock().expect("lengths"), vec![8191, 100]);
@@ -1007,7 +1029,7 @@ mod tests {
     async fn streamed_request_body(config: CompletionConfig) -> Value {
         let captured = std::sync::Arc::new(Mutex::new(None::<Value>));
         let sink = captured.clone();
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let mock = server
             .mock("POST", "/chat/completions")
             .match_request(move |request| {
@@ -1021,7 +1043,8 @@ mod tests {
             .create_async()
             .await;
 
-        let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url());
+        let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url())
+            .with_transport(server.transport());
         let messages = vec![LlmMessage::user("Hi")];
         let mut stream = gateway.complete_stream("gpt-4o", &messages, None, &config);
         while stream.next().await.is_some() {}
@@ -1033,7 +1056,7 @@ mod tests {
 
     /// Stream `body` through the legacy streaming API and collect every item.
     async fn legacy_stream_items(body: &str) -> Vec<Result<StreamChunk>> {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let _mock = server
             .mock("POST", "/chat/completions")
             .with_status(200)
@@ -1042,7 +1065,8 @@ mod tests {
             .create_async()
             .await;
 
-        let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url());
+        let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url())
+            .with_transport(server.transport());
         let messages = vec![LlmMessage::user("Hi")];
         let config = CompletionConfig::default();
         gateway
@@ -1115,15 +1139,19 @@ mod tests {
     #[tokio::test]
     async fn legacy_stream_keeps_a_character_split_across_network_chunks() {
         use crate::llm::stream_events::testing::{
-            split_body_server, split_inside_first_multibyte_char,
+            split_body_fixture, split_inside_first_multibyte_char,
         };
         let body = concat!(
             "data: {\"choices\":[{\"delta\":{\"content\":\"Caf\u{e9} \u{1f30a}\"}}]}\n\n",
             "data: [DONE]\n\n",
         );
-        let url = split_body_server(split_inside_first_multibyte_char(body)).await;
+        let fixture = split_body_fixture(split_inside_first_multibyte_char(body)).await;
+        let url = fixture.url();
 
-        let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", url);
+        let gateway = {
+            let transport = boundary::transport_for(&(url));
+            OpenAIGateway::with_api_key_and_base_url("test-key", url).with_transport(transport)
+        };
         let messages = vec![LlmMessage::user("Hi")];
         let config = CompletionConfig::default();
         let items: Vec<_> = gateway
@@ -1140,7 +1168,7 @@ mod tests {
 
     #[tokio::test]
     async fn legacy_stream_reports_http_error_status() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let _mock = server
             .mock("POST", "/chat/completions")
             .with_status(500)
@@ -1148,7 +1176,8 @@ mod tests {
             .create_async()
             .await;
 
-        let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url());
+        let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url())
+            .with_transport(server.transport());
         let messages = vec![LlmMessage::user("Hi")];
         let config = CompletionConfig::default();
         let items: Vec<_> = gateway
@@ -1215,10 +1244,10 @@ mod tests {
 
     #[tokio::test]
     async fn non_streaming_request_forwards_configured_format() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let mock = server
             .mock("POST", "/chat/completions")
-            .match_body(mockito::Matcher::PartialJson(serde_json::json!({
+            .match_body(boundary::Matcher::PartialJson(serde_json::json!({
                 "response_format": {"type": "json_object"}
             })))
             .with_status(200)
@@ -1226,7 +1255,8 @@ mod tests {
             .create_async()
             .await;
 
-        let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url());
+        let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url())
+            .with_transport(server.transport());
         let messages = vec![LlmMessage::user("Hi")];
         let config = config_with_format(Some(ResponseFormat::JsonObject { schema: None }));
 
@@ -1237,7 +1267,7 @@ mod tests {
 
     #[tokio::test]
     async fn complete_carries_reported_evidence_unchanged() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let mock = server
             .mock("POST", "/chat/completions")
             .with_status(200)
@@ -1251,7 +1281,8 @@ mod tests {
             .create_async()
             .await;
 
-        let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url());
+        let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url())
+            .with_transport(server.transport());
         let messages = vec![LlmMessage::user("Hi")];
 
         let response = gateway
@@ -1275,7 +1306,7 @@ mod tests {
 
     #[tokio::test]
     async fn complete_leaves_unreported_usage_unknown() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let mock = server
             .mock("POST", "/chat/completions")
             .with_status(200)
@@ -1283,7 +1314,8 @@ mod tests {
             .create_async()
             .await;
 
-        let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url());
+        let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url())
+            .with_transport(server.transport());
         let messages = vec![LlmMessage::user("Hi")];
 
         let response = gateway
@@ -1297,7 +1329,7 @@ mod tests {
 
     #[tokio::test]
     async fn complete_json_response_carries_object_and_evidence() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let mock = server
             .mock("POST", "/chat/completions")
             .with_status(200)
@@ -1308,7 +1340,8 @@ mod tests {
             .create_async()
             .await;
 
-        let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url());
+        let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url())
+            .with_transport(server.transport());
         let messages = vec![LlmMessage::user("JSON")];
 
         let response = gateway
@@ -1334,14 +1367,15 @@ mod tests {
 
     mod stream_events {
         use super::*;
-        use crate::llm::stream_events::testing::endless_stream_server;
+        use crate::llm::stream_events::testing::endless_stream_fixture;
         use crate::llm::{StreamEvent, StreamEventError};
 
         async fn collect_events(
-            server: &mockito::Server,
+            server: &boundary::Fixture,
             config: &CompletionConfig,
         ) -> Vec<StreamEvent> {
-            let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url());
+            let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url())
+                .with_transport(server.transport());
             let messages = vec![LlmMessage::user("Hi")];
             let stream = gateway
                 .complete_stream_events("gpt-4o", &messages, config)
@@ -1371,7 +1405,7 @@ mod tests {
         async fn request_streams_without_tools_and_asks_for_usage() {
             let captured = std::sync::Arc::new(Mutex::new(None::<Value>));
             let sink = captured.clone();
-            let mut server = mockito::Server::new_async().await;
+            let mut server = boundary::Fixture::new_async().await;
             let mock = server
                 .mock("POST", "/chat/completions")
                 .match_header("authorization", "Bearer test-key")
@@ -1402,7 +1436,7 @@ mod tests {
 
         #[tokio::test]
         async fn completes_over_http_with_usage() {
-            let mut server = mockito::Server::new_async().await;
+            let mut server = boundary::Fixture::new_async().await;
             let mock = server
                 .mock("POST", "/chat/completions")
                 .with_status(200)
@@ -1430,7 +1464,7 @@ mod tests {
 
         #[tokio::test]
         async fn end_of_stream_without_done_is_incomplete_stream() {
-            let mut server = mockito::Server::new_async().await;
+            let mut server = boundary::Fixture::new_async().await;
             let _mock = server
                 .mock("POST", "/chat/completions")
                 .with_status(200)
@@ -1454,7 +1488,7 @@ mod tests {
 
         #[tokio::test]
         async fn http_error_status_is_reported_with_body() {
-            let mut server = mockito::Server::new_async().await;
+            let mut server = boundary::Fixture::new_async().await;
             let _mock = server
                 .mock("POST", "/chat/completions")
                 .with_status(429)
@@ -1473,10 +1507,15 @@ mod tests {
 
         #[tokio::test]
         async fn dropping_the_stream_cancels_the_request() {
-            let (url, closed) =
-                endless_stream_server("data: {\"choices\":[{\"delta\":{\"content\":\"Hi\"}}]}\n\n")
-                    .await;
-            let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", url);
+            let (fixture, closed) = endless_stream_fixture(
+                "data: {\"choices\":[{\"delta\":{\"content\":\"Hi\"}}]}\n\n",
+            )
+            .await;
+            let url = fixture.url();
+            let gateway = {
+                let transport = boundary::transport_for(&(url));
+                OpenAIGateway::with_api_key_and_base_url("test-key", url).with_transport(transport)
+            };
             let messages = vec![LlmMessage::user("Hi")];
             let config = CompletionConfig::default();
 
@@ -1485,26 +1524,24 @@ mod tests {
             assert!(matches!(stream.next().await, Some(StreamEvent::Content(_))));
             drop(stream);
 
-            tokio::time::timeout(std::time::Duration::from_secs(5), closed)
-                .await
-                .expect("the request was not cancelled")
-                .expect("server reported the disconnect");
+            closed.await.expect("response body released on drop");
         }
     }
 
     #[tokio::test]
     async fn test_calculate_embeddings_custom_model() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let mock = server
             .mock("POST", "/embeddings")
-            .match_body(mockito::Matcher::JsonString(
+            .match_body(boundary::Matcher::JsonString(
                 r#"{"model":"text-embedding-3-small","input":"test"}"#.to_string(),
             ))
             .with_status(200)
             .with_body(r#"{"data":[{"embedding":[0.5,0.6]}]}"#)
             .create();
 
-        let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url());
+        let gateway = OpenAIGateway::with_api_key_and_base_url("test-key", server.url())
+            .with_transport(server.transport());
         let result = gateway.calculate_embeddings("test", Some("text-embedding-3-small")).await;
 
         mock.assert();

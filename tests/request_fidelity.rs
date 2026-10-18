@@ -1,4 +1,6 @@
 //! Executable request-fidelity-v1 through production HTTP adapters.
+#[path = "support/mod.rs"]
+pub mod boundary;
 use mojentic::llm::{
     gateway::{CompletionConfig, LlmGateway},
     gateways::OllamaGateway,
@@ -14,10 +16,10 @@ fn contract() -> Value {
 #[tokio::test]
 async fn unset_controls_cross_http_boundary() {
     let artifact = contract();
-    let mut server = mockito::Server::new_async().await;
+    let mut server = boundary::Fixture::new_async().await;
     let request = server
         .mock("POST", "/api/chat")
-        .match_body(mockito::Matcher::Json(json!({
+        .match_body(boundary::Matcher::Json(json!({
             "model":"contract-model", "messages":[{"role":"user","content":"question"}],
             "options":{}, "stream":false
         })))
@@ -25,6 +27,7 @@ async fn unset_controls_cross_http_boundary() {
         .create_async()
         .await;
     let response = OllamaGateway::with_host(server.url())
+        .with_transport(server.transport())
         .complete(
             "contract-model",
             &[LlmMessage::user("question")],
@@ -90,13 +93,24 @@ impl ProviderKind {
     }
     fn gateway(self, url: &str) -> Arc<dyn LlmGateway> {
         match self {
-            Self::Ollama => Arc::new(OllamaGateway::with_host(url)),
-            Self::Omlx => Arc::new(OmlxGateway::with_config(OmlxConfig {
-                host: url.into(),
-                api_key: None,
-                ..Default::default()
-            })),
-            Self::OpenAi => Arc::new(OpenAIGateway::with_api_key_and_base_url("contract-key", url)),
+            Self::Ollama => Arc::new({
+                let transport = boundary::transport_for(url);
+                OllamaGateway::with_host(url).with_transport(transport)
+            }),
+            Self::Omlx => Arc::new({
+                let transport = boundary::transport_for(url);
+                OmlxGateway::with_config(OmlxConfig {
+                    host: url.into(),
+                    api_key: None,
+                    ..Default::default()
+                })
+                .with_transport(transport)
+            }),
+            Self::OpenAi => Arc::new({
+                let transport = boundary::transport_for(url);
+                OpenAIGateway::with_api_key_and_base_url("contract-key", url)
+                    .with_transport(transport)
+            }),
         }
     }
 }
@@ -206,12 +220,12 @@ fn assert_controls(provider: ProviderKind, body: &Value, case: &Value, reasoning
 
 type Bodies = Arc<Mutex<Vec<Vec<u8>>>>;
 async fn stub(
-    server: &mut mockito::ServerGuard,
+    server: &mut boundary::FixtureGuard,
     provider: ProviderKind,
     status: usize,
     response: String,
     bodies: &Bodies,
-) -> mockito::Mock {
+) -> boundary::Mock {
     let sink = bodies.clone();
     server
         .mock("POST", provider.path())
@@ -250,7 +264,7 @@ async fn artifact_cases_through_broker_all_http_entrypoints() {
     for provider in PROVIDERS {
         for case in cases() {
             for entry in ["complete", "object", "legacy", "events"] {
-                let mut server = mockito::Server::new_async().await;
+                let mut server = boundary::Fixture::new_async().await;
                 let bodies = Bodies::default();
                 let request =
                     stub(&mut server, provider, 200, provider.response(entry), &bodies).await;
@@ -332,7 +346,7 @@ async fn artifact_cases_through_session_send_and_stream() {
     for provider in PROVIDERS {
         for case in cases() {
             for stream in [false, true] {
-                let mut server = mockito::Server::new_async().await;
+                let mut server = boundary::Fixture::new_async().await;
                 let bodies = Bodies::default();
                 let request = stub(
                     &mut server,
@@ -395,7 +409,7 @@ impl Admission for Allow {
 async fn recovery_cases<G: RecoveryProvider>(
     inner: G,
     provider: ProviderKind,
-    server: &mut mockito::ServerGuard,
+    server: &mut boundary::FixtureGuard,
     case: &Value,
     entry: &str,
 ) {
@@ -495,11 +509,12 @@ async fn artifact_cases_recovery_replays_bytes_and_real_attempt_identities() {
     for provider in PROVIDERS {
         for case in cases() {
             for entry in ["complete", "object", "events"] {
-                let mut server = mockito::Server::new_async().await;
+                let mut server = boundary::Fixture::new_async().await;
                 match provider {
                     ProviderKind::Ollama => {
                         recovery_cases(
-                            OllamaGateway::with_host(server.url()),
+                            OllamaGateway::with_host(server.url())
+                                .with_transport(server.transport()),
                             provider,
                             &mut server,
                             &case,
@@ -513,7 +528,8 @@ async fn artifact_cases_recovery_replays_bytes_and_real_attempt_identities() {
                                 host: server.url(),
                                 api_key: None,
                                 ..Default::default()
-                            }),
+                            })
+                            .with_transport(server.transport()),
                             provider,
                             &mut server,
                             &case,
@@ -523,7 +539,8 @@ async fn artifact_cases_recovery_replays_bytes_and_real_attempt_identities() {
                     }
                     ProviderKind::OpenAi => {
                         recovery_cases(
-                            OpenAIGateway::with_api_key_and_base_url("contract-key", server.url()),
+                            OpenAIGateway::with_api_key_and_base_url("contract-key", server.url())
+                                .with_transport(server.transport()),
                             provider,
                             &mut server,
                             &case,
@@ -609,7 +626,7 @@ async fn artifact_tool_continuations_preserve_session_controls_and_history() {
     for provider in PROVIDERS {
         for case in cases() {
             for stream in [false, true] {
-                let mut server = mockito::Server::new_async().await;
+                let mut server = boundary::Fixture::new_async().await;
                 let bodies = Bodies::default();
                 let first =
                     stub(&mut server, provider, 200, tool_response(provider, stream), &bodies)
@@ -679,7 +696,7 @@ async fn openai_model_restrictions_preserve_selected_output_limits() {
         ("gpt-4o-search-preview", Some(0.0), None, None, None),
         ("gpt-4o", Some(0.0), Some(0.0), Some(ReasoningEffort::High), None),
     ] {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let bodies = Bodies::default();
         let request = stub(
             &mut server,
@@ -735,7 +752,7 @@ async fn native_reasoning_mappings_keep_request_fidelity() {
                 .clone();
             let mut cfg = config(&case);
             cfg.reasoning_effort = Some(effort);
-            let mut server = mockito::Server::new_async().await;
+            let mut server = boundary::Fixture::new_async().await;
             let bodies = Bodies::default();
             let request =
                 stub(&mut server, provider, 200, provider.response("complete"), &bodies).await;
@@ -773,7 +790,7 @@ async fn artifact_error_and_optional_response_fields_through_broker() {
             400,
             contract()["retryable_error"]["status"].as_u64().expect("status") as usize,
         ] {
-            let mut server = mockito::Server::new_async().await;
+            let mut server = boundary::Fixture::new_async().await;
             let bodies = Bodies::default();
             let request = stub(
                 &mut server,
@@ -807,7 +824,7 @@ async fn artifact_error_and_optional_response_fields_through_broker() {
         } else {
             response["choices"][0].as_object_mut().expect("choice").remove("finish_reason");
         }
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let bodies = Bodies::default();
         let request = stub(&mut server, provider, 200, response.to_string(), &bodies).await;
         let broker = LlmBroker::new("gpt-4o", provider.gateway(&server.url()), None);
@@ -824,7 +841,7 @@ async fn artifact_error_and_optional_response_fields_through_broker() {
 #[tokio::test]
 async fn session_default_and_temperature_builder_preserve_absence_and_zero() {
     for temperature in [None, Some(0.0)] {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let bodies = Bodies::default();
         let request = stub(
             &mut server,
@@ -872,7 +889,7 @@ async fn dropped_openai_reasoning_warns_at_http_boundary() {
             .with_writer(move || writer.clone())
             .finish();
         async {
-            let mut server = mockito::Server::new_async().await;
+            let mut server = boundary::Fixture::new_async().await;
             let bodies = Bodies::default();
             let request = stub(
                 &mut server,
@@ -909,7 +926,7 @@ async fn artifact_cases_recovery_through_broker_and_session() {
     for provider in PROVIDERS {
         for case in cases() {
             for entry in ["complete", "object", "legacy"] {
-                let mut server = mockito::Server::new_async().await;
+                let mut server = boundary::Fixture::new_async().await;
                 let bodies = Bodies::default();
                 let failure = contract()["retryable_error"].clone();
                 let rejected = stub(
@@ -933,6 +950,7 @@ async fn artifact_cases_recovery_through_broker_and_session() {
                 let gateway: Arc<dyn LlmGateway> = match provider {
                     ProviderKind::Ollama => Arc::new(
                         OllamaGateway::with_host(server.url())
+                            .with_transport(server.transport())
                             .with_recovery(policy)
                             .expect("gateway"),
                     ),
@@ -942,11 +960,13 @@ async fn artifact_cases_recovery_through_broker_and_session() {
                             api_key: None,
                             ..Default::default()
                         })
+                        .with_transport(server.transport())
                         .with_recovery(policy)
                         .expect("gateway"),
                     ),
                     ProviderKind::OpenAi => Arc::new(
                         OpenAIGateway::with_api_key_and_base_url("contract-key", server.url())
+                            .with_transport(server.transport())
                             .with_recovery(policy)
                             .expect("gateway"),
                     ),

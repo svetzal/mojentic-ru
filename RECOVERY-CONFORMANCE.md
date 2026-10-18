@@ -5,7 +5,28 @@
 
 # Rust completion recovery conformance
 
-## Current correction: October 12 amendment item 9 public-boundary evidence
+## Current deterministic transport correction
+
+The binding root recovery contract is synchronized byte-for-byte from coordinating
+revision `36f1cd9a2c89b8ad48384ab15a8ad25c4bb387ad`, SHA-256
+`141d4ee5fcfbc18c940a7e7fe8d5ba9e381abc41a6d03f300f541e0fd5236f9d`.
+Its in-process boundary rule supersedes historical loopback execution below.
+All existing assertion-bearing cases are retained. `HttpTransport` injection
+feeds both legacy requests and the independent recovery execution engine;
+`RecoveryProvider::recovery_transport` defaults to no override for compatibility.
+
+`tests/recovery.rs` retains exact encoded request bytes and per-attempt UUIDs,
+logical identity across resends, distinct wire-attempt numbers, full failure
+headers/raw bytes, admission transitions and tool execution counts. Pending
+bodies and `UnexpectedEof` come from response streams; drop guards prove local
+body release. Typed original I/O causes replace assertions about hyper's socket
+framing error strings. Clocks, sleeps and jitter are injected; timer-based tests
+use Tokio's existing paused test clock. No assertion requires a wall-clock bound.
+
+See `CONFORMANCE-3.0.0.md` for the parts 1–3 decision map and current source and
+packaged-consumer gate results. Prior execution records below remain historical.
+
+## Historical correction: October 12 amendment item 9 public-boundary evidence
 
 Baseline `17ad0cb1a6b5895f5dbe9f758189d61b266bb336` plus uncommitted tests
 and documentation. No runtime fix was necessary. The executable set is

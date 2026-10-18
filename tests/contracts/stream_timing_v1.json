@@ -343,7 +343,7 @@
   },
   "transport_interruption": {
     "version": "rust-stream-timing-transport-interruption-v1",
-    "http_framing": "chunked body closed after semantic observation, without terminating zero chunk",
+    "http_framing": "in-process response body yields UnexpectedEof after semantic observation; same terminal http_body_error as an interrupted HTTP body",
     "terminal_error": "http_body_error",
     "providers": {
       "ollama": [

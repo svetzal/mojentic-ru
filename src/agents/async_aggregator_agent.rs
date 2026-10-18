@@ -273,13 +273,13 @@ mod tests {
         }
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn test_new_aggregator() {
         let agent = AsyncAggregatorAgent::new(vec![TypeId::of::<Event1>(), TypeId::of::<Event2>()]);
         assert_eq!(agent.event_types_needed.len(), 2);
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn test_single_event_does_not_trigger() {
         let agent = AsyncAggregatorAgent::new(vec![TypeId::of::<Event1>(), TypeId::of::<Event2>()]);
 
@@ -293,7 +293,7 @@ mod tests {
         assert_eq!(result.len(), 0); // Should not process yet
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn test_both_events_trigger_processing() {
         let agent = Arc::new(AsyncAggregatorAgent::new(vec![
             TypeId::of::<Event1>(),
@@ -322,7 +322,7 @@ mod tests {
         assert_eq!(result2.len(), 0);
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn test_wait_for_events() {
         let agent = Arc::new(AsyncAggregatorAgent::new(vec![
             TypeId::of::<Event1>(),
@@ -364,7 +364,7 @@ mod tests {
         assert_eq!(result.len(), 2);
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn test_wait_for_events_timeout() {
         let agent = AsyncAggregatorAgent::new(vec![TypeId::of::<Event1>(), TypeId::of::<Event2>()]);
 
@@ -387,7 +387,7 @@ mod tests {
         }
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn test_different_correlation_ids() {
         let agent = Arc::new(AsyncAggregatorAgent::new(vec![
             TypeId::of::<Event1>(),
@@ -431,7 +431,7 @@ mod tests {
         assert_eq!(result.len(), 0); // corr-b completes
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn test_event_without_correlation_id_fails() {
         let agent = AsyncAggregatorAgent::new(vec![TypeId::of::<Event1>()]);
 
@@ -449,7 +449,7 @@ mod tests {
         }
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn test_process_events_override() {
         struct CustomAggregator {
             inner: AsyncAggregatorAgent,

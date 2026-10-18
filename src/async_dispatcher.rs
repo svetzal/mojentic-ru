@@ -283,7 +283,7 @@ mod tests {
         }
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn test_dispatcher_new() {
         let router = Arc::new(Router::new());
         let dispatcher = AsyncDispatcher::new(router);
@@ -291,14 +291,14 @@ mod tests {
         assert_eq!(dispatcher.batch_size, 5);
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn test_dispatcher_with_batch_size() {
         let router = Arc::new(Router::new());
         let dispatcher = AsyncDispatcher::new(router).with_batch_size(10);
         assert_eq!(dispatcher.batch_size, 10);
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn test_start_and_stop() {
         let router = Arc::new(Router::new());
         let mut dispatcher = AsyncDispatcher::new(router);
@@ -310,7 +310,7 @@ mod tests {
         assert!(dispatcher.task_handle.is_none());
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn test_start_twice_fails() {
         let router = Arc::new(Router::new());
         let mut dispatcher = AsyncDispatcher::new(router);
@@ -322,7 +322,7 @@ mod tests {
         dispatcher.stop().await.unwrap();
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn test_dispatch_event() {
         let mut router = Router::new();
         let count = Arc::new(Mutex::new(0));
@@ -351,7 +351,7 @@ mod tests {
         dispatcher.stop().await.unwrap();
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn test_dispatch_assigns_correlation_id() {
         let router = Arc::new(Router::new());
         let mut dispatcher = AsyncDispatcher::new(router);
@@ -370,7 +370,7 @@ mod tests {
         dispatcher.stop().await.unwrap();
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn test_wait_for_empty_queue() {
         let mut router = Router::new();
         let count = Arc::new(Mutex::new(0));
@@ -398,7 +398,7 @@ mod tests {
         dispatcher.stop().await.unwrap();
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn test_wait_for_empty_queue_timeout() {
         use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -450,7 +450,7 @@ mod tests {
         dispatcher.stop().await.unwrap();
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn test_queue_len() {
         let router = Arc::new(Router::new());
         let mut dispatcher = AsyncDispatcher::new(router);
@@ -472,7 +472,7 @@ mod tests {
         dispatcher.stop().await.unwrap();
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn test_terminate_event_stops_dispatcher() {
         let mut router = Router::new();
         let count = Arc::new(Mutex::new(0));
@@ -508,7 +508,7 @@ mod tests {
         dispatcher.stop().await.unwrap();
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn test_multiple_agents_receive_event() {
         let mut router = Router::new();
         let count1 = Arc::new(Mutex::new(0));
@@ -545,7 +545,7 @@ mod tests {
 
     /// Verify that `wait_for_empty_queue` only resolves after spawned agent
     /// handlers have finished, not just when the queue drains.
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn test_wait_for_empty_queue_waits_for_in_flight_handlers() {
         use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrdering};
 

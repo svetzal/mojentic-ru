@@ -356,7 +356,7 @@ impl<'a> Attempt<'a> {
     }
     async fn send(
         &mut self,
-        client: &reqwest::Client,
+        client: &crate::llm::transport::Client,
         request: &reqwest::Request,
         call: &RecoveryCall,
     ) -> Result<reqwest::Response, RecoveryError> {
@@ -754,7 +754,7 @@ pub(super) fn stream<G: RecoveryProvider>(
     })
 }
 struct StreamOwner {
-    client: reqwest::Client,
+    client: crate::llm::transport::Client,
     policy: RecoveryPolicy,
     provider: Provider,
     timing: StreamTiming,

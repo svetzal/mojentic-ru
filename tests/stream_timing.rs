@@ -1,4 +1,6 @@
 //! Public HTTP acceptance for MODEL-METADATA section 2.
+#[path = "support/mod.rs"]
+pub mod boundary;
 use futures::StreamExt;
 use mojentic::llm::{
     gateway::{CompletionConfig, LlmGateway, StreamChunk},
@@ -8,13 +10,13 @@ use mojentic::llm::{
 
 #[tokio::test]
 async fn first_frame_precedence_crosses_public_http_boundary() {
-    let mut server = mockito::Server::new_async().await;
+    let mut server = boundary::Fixture::new_async().await;
     let request = server.mock("POST", "/api/chat")
         .with_body(concat!(
             "{\"message\":{\"content\":\"answer\",\"thinking\":\"reason\"},\"done\":false}\n",
             "{\"message\":{},\"done\":true,\"done_reason\":\"stop\",\"eval_count\":2,\"total_duration\":900}\n"
         )).create_async().await;
-    let gateway = OllamaGateway::with_host(server.url());
+    let gateway = OllamaGateway::with_host(server.url()).with_transport(server.transport());
     let messages = [LlmMessage::user("question")];
     let config = CompletionConfig::default();
     let events: Vec<_> = gateway.complete_stream("m", &messages, None, &config).collect().await;
@@ -101,7 +103,11 @@ fn gateway(
     };
     match provider {
         "ollama" => {
-            let g = OllamaGateway::with_host(url).with_stream_clock(clock);
+            let g = {
+                let transport = boundary::transport_for(url);
+                OllamaGateway::with_host(url).with_transport(transport)
+            }
+            .with_stream_clock(clock);
             if recovery {
                 Arc::new(g.with_recovery(policy).expect("policy"))
             } else {
@@ -109,11 +115,15 @@ fn gateway(
             }
         }
         "omlx" => {
-            let g = OmlxGateway::with_config(OmlxConfig {
-                host: url.into(),
-                api_key: None,
-                ..Default::default()
-            })
+            let g = {
+                let transport = boundary::transport_for(url);
+                OmlxGateway::with_config(OmlxConfig {
+                    host: url.into(),
+                    api_key: None,
+                    ..Default::default()
+                })
+                .with_transport(transport)
+            }
             .with_stream_clock(clock);
             if recovery {
                 Arc::new(g.with_recovery(policy).expect("policy"))
@@ -122,8 +132,11 @@ fn gateway(
             }
         }
         _ => {
-            let g =
-                OpenAIGateway::with_api_key_and_base_url("test-key", url).with_stream_clock(clock);
+            let g = {
+                let transport = boundary::transport_for(url);
+                OpenAIGateway::with_api_key_and_base_url("test-key", url).with_transport(transport)
+            }
+            .with_stream_clock(clock);
             if recovery {
                 Arc::new(g.with_recovery(policy).expect("policy"))
             } else {
@@ -149,11 +162,11 @@ async fn section2_exact_clocks_all_public_http_streams() {
     for provider in ["ollama", "omlx", "openai"] {
         for case in contract["providers"][provider].as_array().expect("cases") {
             for entry in ["legacy", "events", "recovery"] {
-                let mut server = mockito::Server::new_async().await;
+                let mut server = boundary::Fixture::new_async().await;
                 let request = server
                     .mock("POST", path(provider))
                     .with_status(case["status"].as_u64().unwrap_or(200) as usize)
-                    .match_body(mockito::Matcher::PartialJson(
+                    .match_body(boundary::Matcher::PartialJson(
                         serde_json::json!({"model":"gpt-4o","stream":true}),
                     ))
                     .with_body(case["body"].as_str().expect("contract wire body"))
@@ -244,7 +257,7 @@ async fn section2_retry_keeps_first_dispatch_clock() {
         }
     }
     for provider in ["ollama", "omlx", "openai"] {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let rejected = server
             .mock("POST", path(provider))
             .with_status(503)
@@ -333,7 +346,7 @@ async fn section2_broker_session_tool_continuations_start_fresh_clocks() {
         for recovery in [false, true] {
             for session_entry in [false, true] {
                 let contract = artifact();
-                let mut server = mockito::Server::new_async().await;
+                let mut server = boundary::Fixture::new_async().await;
                 let tool = contract["tool_continuation"][provider]
                     .as_str()
                     .expect("versioned tool response");
@@ -345,7 +358,7 @@ async fn section2_broker_session_tool_continuations_start_fresh_clocks() {
                     .await;
                 let second = server
                     .mock("POST", path(provider))
-                    .match_body(mockito::Matcher::Regex("observed".into()))
+                    .match_body(boundary::Matcher::Regex("observed".into()))
                     .with_body(
                         contract["providers"][provider][3]["body"].as_str().expect("final body"),
                     )
@@ -461,7 +474,7 @@ async fn section2_native_recovery_terminal_success_and_failure_retain_timing() {
     let contract = artifact();
     for provider in ["ollama", "omlx", "openai"] {
         for case in contract["providers"][provider].as_array().expect("cases") {
-            let mut server = mockito::Server::new_async().await;
+            let mut server = boundary::Fixture::new_async().await;
             let request = server
                 .mock("POST", path(provider))
                 .with_status(case["status"].as_u64().unwrap_or(200) as usize)
@@ -477,7 +490,9 @@ async fn section2_native_recovery_terminal_success_and_failure_retain_timing() {
             match provider {
                 "ollama" => {
                     native_recovery_case(
-                        OllamaGateway::with_host(server.url()).with_stream_clock(clock.clone()),
+                        OllamaGateway::with_host(server.url())
+                            .with_transport(server.transport())
+                            .with_stream_clock(clock.clone()),
                         case,
                     )
                     .await
@@ -489,6 +504,7 @@ async fn section2_native_recovery_terminal_success_and_failure_retain_timing() {
                             api_key: None,
                             ..Default::default()
                         })
+                        .with_transport(server.transport())
                         .with_stream_clock(clock.clone()),
                         case,
                     )
@@ -497,6 +513,7 @@ async fn section2_native_recovery_terminal_success_and_failure_retain_timing() {
                 _ => {
                     native_recovery_case(
                         OpenAIGateway::with_api_key_and_base_url("test-key", server.url())
+                            .with_transport(server.transport())
                             .with_stream_clock(clock.clone()),
                         case,
                     )
@@ -513,7 +530,7 @@ async fn section2_native_recovery_terminal_success_and_failure_retain_timing() {
 async fn section2_retry_does_not_relabel_prior_attempt_provider_usage() {
     let contract = artifact();
     for provider in ["ollama", "omlx", "openai"] {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let case = &contract["retry_provider_usage"][provider];
         let first = server
             .mock("POST", path(provider))
@@ -553,7 +570,7 @@ async fn section2_retry_does_not_relabel_prior_attempt_provider_usage() {
     }
 }
 
-// Interrupt a real HTTP body only after the semantic frame has been observed.
+// Interrupt an in-process response body only after the semantic frame has been observed.
 struct InterruptedClock {
     script: Arc<ScriptClock>,
     observed: Arc<tokio::sync::Notify>,
@@ -573,7 +590,6 @@ async fn verify_transport_interruption(entry: &str) {
         llm::{ChatSession, LlmBroker},
         tracer::{EventStore, LlmResponseTracerEvent, TracerSystem},
     };
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
     let contract = artifact();
     for provider in ["ollama", "omlx", "openai"] {
         for case in contract["transport_interruption"]["providers"][provider]
@@ -590,57 +606,25 @@ async fn verify_transport_interruption(entry: &str) {
                 script: script.clone(),
                 observed: observed.clone(),
             });
-            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.expect("listen");
-            let url = format!("http://{}", listener.local_addr().expect("address"));
+            let server = boundary::Fixture::new();
+            let url = server.url();
             let body = case["body"].as_str().expect("contract frame").to_owned();
-            let server = tokio::spawn(async move {
-                let (mut socket, _) = listener.accept().await.expect("accept");
-                let mut request = Vec::new();
-                let mut buffer = [0; 4096];
-                loop {
-                    let n = socket.read(&mut buffer).await.expect("request");
-                    assert!(n > 0);
-                    request.extend_from_slice(&buffer[..n]);
-                    if let Some(end) = request.windows(4).position(|w| w == b"\r\n\r\n") {
-                        let headers = String::from_utf8_lossy(&request[..end]);
-                        let length: usize = headers
-                            .lines()
-                            .find_map(|line| {
-                                line.to_ascii_lowercase()
-                                    .strip_prefix("content-length: ")
-                                    .map(str::to_owned)
-                            })
-                            .expect("length")
-                            .parse()
-                            .expect("length number");
-                        if request.len() >= end + 4 + length {
-                            assert!(
-                                headers.starts_with(&format!("POST {} HTTP/1.1", path(provider)))
-                            );
-                            let payload: Value =
-                                serde_json::from_slice(&request[end + 4..end + 4 + length])
-                                    .expect("JSON request");
-                            assert_eq!(payload["stream"], true);
-                            assert_eq!(payload["model"], "gpt-4o");
-                            assert_eq!(
-                                payload["messages"]
-                                    .as_array()
-                                    .expect("messages")
-                                    .last()
-                                    .expect("query")["content"],
-                                "question"
-                            );
-                            break;
-                        }
-                    }
-                }
-                socket.write_all(format!("HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n{:x}\r\n{}\r\n", body.len(), body).as_bytes()).await.expect("frame");
-                tokio::time::timeout(Duration::from_secs(10), observed.notified())
-                    .await
-                    .expect("semantic observation before interruption");
-                // Deliberately omit the HTTP terminating zero chunk: this is a
-                // transport error, not a normally completed provider body.
-                socket.shutdown().await.expect("interrupt");
+            let expected_path = path(provider).to_string();
+            server.respond(move |request| {
+                assert_eq!(request.method(), "POST");
+                assert_eq!(request.url().path(), expected_path);
+                let payload: Value = serde_json::from_slice(request.body().expect("body").as_bytes().expect("bytes")).expect("JSON request");
+                assert_eq!(payload["stream"], true);
+                assert_eq!(payload["model"], "gpt-4o");
+                assert_eq!(payload["messages"].as_array().expect("messages").last().expect("query")["content"], "question");
+                let body = body.clone();
+                let observed = observed.clone();
+                let chunks = async_stream::stream! {
+                    yield Ok::<_, std::io::Error>(body);
+                    observed.notified().await;
+                    yield Err(std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "contract transport interruption"));
+                };
+                http::Response::new(reqwest::Body::wrap_stream(chunks)).into()
             });
             let gateway = gateway(provider, &url, clock, false, 1);
             let evidence = Arc::new(Mutex::new(Vec::<Value>::new()));
@@ -736,7 +720,7 @@ async fn verify_transport_interruption(entry: &str) {
             };
             assert_timing(&metrics, case);
             assert_eq!(script.remaining(), 0);
-            server.await.expect("HTTP server");
+            assert_eq!(server.requests().len(), 1);
         }
     }
 }

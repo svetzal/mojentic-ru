@@ -9,9 +9,11 @@ use crate::llm::models::{
 use crate::llm::stream_events::{drive_event_stream, StreamEventError, StreamEventStream};
 use crate::llm::stream_timing::{system_clock, StreamClock, StreamTiming};
 use crate::llm::tools::LlmTool;
+use crate::llm::transport::Client;
+#[cfg(test)]
+use crate::test_boundary as boundary;
 use async_trait::async_trait;
 use futures::stream::{Stream, StreamExt};
-use reqwest::Client;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::pin::Pin;
@@ -48,6 +50,15 @@ pub struct OllamaGateway {
 }
 
 impl OllamaGateway {
+    /// Replace HTTP execution for all requests, including opt-in recovery.
+    pub fn with_transport(
+        mut self,
+        transport: Arc<dyn crate::llm::transport::HttpTransport>,
+    ) -> Self {
+        self.client = self.client.with_transport(transport);
+        self
+    }
+
     /// Select a monotonic measurement clock. The default uses std::time::Instant.
     pub fn with_stream_clock(mut self, clock: Arc<dyn StreamClock>) -> Self {
         self.clock = clock;
@@ -69,13 +80,13 @@ impl OllamaGateway {
 
     /// Create a new Ollama gateway with custom configuration
     pub fn with_config(config: OllamaConfig) -> Self {
-        let mut client_builder = Client::builder();
+        let mut client_builder = reqwest::Client::builder();
 
         if let Some(timeout) = config.timeout {
             client_builder = client_builder.timeout(timeout);
         }
 
-        let client = client_builder.build().unwrap();
+        let client = client_builder.build().unwrap().into();
 
         Self {
             client,
@@ -93,7 +104,7 @@ impl OllamaGateway {
     }
 
     /// A POST to the chat endpoint carrying `body`.
-    fn chat_request(&self, body: &Value) -> reqwest::RequestBuilder {
+    fn chat_request(&self, body: &Value) -> crate::llm::transport::RequestBuilder {
         self.client.post(format!("{}/api/chat", self.config.host)).json(body)
     }
 
@@ -788,6 +799,10 @@ fn add_response_format(body: &mut Value, config: &CompletionConfig) {
 }
 
 impl crate::llm::recovery::RecoveryProvider for OllamaGateway {
+    fn recovery_transport(&self) -> Option<Arc<dyn crate::llm::transport::HttpTransport>> {
+        self.client.transport()
+    }
+
     fn recovery_provider(&self) -> crate::llm::recovery::Provider {
         crate::llm::recovery::Provider::Ollama
     }
@@ -1284,7 +1299,7 @@ mod tests {
     async fn streamed_request_body(config: CompletionConfig) -> Value {
         let captured = std::sync::Arc::new(Mutex::new(None::<Value>));
         let sink = captured.clone();
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let mock = server
             .mock("POST", "/api/chat")
             .match_request(move |request| {
@@ -1298,7 +1313,7 @@ mod tests {
             .create_async()
             .await;
 
-        let gateway = OllamaGateway::with_host(server.url());
+        let gateway = OllamaGateway::with_host(server.url()).with_transport(server.transport());
         let messages = vec![LlmMessage::user("Hi")];
         let mut stream = gateway.complete_stream("qwen3:32b", &messages, None, &config);
         while stream.next().await.is_some() {}
@@ -1360,7 +1375,7 @@ mod tests {
 
     #[tokio::test]
     async fn complete_carries_reported_evidence_unchanged() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let mock = server
             .mock("POST", "/api/chat")
             .with_status(200)
@@ -1375,7 +1390,7 @@ mod tests {
             .create_async()
             .await;
 
-        let gateway = OllamaGateway::with_host(server.url());
+        let gateway = OllamaGateway::with_host(server.url()).with_transport(server.transport());
         let messages = vec![LlmMessage::user("Hi")];
 
         let response = gateway
@@ -1400,7 +1415,7 @@ mod tests {
 
     #[tokio::test]
     async fn complete_leaves_unreported_usage_unknown() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let mock = server
             .mock("POST", "/api/chat")
             .with_status(200)
@@ -1408,7 +1423,7 @@ mod tests {
             .create_async()
             .await;
 
-        let gateway = OllamaGateway::with_host(server.url());
+        let gateway = OllamaGateway::with_host(server.url()).with_transport(server.transport());
         let messages = vec![LlmMessage::user("Hi")];
 
         let response = gateway
@@ -1422,7 +1437,7 @@ mod tests {
 
     #[tokio::test]
     async fn complete_json_response_carries_object_and_evidence() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let mock = server
             .mock("POST", "/api/chat")
             .with_status(200)
@@ -1433,7 +1448,7 @@ mod tests {
             .create_async()
             .await;
 
-        let gateway = OllamaGateway::with_host(server.url());
+        let gateway = OllamaGateway::with_host(server.url()).with_transport(server.transport());
         let messages = vec![LlmMessage::user("JSON")];
 
         let response = gateway
@@ -1457,14 +1472,14 @@ mod tests {
 
     mod stream_events {
         use super::*;
-        use crate::llm::stream_events::testing::endless_stream_server;
+        use crate::llm::stream_events::testing::endless_stream_fixture;
         use crate::llm::{StreamEvent, StreamEventError};
 
         async fn collect_events(
-            server: &mockito::Server,
+            server: &boundary::Fixture,
             config: &CompletionConfig,
         ) -> Vec<StreamEvent> {
-            let gateway = OllamaGateway::with_host(server.url());
+            let gateway = OllamaGateway::with_host(server.url()).with_transport(server.transport());
             let messages = vec![LlmMessage::user("Hi")];
             let stream = gateway
                 .complete_stream_events("qwen3:32b", &messages, config)
@@ -1496,7 +1511,7 @@ mod tests {
 
             let captured = std::sync::Arc::new(Mutex::new(None::<Value>));
             let sink = captured.clone();
-            let mut server = mockito::Server::new_async().await;
+            let mut server = boundary::Fixture::new_async().await;
             let mock = server
                 .mock("POST", "/api/chat")
                 .match_request(move |request| {
@@ -1527,7 +1542,7 @@ mod tests {
 
         #[tokio::test]
         async fn completes_over_http_with_durations() {
-            let mut server = mockito::Server::new_async().await;
+            let mut server = boundary::Fixture::new_async().await;
             let mock = server
                 .mock("POST", "/api/chat")
                 .with_status(200)
@@ -1553,7 +1568,7 @@ mod tests {
 
         #[tokio::test]
         async fn end_of_stream_without_done_is_incomplete_stream() {
-            let mut server = mockito::Server::new_async().await;
+            let mut server = boundary::Fixture::new_async().await;
             let _mock = server
                 .mock("POST", "/api/chat")
                 .with_status(200)
@@ -1574,7 +1589,7 @@ mod tests {
 
         #[tokio::test]
         async fn http_error_status_is_reported_with_body() {
-            let mut server = mockito::Server::new_async().await;
+            let mut server = boundary::Fixture::new_async().await;
             let _mock = server
                 .mock("POST", "/api/chat")
                 .with_status(404)
@@ -1593,9 +1608,13 @@ mod tests {
 
         #[tokio::test]
         async fn dropping_the_stream_cancels_the_request() {
-            let (url, closed) =
-                endless_stream_server("{\"message\":{\"content\":\"Hi\"},\"done\":false}\n").await;
-            let gateway = OllamaGateway::with_host(url);
+            let (fixture, closed) =
+                endless_stream_fixture("{\"message\":{\"content\":\"Hi\"},\"done\":false}\n").await;
+            let url = fixture.url();
+            let gateway = {
+                let transport = boundary::transport_for(&(url));
+                OllamaGateway::with_host(url).with_transport(transport)
+            };
             let messages = vec![LlmMessage::user("Hi")];
             let config = CompletionConfig::default();
 
@@ -1605,23 +1624,20 @@ mod tests {
             assert!(matches!(stream.next().await, Some(StreamEvent::Content(_))));
             drop(stream);
 
-            tokio::time::timeout(std::time::Duration::from_secs(5), closed)
-                .await
-                .expect("the request was not cancelled")
-                .expect("server reported the disconnect");
+            closed.await.expect("response body released on drop");
         }
     }
 
     #[tokio::test]
     async fn test_pull_model_success() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let mock = server
             .mock("POST", "/api/pull")
             .with_status(200)
             .with_body(r#"{"status":"success"}"#)
             .create();
 
-        let gateway = OllamaGateway::with_host(server.url());
+        let gateway = OllamaGateway::with_host(server.url()).with_transport(server.transport());
         let result = gateway.pull_model("llama2").await;
 
         mock.assert();
@@ -1630,10 +1646,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_pull_model_failure() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let mock = server.mock("POST", "/api/pull").with_status(404).create();
 
-        let gateway = OllamaGateway::with_host(server.url());
+        let gateway = OllamaGateway::with_host(server.url()).with_transport(server.transport());
         let result = gateway.pull_model("nonexistent").await;
 
         mock.assert();
@@ -1642,14 +1658,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_complete_simple() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let mock = server
             .mock("POST", "/api/chat")
             .with_status(200)
             .with_body(r#"{"message":{"role":"assistant","content":"Hello!"}}"#)
             .create();
 
-        let gateway = OllamaGateway::with_host(server.url());
+        let gateway = OllamaGateway::with_host(server.url()).with_transport(server.transport());
         let messages = vec![LlmMessage::user("Hi")];
         let config = CompletionConfig::default();
 
@@ -1664,17 +1680,17 @@ mod tests {
 
     #[tokio::test]
     async fn test_complete_with_tools() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let mock = server
             .mock("POST", "/api/chat")
-            .match_body(mockito::Matcher::JsonString(
+            .match_body(boundary::Matcher::JsonString(
                 r#"{"model":"llama2","messages":[{"role":"user","content":"Hi"}],"options":{},"stream":false,"tools":[{"type":"function","function":{"name":"test_tool","description":"A test","parameters":{}}}]}"#.to_string()
             ))
             .with_status(200)
             .with_body(r#"{"message":{"role":"assistant","content":"Result"}}"#)
             .create();
 
-        let gateway = OllamaGateway::with_host(server.url());
+        let gateway = OllamaGateway::with_host(server.url()).with_transport(server.transport());
         let messages = vec![LlmMessage::user("Hi")];
         let config = CompletionConfig::default();
 
@@ -1715,10 +1731,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_complete_error() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let mock = server.mock("POST", "/api/chat").with_status(500).create();
 
-        let gateway = OllamaGateway::with_host(server.url());
+        let gateway = OllamaGateway::with_host(server.url()).with_transport(server.transport());
         let messages = vec![LlmMessage::user("Hi")];
         let config = CompletionConfig::default();
 
@@ -1730,14 +1746,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_complete_json() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let mock = server
             .mock("POST", "/api/chat")
             .with_status(200)
             .with_body(r#"{"message":{"content":"{\"name\":\"test\",\"value\":42}"}}"#)
             .create();
 
-        let gateway = OllamaGateway::with_host(server.url());
+        let gateway = OllamaGateway::with_host(server.url()).with_transport(server.transport());
         let messages = vec![LlmMessage::user("Generate JSON")];
         let schema = serde_json::json!({"type": "object"});
         let config = CompletionConfig::default();
@@ -1753,14 +1769,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_available_models() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let mock = server
             .mock("GET", "/api/tags")
             .with_status(200)
             .with_body(r#"{"models":[{"name":"llama2"},{"name":"mistral"}]}"#)
             .create();
 
-        let gateway = OllamaGateway::with_host(server.url());
+        let gateway = OllamaGateway::with_host(server.url()).with_transport(server.transport());
         let result = gateway.get_available_models().await;
 
         mock.assert();
@@ -1773,14 +1789,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_calculate_embeddings() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let mock = server
             .mock("POST", "/api/embeddings")
             .with_status(200)
             .with_body(r#"{"embedding":[0.1,0.2,0.3,0.4]}"#)
             .create();
 
-        let gateway = OllamaGateway::with_host(server.url());
+        let gateway = OllamaGateway::with_host(server.url()).with_transport(server.transport());
         let result = gateway.calculate_embeddings("test text", None).await;
 
         mock.assert();
@@ -1793,17 +1809,17 @@ mod tests {
 
     #[tokio::test]
     async fn test_calculate_embeddings_custom_model() {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let mock = server
             .mock("POST", "/api/embeddings")
-            .match_body(mockito::Matcher::JsonString(
+            .match_body(boundary::Matcher::JsonString(
                 r#"{"model":"custom-embed","prompt":"test"}"#.to_string(),
             ))
             .with_status(200)
             .with_body(r#"{"embedding":[0.5,0.6]}"#)
             .create();
 
-        let gateway = OllamaGateway::with_host(server.url());
+        let gateway = OllamaGateway::with_host(server.url()).with_transport(server.transport());
         let result = gateway.calculate_embeddings("test", Some("custom-embed")).await;
 
         mock.assert();
@@ -1814,17 +1830,17 @@ mod tests {
     async fn test_complete_with_reasoning_effort() {
         use crate::llm::gateway::ReasoningEffort;
 
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let mock = server
             .mock("POST", "/api/chat")
-            .match_body(mockito::Matcher::PartialJson(
+            .match_body(boundary::Matcher::PartialJson(
                 serde_json::json!({"think": "high"}),
             ))
             .with_status(200)
             .with_body(r#"{"message":{"role":"assistant","content":"Response","thinking":"Internal reasoning..."}}"#)
             .create();
 
-        let gateway = OllamaGateway::with_host(server.url());
+        let gateway = OllamaGateway::with_host(server.url()).with_transport(server.transport());
         let messages = vec![LlmMessage::user("Test")];
         let config = CompletionConfig {
             reasoning_effort: Some(ReasoningEffort::High),
@@ -1844,10 +1860,10 @@ mod tests {
     async fn test_complete_stream_disables_thinking() {
         use crate::llm::gateway::ReasoningEffort;
 
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let mock = server
             .mock("POST", "/api/chat")
-            .match_body(mockito::Matcher::PartialJson(
+            .match_body(boundary::Matcher::PartialJson(
                 serde_json::json!({"stream": true, "think": false}),
             ))
             .with_status(200)
@@ -1858,7 +1874,7 @@ mod tests {
             )
             .create();
 
-        let gateway = OllamaGateway::with_host(server.url());
+        let gateway = OllamaGateway::with_host(server.url()).with_transport(server.transport());
         let messages = vec![LlmMessage::user("Act")];
         let config = CompletionConfig {
             reasoning_effort: Some(ReasoningEffort::Disabled),
@@ -1882,10 +1898,10 @@ mod tests {
     async fn test_complete_stream_surfaces_thinking_chunks() {
         use crate::llm::gateway::ReasoningEffort;
 
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let mock = server
             .mock("POST", "/api/chat")
-            .match_body(mockito::Matcher::PartialJson(
+            .match_body(boundary::Matcher::PartialJson(
                 serde_json::json!({"stream": true, "think": "high"}),
             ))
             .with_status(200)
@@ -1897,7 +1913,7 @@ mod tests {
             )
             .create();
 
-        let gateway = OllamaGateway::with_host(server.url());
+        let gateway = OllamaGateway::with_host(server.url()).with_transport(server.transport());
         let messages = vec![LlmMessage::user("Test")];
         let config = CompletionConfig {
             reasoning_effort: Some(ReasoningEffort::High),

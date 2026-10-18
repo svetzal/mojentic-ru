@@ -1287,21 +1287,23 @@ mod tests {
         #[tokio::test]
         async fn dropping_the_broker_stream_cancels_the_provider_request() {
             use crate::llm::gateways::OllamaGateway;
-            use crate::llm::stream_events::testing::endless_stream_server;
+            use crate::llm::stream_events::testing::endless_stream_fixture;
 
-            let (url, closed) =
-                endless_stream_server("{\"message\":{\"content\":\"Hi\"},\"done\":false}\n").await;
-            let broker = LlmBroker::new("qwen3:32b", Arc::new(OllamaGateway::with_host(url)), None);
+            let (fixture, closed) =
+                endless_stream_fixture("{\"message\":{\"content\":\"Hi\"},\"done\":false}\n").await;
+            let url = fixture.url();
+            let broker = LlmBroker::new(
+                "qwen3:32b",
+                Arc::new(OllamaGateway::with_host(url).with_transport(fixture.transport())),
+                None,
+            );
             let messages = vec![LlmMessage::user("Hi")];
 
             let mut stream = broker.generate_stream_events(&messages, None, None);
             assert!(matches!(stream.next().await, Some(StreamEvent::Content(_))));
             drop(stream);
 
-            tokio::time::timeout(std::time::Duration::from_secs(5), closed)
-                .await
-                .expect("the request was not cancelled")
-                .expect("server reported the disconnect");
+            closed.await.expect("response body released on drop");
         }
 
         #[test]

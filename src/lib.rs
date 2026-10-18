@@ -27,3 +27,9 @@ pub mod prelude {
     pub use crate::llm::{CompletionConfig, LlmBroker, LlmGateway, LlmMessage, MessageRole};
     pub use crate::router::Router;
 }
+
+#[cfg(test)]
+extern crate self as mojentic;
+#[cfg(test)]
+#[path = "../tests/support/mod.rs"]
+pub mod test_boundary;

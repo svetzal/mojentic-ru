@@ -753,7 +753,7 @@ mod tests {
         }
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn test_goal_state_creation() {
         let state = GoalState::new("Test problem", 5);
 
@@ -764,7 +764,7 @@ mod tests {
         assert!(!state.is_complete);
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn test_event_emitter_subscribe_and_emit() {
         let emitter = EventEmitter::new();
         let received = Arc::new(Mutex::new(false));
@@ -788,7 +788,7 @@ mod tests {
         assert!(*received.lock().await);
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn test_builder_default_settings() {
         let gateway = Arc::new(MockGateway::new(vec![]));
         let broker = Arc::new(LlmBroker::new("test-model", gateway, None));
@@ -798,7 +798,7 @@ mod tests {
         assert_eq!(agent.tools.len(), 0);
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn test_builder_custom_max_iterations() {
         let gateway = Arc::new(MockGateway::new(vec![]));
         let broker = Arc::new(LlmBroker::new("test-model", gateway, None));
@@ -807,7 +807,7 @@ mod tests {
         assert_eq!(agent.max_iterations, 10);
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn test_builder_with_tools() {
         let gateway = Arc::new(MockGateway::new(vec![]));
         let broker = Arc::new(LlmBroker::new("test-model", gateway, None));
@@ -821,7 +821,7 @@ mod tests {
         assert_eq!(agent.tools.len(), 1);
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn test_builder_custom_system_prompt() {
         let gateway = Arc::new(MockGateway::new(vec![]));
         let broker = Arc::new(LlmBroker::new("test-model", gateway, None));
@@ -830,7 +830,7 @@ mod tests {
         assert_eq!(agent.system_prompt, "Custom prompt");
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn test_solve_completes_with_done() {
         let gateway = Arc::new(MockGateway::new(vec!["DONE".to_string()]));
         let broker = Arc::new(LlmBroker::new("test-model", gateway, None));
@@ -841,7 +841,7 @@ mod tests {
         assert_eq!(result, "DONE");
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn test_solve_fails_with_fail() {
         let gateway = Arc::new(MockGateway::new(vec!["FAIL".to_string()]));
         let broker = Arc::new(LlmBroker::new("test-model", gateway, None));
@@ -853,7 +853,7 @@ mod tests {
         assert!(result.contains("FAIL"));
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn test_solve_case_insensitive_done() {
         let gateway = Arc::new(MockGateway::new(vec!["done".to_string()]));
         let broker = Arc::new(LlmBroker::new("test-model", gateway, None));
@@ -864,7 +864,7 @@ mod tests {
         assert_eq!(result, "done");
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn test_solve_case_insensitive_fail() {
         let gateway = Arc::new(MockGateway::new(vec!["fail".to_string()]));
         let broker = Arc::new(LlmBroker::new("test-model", gateway, None));
@@ -876,7 +876,7 @@ mod tests {
         assert!(result.contains("fail"));
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn test_solve_word_boundary_done() {
         // "I'm DONE with this task" is NOT a strict match — should not trigger completion.
         // The agent will exhaust max_iterations (default 5) using the single response.
@@ -891,7 +891,7 @@ mod tests {
         assert!(result.contains("I'm DONE with this task"));
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn test_solve_word_boundary_fail() {
         // "This will FAIL" is NOT a strict match — should not trigger GoalFailed.
         // The agent will exhaust max_iterations (default 5) using the single response.
@@ -906,7 +906,7 @@ mod tests {
         assert!(result.contains("This will FAIL"));
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn test_solve_stops_at_max_iterations() {
         let gateway = Arc::new(MockGateway::new(vec![
             "Step 1".to_string(),
@@ -922,7 +922,7 @@ mod tests {
         assert!(result.contains("Step 3"));
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn test_solve_multiple_iterations_before_done() {
         let gateway = Arc::new(MockGateway::new(vec![
             "Working...".to_string(),
@@ -937,7 +937,7 @@ mod tests {
         assert_eq!(result, "DONE");
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn test_event_emission_during_solve() {
         let gateway = Arc::new(MockGateway::new(vec!["DONE".to_string()]));
         let broker = Arc::new(LlmBroker::new("test-model", gateway, None));
@@ -979,7 +979,7 @@ mod tests {
         assert!(*goal_achieved.lock().await, "GoalAchieved event not fired");
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn test_event_emission_on_failure() {
         let gateway = Arc::new(MockGateway::new(vec!["FAIL".to_string()]));
         let broker = Arc::new(LlmBroker::new("test-model", gateway, None));
@@ -1008,7 +1008,7 @@ mod tests {
         assert!(*goal_failed.lock().await, "GoalFailed event not fired");
     }
 
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn test_handler_panic_surfaces_as_error() {
         let emitter = EventEmitter::new();
 

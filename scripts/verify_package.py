@@ -29,7 +29,8 @@ def digest(path):
 def main():
     manifest_text = (ROOT / "Cargo.toml").read_text()
     package = tomllib.loads(manifest_text)["package"]
-    run("cargo", "package", "--allow-dirty")
+    os.environ["CARGO_NET_OFFLINE"] = "true"
+    run("cargo", "package", "--offline", "--allow-dirty", "--no-verify")
     target = Path(os.environ.get("CARGO_TARGET_DIR", ROOT / "target"))
     if not target.is_absolute():
         target = ROOT / target
@@ -58,18 +59,19 @@ def main():
     (consumer / "src/main.rs").write_text('fn main() {}\n')
     shutil.copytree(library / "tests", consumer / "tests")
     metadata = json.loads(subprocess.check_output(
-        ["cargo", "metadata", "--format-version=1"], cwd=consumer
+        ["cargo", "metadata", "--offline", "--format-version=1"], cwd=consumer
     ))
     dependency = next(d for d in next(p for p in metadata["packages"] if p["name"] == "mojentic-packaged-consumer")["dependencies"] if d["name"] == "mojentic")
     assert Path(dependency["path"]).resolve() == library.resolve(), dependency
     resolved = next(p for p in metadata["packages"] if p["name"] == "mojentic")
     assert Path(resolved["manifest_path"]).resolve() == library / "Cargo.toml", resolved
     assert not str(library).startswith(str(ROOT)), "consumer must use extracted artifact"
-    run("cargo", "test", "--verbose", "--all-features", cwd=consumer)
+    run("cargo", "test", "--offline", "--verbose", "--all-features", cwd=consumer)
     timing_contract = json.loads((library / "tests/contracts/stream_timing_v1.json").read_text())
     interruption = timing_contract["transport_interruption"]
     record = {
         "kind": "packaged-public-consumer",
+        "network": "disabled by CARGO_NET_OFFLINE and in-process transports",
         "base_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
         "archive_sha256": digest(archive),
         "archive": str(archive),
@@ -77,7 +79,7 @@ def main():
         "resolved_library": str(library),
         "forbidden_artifacts": "absent",
         "provider_consumer_sources": "byte-identical src and tests",
-        "commands": ["cargo package --allow-dirty", "cargo metadata --format-version=1", "cargo test --verbose --all-features"],
+        "commands": ["cargo package --offline --allow-dirty --no-verify", "cargo metadata --offline --format-version=1", "cargo test --offline --verbose --all-features"],
         "exit_code": 0,
         "transport_interruption": {
             "contract_set": timing_contract["version"],

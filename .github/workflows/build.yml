@@ -16,6 +16,7 @@ permissions:
 
 jobs:
   setup:
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     # Skip job if actor is github-actions[bot] to ensure agent safety
     if: ${{ github.actor != 'github-actions[bot]' }}
@@ -56,6 +57,7 @@ jobs:
         run: cargo fetch
 
   format-check:
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     needs: setup
     # Skip job if actor is github-actions[bot] to ensure agent safety
@@ -97,6 +99,7 @@ jobs:
         run: cargo fmt -- --check
 
   clippy:
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     needs: setup
     # Skip job if actor is github-actions[bot] to ensure agent safety
@@ -138,6 +141,7 @@ jobs:
         run: cargo clippy --all-targets --all-features -- -D warnings
 
   build:
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     needs: setup
     # Skip job if actor is github-actions[bot] to ensure agent safety
@@ -178,6 +182,7 @@ jobs:
         run: cargo build --verbose --all-features
 
   test:
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     needs: setup
     # Skip job if actor is github-actions[bot] to ensure agent safety
@@ -215,9 +220,17 @@ jobs:
             ${{ runner.os }}-cargo-build-
 
       - name: Run tests
+        env:
+          CARGO_NET_OFFLINE: "true"
         run: cargo test --verbose --all-features
 
+      - name: Verify extracted package contracts offline
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/target
+        run: python3 scripts/verify_package.py
+
   security-audit:
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     needs: setup
     # Skip job if actor is github-actions[bot] to ensure agent safety
@@ -267,6 +280,7 @@ jobs:
         run: cargo deny check
 
   release-build:
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     needs: [format-check, clippy, build, test, security-audit]
     # Only run on release publish events
@@ -331,6 +345,7 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     needs: release-build
     # Only run on release publish events
@@ -353,6 +368,7 @@ jobs:
 
   # Crates.io publishing (only on v* releases)
   crates-publish:
+    timeout-minutes: 30
     runs-on: ubuntu-latest
     needs: [format-check, clippy, build, test, security-audit]
     # Only run on release publish events with v* tags

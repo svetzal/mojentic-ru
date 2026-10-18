@@ -1,4 +1,6 @@
-//! Public HTTP-boundary conformance; synthetic payloads and loopback only.
+//! Public HTTP-boundary conformance; contract-derived in-process transports.
+#[path = "support/mod.rs"]
+pub mod boundary;
 use async_trait::async_trait;
 use futures::StreamExt;
 use mojentic::{
@@ -23,6 +25,7 @@ use std::{
 
 #[derive(Default)]
 struct Capture {
+    cancel_on_body: Mutex<Option<tokio_util::sync::CancellationToken>>,
     events: Mutex<Vec<LifecycleEvent>>,
     requests: Mutex<Vec<(Identity, Vec<u8>)>>,
 }
@@ -36,6 +39,11 @@ impl WireObserver for Capture {
         &self,
         event: WireEvent<'_>,
     ) -> std::result::Result<(), Box<dyn std::error::Error + Send + Sync>> {
+        if matches!(event, WireEvent::Body { .. }) {
+            if let Some(cancel) = &*self.cancel_on_body.lock().expect("cancellation") {
+                cancel.cancel();
+            }
+        }
         if let WireEvent::Request { identity, request } = event {
             self.requests.lock().expect("requests").push((
                 identity,
@@ -102,6 +110,7 @@ fn policy(attempts: u32, capture: &Arc<Capture>) -> RecoveryPolicy {
     RecoveryPolicy {
         max_attempts: NonZeroU32::new(attempts).expect("attempts"),
         base_delay: Duration::ZERO,
+        timing: Arc::new(Clock::default()),
         admission: Some(Arc::new(Allow)),
         observer: Some(capture.clone()),
         wire_observer: Some(capture.clone()),
@@ -109,11 +118,15 @@ fn policy(attempts: u32, capture: &Arc<Capture>) -> RecoveryPolicy {
     }
 }
 fn omlx(url: &str) -> OmlxGateway {
-    OmlxGateway::with_config(OmlxConfig {
-        host: url.into(),
-        api_key: Some("synthetic-secret".into()),
-        ..Default::default()
-    })
+    {
+        let transport = boundary::transport_for(url);
+        OmlxGateway::with_config(OmlxConfig {
+            host: url.into(),
+            api_key: Some("synthetic-secret".into()),
+            ..Default::default()
+        })
+        .with_transport(transport)
+    }
 }
 fn response(provider: Provider, content: &str) -> Value {
     if provider == Provider::Ollama {
@@ -132,7 +145,7 @@ fn path(provider: Provider) -> &'static str {
 async fn seed<G: RecoveryProvider>(
     inner: G,
     provider: Provider,
-    server: &mut mockito::ServerGuard,
+    server: &mut boundary::FixtureGuard,
 ) {
     let capture = Arc::new(Capture::default());
     let fail = server
@@ -188,15 +201,21 @@ async fn seed<G: RecoveryProvider>(
     fail.assert_async().await;
     success.assert_async().await;
 }
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn public_503_success_all_adapters() {
-    let mut server = mockito::Server::new_async().await;
-    seed(OllamaGateway::with_host(server.url()), Provider::Ollama, &mut server).await;
-    let mut server = mockito::Server::new_async().await;
-    seed(omlx(&server.url()), Provider::Omlx, &mut server).await;
-    let mut server = mockito::Server::new_async().await;
+    let mut server = boundary::Fixture::new_async().await;
     seed(
-        OpenAIGateway::with_api_key_and_base_url("synthetic-secret", server.url()),
+        OllamaGateway::with_host(server.url()).with_transport(server.transport()),
+        Provider::Ollama,
+        &mut server,
+    )
+    .await;
+    let mut server = boundary::Fixture::new_async().await;
+    seed(omlx(&server.url()), Provider::Omlx, &mut server).await;
+    let mut server = boundary::Fixture::new_async().await;
+    seed(
+        OpenAIGateway::with_api_key_and_base_url("synthetic-secret", server.url())
+            .with_transport(server.transport()),
         Provider::OpenAi,
         &mut server,
     )
@@ -228,26 +247,27 @@ impl LlmTool for CountTool {
         Box::new(self.clone())
     }
 }
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn public_broker_recovery_never_reexecutes_tool() {
-    let mut server = mockito::Server::new_async().await;
-    let tool=server.mock("POST","/chat/completions").match_body(mockito::Matcher::PartialJson(json!({"messages":[{"role":"user","content":"tool"}]}))).with_body(json!({"choices":[{"message":{"tool_calls":[{"id":"call1","function":{"name":"count","arguments":"{}"}}]}}]}).to_string()).expect(1).create_async().await;
+    let mut server = boundary::Fixture::new_async().await;
+    let tool=server.mock("POST","/chat/completions").match_body(boundary::Matcher::PartialJson(json!({"messages":[{"role":"user","content":"tool"}]}))).with_body(json!({"choices":[{"message":{"tool_calls":[{"id":"call1","function":{"name":"count","arguments":"{}"}}]}}]}).to_string()).expect(1).create_async().await;
     let fail = server
         .mock("POST", "/chat/completions")
-        .match_body(mockito::Matcher::Regex("tool_call_id".into()))
+        .match_body(boundary::Matcher::Regex("tool_call_id".into()))
         .with_status(503)
         .expect(1)
         .create_async()
         .await;
     let done = server
         .mock("POST", "/chat/completions")
-        .match_body(mockito::Matcher::Regex("tool_call_id".into()))
+        .match_body(boundary::Matcher::Regex("tool_call_id".into()))
         .with_body(response(Provider::OpenAi, "done").to_string())
         .expect(1)
         .create_async()
         .await;
     let capture = Arc::new(Capture::default());
     let gateway = OpenAIGateway::with_api_key_and_base_url("synthetic-secret", server.url())
+        .with_transport(server.transport())
         .with_recovery(policy(2, &capture))
         .expect("gateway");
     let count = Arc::new(AtomicUsize::new(0));
@@ -270,7 +290,7 @@ async fn public_broker_recovery_never_reexecutes_tool() {
     fail.assert_async().await;
     done.assert_async().await;
 }
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn bounded_errors_privacy_and_disabled() {
     for (status, attempts, expected) in [
         (504, 3, Outcome::Exhausted),
@@ -278,7 +298,7 @@ async fn bounded_errors_privacy_and_disabled() {
         (400, 3, Outcome::Failed),
         (401, 3, Outcome::Failed),
     ] {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let capture = Arc::new(Capture::default());
         let sends = if status == 400 || status == 401 {
             1
@@ -294,6 +314,7 @@ async fn bounded_errors_privacy_and_disabled() {
             .create_async()
             .await;
         let gateway = OpenAIGateway::with_api_key_and_base_url("synthetic-secret", server.url())
+            .with_transport(server.transport())
             .with_recovery(policy(attempts, &capture))
             .expect("gateway");
         let error = gateway
@@ -325,7 +346,7 @@ async fn bounded_errors_privacy_and_disabled() {
         mock.assert_async().await;
     }
 }
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn retry_after_floors_dates_invalid_and_refusals() {
     for (header, expected, outcome) in [
         ("2", Duration::from_secs(2), None),
@@ -336,7 +357,7 @@ async fn retry_after_floors_dates_invalid_and_refusals() {
         ("bad", Duration::from_secs(1), None),
         ("31", Duration::ZERO, Some(Outcome::DelayCeiling)),
     ] {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let capture = Arc::new(Capture::default());
         let clock = Arc::new(Clock::default());
         let fail = server
@@ -356,6 +377,7 @@ async fn retry_after_floors_dates_invalid_and_refusals() {
         p.timing = clock.clone();
         p.base_delay = Duration::from_secs(2);
         let gateway = OpenAIGateway::with_api_key_and_base_url("synthetic-secret", server.url())
+            .with_transport(server.transport())
             .with_recovery(p)
             .expect("gateway");
         let result = gateway
@@ -378,10 +400,10 @@ async fn retry_after_floors_dates_invalid_and_refusals() {
         done.assert_async().await;
     }
 }
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn local_ambiguity_requires_admission_rejection_preserves_failure() {
     for admission in [None, Some(Arc::new(Reject) as Arc<dyn Admission>)] {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let capture = Arc::new(Capture::default());
         let mock = server.mock("POST", "/api/chat").with_status(504).expect(1).create_async().await;
         let expected = if admission.is_none() {
@@ -391,7 +413,10 @@ async fn local_ambiguity_requires_admission_rejection_preserves_failure() {
         };
         let mut p = policy(3, &capture);
         p.admission = admission;
-        let gateway = OllamaGateway::with_host(server.url()).with_recovery(p).expect("gateway");
+        let gateway = OllamaGateway::with_host(server.url())
+            .with_transport(server.transport())
+            .with_recovery(p)
+            .expect("gateway");
         let error = gateway
             .complete_with_recovery(
                 "qwen3",
@@ -409,10 +434,10 @@ async fn local_ambiguity_requires_admission_rejection_preserves_failure() {
         mock.assert_async().await;
     }
 }
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn cancellation_pending_admission_and_backoff() {
     for pending in [true, false] {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let capture = Arc::new(Capture::default());
         let mock = server.mock("POST", "/api/chat").with_status(503).expect(1).create_async().await;
         let mut p = policy(3, &capture);
@@ -420,9 +445,12 @@ async fn cancellation_pending_admission_and_backoff() {
             p.admission = Some(Arc::new(Pending));
         } else {
             p.base_delay = Duration::from_secs(10);
-            p.timing = Arc::new(SystemTiming);
+            p.timing = Arc::new(BackoffWait);
         }
-        let gateway = OllamaGateway::with_host(server.url()).with_recovery(p).expect("gateway");
+        let gateway = OllamaGateway::with_host(server.url())
+            .with_transport(server.transport())
+            .with_recovery(p)
+            .expect("gateway");
         let call = RecoveryCall::default();
         let cancel = call.cancellation.clone();
         let events = capture.clone();
@@ -463,74 +491,48 @@ struct HttpFixture {
     sends: Arc<AtomicUsize>,
     bodies: Arc<Mutex<Vec<Vec<u8>>>>,
     closed: Arc<AtomicUsize>,
-    task: tokio::task::JoinHandle<()>,
+    _fixture: boundary::Fixture,
 }
-impl Drop for HttpFixture {
-    fn drop(&mut self) {
-        self.task.abort();
+impl HttpFixture {
+    fn transport(&self) -> Arc<dyn mojentic::llm::transport::HttpTransport> {
+        self._fixture.transport()
     }
 }
 async fn fixture(replies: Vec<(u16, String, bool, bool)>) -> HttpFixture {
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.expect("loopback");
-    let url = format!("http://{}", listener.local_addr().expect("address"));
+    let fixture = boundary::Fixture::new();
     let sends = Arc::new(AtomicUsize::new(0));
     let bodies = Arc::new(Mutex::new(vec![]));
     let closed = Arc::new(AtomicUsize::new(0));
     let state = (sends.clone(), bodies.clone(), closed.clone());
-    let task = tokio::spawn(async move {
-        for (status, body, partial, hang) in replies {
-            let (mut socket, _) = listener.accept().await.expect("accept");
-            let mut bytes = vec![];
-            let mut buf = [0u8; 4096];
-            loop {
-                let n = socket.read(&mut buf).await.expect("request");
-                if n == 0 {
-                    return;
-                }
-                bytes.extend_from_slice(&buf[..n]);
-                if let Some(end) = bytes.windows(4).position(|w| w == b"\r\n\r\n") {
-                    let head = String::from_utf8_lossy(&bytes[..end]);
-                    let length = head
-                        .lines()
-                        .find_map(|l| {
-                            let (k, v) = l.split_once(':')?;
-                            if k.eq_ignore_ascii_case("content-length") {
-                                v.trim().parse::<usize>().ok()
-                            } else {
-                                None
-                            }
-                        })
-                        .unwrap_or(0);
-                    if bytes.len() >= end + 4 + length {
-                        state
-                            .1
-                            .lock()
-                            .expect("bodies")
-                            .push(bytes[end + 4..end + 4 + length].to_vec());
-                        break;
-                    }
-                }
-            }
-            state.0.fetch_add(1, Ordering::SeqCst);
-            let length = body.len() + if partial || hang { 100 } else { 0 };
-            let head=format!("HTTP/1.1 {status} Fixture\r\nContent-Type: text/event-stream\r\nContent-Length: {length}\r\nX-Request-ID: req_550e8400-e29b-41d4-a716-446655440000\r\nRetry-After: 0\r\nConnection: close\r\n\r\n");
-            socket.write_all(head.as_bytes()).await.expect("headers");
-            socket.write_all(body.as_bytes()).await.expect("body");
-            socket.flush().await.expect("flush");
-            if hang {
-                let mut buf = [0u8; 1];
-                let _ = socket.read(&mut buf).await;
-                state.2.fetch_add(1, Ordering::SeqCst);
-            }
-        }
+    let replies = Mutex::new(std::collections::VecDeque::from(replies));
+    fixture.respond(move |request| {
+        state.0.fetch_add(1, Ordering::SeqCst);
+        state.1.lock().expect("bodies").push(request.body().expect("body").as_bytes().expect("bytes").to_vec());
+        let (status, body, partial, hang) = replies.lock().expect("replies").pop_front().expect("expected attempt");
+        let length = body.len() + if partial || hang { 100 } else { 0 };
+        let closed = state.2.clone();
+        let stream = async_stream::stream! {
+            struct Closed(Arc<AtomicUsize>);
+            impl Drop for Closed { fn drop(&mut self) { self.0.fetch_add(1, Ordering::SeqCst); } }
+            let _closed = Closed(closed);
+            yield Ok::<_, std::io::Error>(body.into_bytes());
+            if hang { futures::future::pending::<()>().await; }
+            if partial { yield Err(std::io::Error::new(std::io::ErrorKind::UnexpectedEof, "contract body interruption")); }
+        };
+        http::Response::builder().status(status)
+            .header("content-type", "text/event-stream")
+            .header("content-length", length.to_string())
+            .header("connection", "close")
+            .header("x-request-id", "req_550e8400-e29b-41d4-a716-446655440000")
+            .header("retry-after", "0")
+            .body(reqwest::Body::wrap_stream(stream)).expect("response").into()
     });
     HttpFixture {
-        url,
+        url: fixture.url(),
         sends,
         bodies,
         closed,
-        task,
+        _fixture: fixture,
     }
 }
 fn frame(provider: Provider, kind: &str) -> String {
@@ -596,16 +598,23 @@ async fn partial<G: RecoveryProvider>(
     assert_eq!(server.sends.load(Ordering::SeqCst), 1);
     assert!(!serde_json::to_string(&error).expect("safe").contains("synthetic-secret"));
 }
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn partial_reasoning_content_and_tools_all_adapters_never_replay() {
     for kind in ["reasoning", "content", "tools"] {
         let server = fixture(vec![(200, frame(Provider::Ollama, kind), true, false)]).await;
-        partial(OllamaGateway::with_host(&server.url), Provider::Ollama, &server, kind).await;
+        partial(
+            OllamaGateway::with_host(&server.url).with_transport(server.transport()),
+            Provider::Ollama,
+            &server,
+            kind,
+        )
+        .await;
         let server = fixture(vec![(200, frame(Provider::Omlx, kind), true, false)]).await;
         partial(omlx(&server.url), Provider::Omlx, &server, kind).await;
         let server = fixture(vec![(200, frame(Provider::OpenAi, kind), true, false)]).await;
         partial(
-            OpenAIGateway::with_api_key_and_base_url("synthetic-secret", &server.url),
+            OpenAIGateway::with_api_key_and_base_url("synthetic-secret", &server.url)
+                .with_transport(server.transport()),
             Provider::OpenAi,
             &server,
             kind,
@@ -613,7 +622,7 @@ async fn partial_reasoning_content_and_tools_all_adapters_never_replay() {
         .await;
     }
 }
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn keepalive_only_recovers_raw_without_semantic_progress() {
     let server = fixture(vec![
         (200, "data: {\"model\":\"keepalive\"}\n\n".into(), false, false),
@@ -648,7 +657,7 @@ async fn keepalive_only_recovers_raw_without_semantic_progress() {
     let bodies = server.bodies.lock().expect("bodies");
     assert_eq!(bodies[0], bodies[1]);
 }
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn cancellation_retains_received_semantics_and_closes_when_consumer_pauses() {
     async fn check<G: RecoveryProvider>(inner: G, provider: Provider, server: &HttpFixture) {
         let body = format!(
@@ -678,7 +687,7 @@ async fn cancellation_retains_received_semantics_and_closes_when_consumer_pauses
             }
         })
         .await
-        .expect("socket closes without consumer polling");
+        .expect("body releases without consumer polling");
         let error = loop {
             if let Some(RecoveryStreamEvent::Failed(error)) = stream.next().await {
                 break error;
@@ -725,12 +734,18 @@ async fn cancellation_retains_received_semantics_and_closes_when_consumer_pauses
         let server = fixture(vec![(200, body, true, true)]).await;
         match provider {
             Provider::Ollama => {
-                check(OllamaGateway::with_host(&server.url), provider, &server).await
+                check(
+                    OllamaGateway::with_host(&server.url).with_transport(server.transport()),
+                    provider,
+                    &server,
+                )
+                .await
             }
             Provider::Omlx => check(omlx(&server.url), provider, &server).await,
             Provider::OpenAi => {
                 check(
-                    OpenAIGateway::with_api_key_and_base_url("synthetic-secret", &server.url),
+                    OpenAIGateway::with_api_key_and_base_url("synthetic-secret", &server.url)
+                        .with_transport(server.transport()),
                     provider,
                     &server,
                 )
@@ -740,24 +755,17 @@ async fn cancellation_retains_received_semantics_and_closes_when_consumer_pauses
     }
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn cancellation_active_ordinary_retains_headers_raw_and_no_resend() {
     let server =
         fixture(vec![(200, "{\"message\":{\"content\":\"partial".into(), true, true)]).await;
     let capture = Arc::new(Capture::default());
+    let call = RecoveryCall::default();
+    *capture.cancel_on_body.lock().expect("cancellation") = Some(call.cancellation.clone());
     let gateway = OllamaGateway::with_host(&server.url)
+        .with_transport(server._fixture.transport())
         .with_recovery(policy(3, &capture))
         .expect("gateway");
-    let call = RecoveryCall::default();
-    let cancel = call.cancellation.clone();
-    let s = server.sends.clone();
-    tokio::spawn(async move {
-        while s.load(Ordering::SeqCst) == 0 {
-            tokio::task::yield_now().await;
-        }
-        tokio::time::sleep(Duration::from_millis(20)).await;
-        cancel.cancel();
-    });
     let error = tokio::time::timeout(
         Duration::from_secs(2),
         gateway.complete_with_recovery("qwen3", &[], None, &CompletionConfig::default(), &call),
@@ -773,7 +781,7 @@ async fn cancellation_active_ordinary_retains_headers_raw_and_no_resend() {
     assert_eq!(error.history.len(), 1);
     assert_eq!(server.sends.load(Ordering::SeqCst), 1);
 }
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn partial_http200_body_and_malformed_protocol_never_replayed() {
     for (body, partial) in [
         ("{\"message\":{\"content\":\"half".to_string(), true),
@@ -782,6 +790,7 @@ async fn partial_http200_body_and_malformed_protocol_never_replayed() {
         let server = fixture(vec![(200, body, partial, false)]).await;
         let capture = Arc::new(Capture::default());
         let gateway = OllamaGateway::with_host(&server.url)
+            .with_transport(server.transport())
             .with_recovery(policy(3, &capture))
             .expect("gateway");
         let error = gateway
@@ -800,7 +809,7 @@ async fn partial_http200_body_and_malformed_protocol_never_replayed() {
         assert_eq!(server.sends.load(Ordering::SeqCst), 1);
     }
 }
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn immutable_reasoning_tools_schema_and_sampling_all_adapters() {
     async fn check<G: RecoveryProvider>(inner: G, server: &HttpFixture, reasoning_field: &str) {
         let capture = Arc::new(Capture::default());
@@ -837,7 +846,12 @@ async fn immutable_reasoning_tools_schema_and_sampling_all_adapters() {
         (200, response(Provider::Ollama, "{\"ok\":true}").to_string(), false, false),
     ])
     .await;
-    check(OllamaGateway::with_host(&server.url), &server, "thinking").await;
+    check(
+        OllamaGateway::with_host(&server.url).with_transport(server.transport()),
+        &server,
+        "thinking",
+    )
+    .await;
     let server = fixture(vec![
         (503, "fail".into(), false, false),
         (200, response(Provider::Omlx, "{\"ok\":true}").to_string(), false, false),
@@ -851,6 +865,7 @@ async fn immutable_reasoning_tools_schema_and_sampling_all_adapters() {
     ])
     .await;
     let gateway = OpenAIGateway::with_api_key_and_base_url("synthetic-secret", &server.url)
+        .with_transport(server.transport())
         .with_recovery(policy(2, &Arc::new(Capture::default())))
         .expect("gateway");
     let result = gateway
@@ -868,7 +883,7 @@ async fn immutable_reasoning_tools_schema_and_sampling_all_adapters() {
     assert_eq!(bodies[0], bodies[1]);
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn no_newline_semantic_or_truncated_frames_never_replay() {
     async fn check<G: RecoveryProvider>(inner: G, server: &HttpFixture) {
         let gateway =
@@ -902,7 +917,11 @@ async fn no_newline_semantic_or_truncated_frames_never_replay() {
                 false,
             )])
             .await;
-            check(OllamaGateway::with_host(&server.url), &server).await;
+            check(
+                OllamaGateway::with_host(&server.url).with_transport(server.transport()),
+                &server,
+            )
+            .await;
             let server =
                 fixture(vec![(200, frame(Provider::Omlx, kind).trim_end().into(), partial, false)])
                     .await;
@@ -915,7 +934,8 @@ async fn no_newline_semantic_or_truncated_frames_never_replay() {
             )])
             .await;
             check(
-                OpenAIGateway::with_api_key_and_base_url("synthetic-secret", &server.url),
+                OpenAIGateway::with_api_key_and_base_url("synthetic-secret", &server.url)
+                    .with_transport(server.transport()),
                 &server,
             )
             .await;
@@ -923,12 +943,12 @@ async fn no_newline_semantic_or_truncated_frames_never_replay() {
     }
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn provider_response_category_codes_and_causes_all_adapters() {
     async fn check<G: RecoveryProvider>(
         inner: G,
         provider: Provider,
-        server: &mut mockito::ServerGuard,
+        server: &mut boundary::FixtureGuard,
     ) {
         let mock = server
             .mock("POST", path(provider))
@@ -964,23 +984,29 @@ async fn provider_response_category_codes_and_causes_all_adapters() {
         assert!(!format!("{error:?} {error}").contains("synthetic-secret"));
         mock.assert_async().await;
     }
-    let mut server = mockito::Server::new_async().await;
-    check(OllamaGateway::with_host(server.url()), Provider::Ollama, &mut server).await;
-    let mut server = mockito::Server::new_async().await;
-    check(omlx(&server.url()), Provider::Omlx, &mut server).await;
-    let mut server = mockito::Server::new_async().await;
+    let mut server = boundary::Fixture::new_async().await;
     check(
-        OpenAIGateway::with_api_key_and_base_url("synthetic-secret", server.url()),
+        OllamaGateway::with_host(server.url()).with_transport(server.transport()),
+        Provider::Ollama,
+        &mut server,
+    )
+    .await;
+    let mut server = boundary::Fixture::new_async().await;
+    check(omlx(&server.url()), Provider::Omlx, &mut server).await;
+    let mut server = boundary::Fixture::new_async().await;
+    check(
+        OpenAIGateway::with_api_key_and_base_url("synthetic-secret", server.url())
+            .with_transport(server.transport()),
         Provider::OpenAi,
         &mut server,
     )
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn budgets_retry_after_and_exact_exponential_delays() {
     for budget in [Some(Duration::from_secs(2)), Some(Duration::ZERO), None] {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let attempts = if budget.is_some() { 1 } else { 4 };
         let mock = server
             .mock("POST", "/chat/completions")
@@ -996,6 +1022,7 @@ async fn budgets_retry_after_and_exact_exponential_delays() {
         p.base_delay = Duration::from_secs(1);
         p.timing = clock.clone();
         let gateway = OpenAIGateway::with_api_key_and_base_url("synthetic-secret", server.url())
+            .with_transport(server.transport())
             .with_recovery(p)
             .expect("gateway");
         let error = gateway
@@ -1044,7 +1071,7 @@ impl Admission for DecideLater {
         AdmissionDecision::Allow
     }
 }
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn pending_is_not_permission_then_explicit_allow_dispatches() {
     let server = fixture(vec![
         (504, "failure".into(), false, false),
@@ -1057,7 +1084,10 @@ async fn pending_is_not_permission_then_explicit_allow_dispatches() {
     });
     let mut p = policy(2, &capture);
     p.admission = Some(admission.clone());
-    let gateway = OllamaGateway::with_host(&server.url).with_recovery(p).expect("gateway");
+    let gateway = OllamaGateway::with_host(&server.url)
+        .with_transport(server.transport())
+        .with_recovery(p)
+        .expect("gateway");
     let config = CompletionConfig::default();
     let call = RecoveryCall::default();
     let future = gateway.complete_with_recovery("qwen3", &[], None, &config, &call);
@@ -1076,16 +1106,19 @@ impl LifecycleObserver for CancelOnStart {
         }
     }
 }
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn cancellation_before_dispatch_has_no_phantom_wire_attempt() {
-    let mut server = mockito::Server::new_async().await;
+    let mut server = boundary::Fixture::new_async().await;
     let mock = server.mock("POST", "/api/chat").expect(0).create_async().await;
     let call = RecoveryCall::default();
     let p = RecoveryPolicy {
         observer: Some(Arc::new(CancelOnStart(call.cancellation.clone()))),
         ..Default::default()
     };
-    let gateway = OllamaGateway::with_host(server.url()).with_recovery(p).expect("gateway");
+    let gateway = OllamaGateway::with_host(server.url())
+        .with_transport(server.transport())
+        .with_recovery(p)
+        .expect("gateway");
     let error = gateway
         .complete_with_recovery("qwen3", &[], None, &CompletionConfig::default(), &call)
         .await
@@ -1113,14 +1146,17 @@ impl WireObserver for BrokenCapture {
         }
     }
 }
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn capture_failure_is_terminal_accounted_and_preserves_original_cause() {
-    let mut server = mockito::Server::new_async().await;
+    let mut server = boundary::Fixture::new_async().await;
     let mock = server.mock("POST", "/api/chat").with_status(503).expect(1).create_async().await;
     let capture = Arc::new(Capture::default());
     let mut p = policy(3, &capture);
     p.wire_observer = Some(Arc::new(BrokenCapture { at_request: false }));
-    let gateway = OllamaGateway::with_host(server.url()).with_recovery(p).expect("gateway");
+    let gateway = OllamaGateway::with_host(server.url())
+        .with_transport(server.transport())
+        .with_recovery(p)
+        .expect("gateway");
     let error = gateway
         .complete_with_recovery(
             "qwen3",
@@ -1150,9 +1186,9 @@ async fn capture_failure_is_terminal_accounted_and_preserves_original_cause() {
     mock.assert_async().await;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn public_broker_and_session_preserve_structured_failure_and_history() {
-    let mut server = mockito::Server::new_async().await;
+    let mut server = boundary::Fixture::new_async().await;
     let mock = server
         .mock("POST", "/api/chat")
         .with_status(504)
@@ -1161,6 +1197,7 @@ async fn public_broker_and_session_preserve_structured_failure_and_history() {
         .create_async()
         .await;
     let gateway = OllamaGateway::with_host(server.url())
+        .with_transport(server.transport())
         .with_recovery(RecoveryPolicy::default())
         .expect("gateway");
     let broker = LlmBroker::new("qwen3", Arc::new(gateway), None);
@@ -1199,7 +1236,7 @@ async fn public_broker_and_session_preserve_structured_failure_and_history() {
     mock.assert_async().await;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn native_reasoning_streamed_tool_turn_is_retained_and_tool_runs_once() {
     let body = format!(
         "data: {}\n\ndata: {}\n\ndata: [DONE]\n\n",
@@ -1237,7 +1274,7 @@ async fn native_reasoning_streamed_tool_turn_is_retained_and_tool_runs_once() {
     assert_eq!(second["messages"][1]["reasoning_content"], "native prior reasoning");
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn streaming_503_success_preserves_payload_and_accounting_all_adapters() {
     async fn check<G: RecoveryProvider>(inner: G, server: &HttpFixture) {
         let capture = Arc::new(Capture::default());
@@ -1275,7 +1312,11 @@ async fn streaming_503_success_preserves_payload_and_accounting_all_adapters() {
         (200, final_stream(Provider::Ollama), false, false),
     ])
     .await;
-    check(OllamaGateway::with_host(&server.url), &server).await;
+    check(
+        OllamaGateway::with_host(&server.url).with_transport(server.transport()),
+        &server,
+    )
+    .await;
     let server = fixture(vec![
         (503, "failure".into(), false, false),
         (200, final_stream(Provider::Omlx), false, false),
@@ -1288,13 +1329,14 @@ async fn streaming_503_success_preserves_payload_and_accounting_all_adapters() {
     ])
     .await;
     check(
-        OpenAIGateway::with_api_key_and_base_url("synthetic-secret", &server.url),
+        OpenAIGateway::with_api_key_and_base_url("synthetic-secret", &server.url)
+            .with_transport(server.transport()),
         &server,
     )
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn native_history_tool_schema_combination_is_frozen_all_adapters() {
     async fn check<G: RecoveryProvider>(inner: G, provider: Provider, server: &HttpFixture) {
         let capture = Arc::new(Capture::default());
@@ -1347,7 +1389,12 @@ async fn native_history_tool_schema_combination_is_frozen_all_adapters() {
         (200, response(Provider::Ollama, "{}").to_string(), false, false),
     ])
     .await;
-    check(OllamaGateway::with_host(&server.url), Provider::Ollama, &server).await;
+    check(
+        OllamaGateway::with_host(&server.url).with_transport(server.transport()),
+        Provider::Ollama,
+        &server,
+    )
+    .await;
     let server = fixture(vec![
         (503, "failure".into(), false, false),
         (200, response(Provider::Omlx, "{}").to_string(), false, false),
@@ -1360,13 +1407,14 @@ async fn native_history_tool_schema_combination_is_frozen_all_adapters() {
     ])
     .await;
     check(
-        OpenAIGateway::with_api_key_and_base_url("synthetic-secret", &server.url),
+        OpenAIGateway::with_api_key_and_base_url("synthetic-secret", &server.url)
+            .with_transport(server.transport()),
         Provider::OpenAi,
         &server,
     )
     .await;
 }
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn session_interruption_never_commits_partial_assistant_or_executes_tools() {
     let server = fixture(vec![(
         200,
@@ -1405,7 +1453,7 @@ async fn session_interruption_never_commits_partial_assistant_or_executes_tools(
     assert_eq!(server.sends.load(Ordering::SeqCst), 1);
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn permanent_and_bounded_errors_all_adapters() {
     async fn check<G: RecoveryProvider>(inner: G, status: u16, server: &HttpFixture) {
         let capture = Arc::new(Capture::default());
@@ -1445,12 +1493,18 @@ async fn permanent_and_bounded_errors_all_adapters() {
             if status == 504 { 2 } else { 1 }
         ];
         let server = fixture(replies.clone()).await;
-        check(OllamaGateway::with_host(&server.url), status, &server).await;
+        check(
+            OllamaGateway::with_host(&server.url).with_transport(server.transport()),
+            status,
+            &server,
+        )
+        .await;
         let server = fixture(replies.clone()).await;
         check(omlx(&server.url), status, &server).await;
         let server = fixture(replies).await;
         check(
-            OpenAIGateway::with_api_key_and_base_url("synthetic-secret", &server.url),
+            OpenAIGateway::with_api_key_and_base_url("synthetic-secret", &server.url)
+                .with_transport(server.transport()),
             status,
             &server,
         )
@@ -1475,7 +1529,7 @@ impl WireObserver for AdvanceDuringActive {
         Ok(())
     }
 }
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn recovery_budget_and_provider_timeout_do_not_cut_off_admitted_generation() {
     let server = fixture(vec![
         (503, "failure".into(), false, false),
@@ -1495,6 +1549,7 @@ async fn recovery_budget_and_provider_timeout_do_not_cut_off_admitted_generation
         timeout: Some(Duration::from_nanos(1)),
         ..Default::default()
     })
+    .with_transport(server.transport())
     .with_recovery(p)
     .expect("gateway");
     let result = gateway
@@ -1511,14 +1566,17 @@ async fn recovery_budget_and_provider_timeout_do_not_cut_off_admitted_generation
     assert_eq!(result.report.identity.wire_attempt, 2);
     assert_eq!(*clock.elapsed.lock().expect("clock"), Duration::from_secs(10));
 }
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn absolute_deadline_refuses_retry_without_timing_out_initial_request() {
     let server = fixture(vec![(504, "failure".into(), false, false)]).await;
     let clock = Arc::new(Clock::default());
     let mut p = policy(3, &Arc::new(Capture::default()));
     p.deadline = Some(clock.start);
     p.timing = clock;
-    let gateway = OllamaGateway::with_host(&server.url).with_recovery(p).expect("gateway");
+    let gateway = OllamaGateway::with_host(&server.url)
+        .with_transport(server.transport())
+        .with_recovery(p)
+        .expect("gateway");
     let error = gateway
         .complete_with_recovery(
             "qwen3",
@@ -1534,11 +1592,12 @@ async fn absolute_deadline_refuses_retry_without_timing_out_initial_request() {
     assert_eq!(error.history.len(), 1);
     assert_eq!(server.sends.load(Ordering::SeqCst), 1);
 }
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn unsupported_reasoning_rejected_before_send_and_capabilities_truthful() {
-    let mut server = mockito::Server::new_async().await;
+    let mut server = boundary::Fixture::new_async().await;
     let mock = server.mock("POST", "/chat/completions").expect(0).create_async().await;
     let gateway = OpenAIGateway::with_api_key_and_base_url("synthetic-secret", server.url())
+        .with_transport(server.transport())
         .with_recovery(RecoveryPolicy::default())
         .expect("gateway");
     let config = CompletionConfig {
@@ -1561,15 +1620,18 @@ async fn unsupported_reasoning_rejected_before_send_and_capabilities_truthful() 
     mock.assert_async().await;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn predispatch_capture_failure_has_zero_wire_attempts() {
-    let mut server = mockito::Server::new_async().await;
+    let mut server = boundary::Fixture::new_async().await;
     let mock = server.mock("POST", "/api/chat").expect(0).create_async().await;
     let p = RecoveryPolicy {
         wire_observer: Some(Arc::new(BrokenCapture { at_request: true })),
         ..Default::default()
     };
-    let gateway = OllamaGateway::with_host(server.url()).with_recovery(p).expect("gateway");
+    let gateway = OllamaGateway::with_host(server.url())
+        .with_transport(server.transport())
+        .with_recovery(p)
+        .expect("gateway");
     let error = gateway
         .complete_with_recovery(
             "qwen3",
@@ -1593,9 +1655,9 @@ async fn predispatch_capture_failure_has_zero_wire_attempts() {
     mock.assert_async().await;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn rfc850_century_is_resolved_before_weekday_and_floor_validation() {
-    let mut server = mockito::Server::new_async().await;
+    let mut server = boundary::Fixture::new_async().await;
     let mock = server
         .mock("POST", "/chat/completions")
         .with_status(429)
@@ -1613,6 +1675,7 @@ async fn rfc850_century_is_resolved_before_weekday_and_floor_validation() {
     let mut p = policy(2, &Arc::new(Capture::default()));
     p.timing = clock.clone();
     let gateway = OpenAIGateway::with_api_key_and_base_url("synthetic-secret", server.url())
+        .with_transport(server.transport())
         .with_recovery(p)
         .expect("gateway");
     let error = gateway
@@ -1646,9 +1709,9 @@ async fn rfc850_century_is_resolved_before_weekday_and_floor_validation() {
     mock.assert_async().await;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn recovery_preserves_omlx_structured_warning_evidence_without_logging_it() {
-    let mut server = mockito::Server::new_async().await;
+    let mut server = boundary::Fixture::new_async().await;
     let mock = server
         .mock("POST", "/v1/chat/completions")
         .with_header("warning", "199 oMLX schema fallback")
@@ -1673,14 +1736,14 @@ async fn recovery_preserves_omlx_structured_warning_evidence_without_logging_it(
     mock.assert_async().await;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn uuid_shaped_credential_or_prompt_echo_is_omitted_from_safe_metadata() {
     for credential in [
         "550e8400-e29b-41d4-a716-446655440000",
         "550E8400-E29B-41D4-A716-446655440000",
         "550e8400e29b41d4a716446655440000",
     ] {
-        let mut server = mockito::Server::new_async().await;
+        let mut server = boundary::Fixture::new_async().await;
         let mock = server
             .mock("POST", "/chat/completions")
             .with_status(503)
@@ -1689,6 +1752,7 @@ async fn uuid_shaped_credential_or_prompt_echo_is_omitted_from_safe_metadata() {
             .create_async()
             .await;
         let gateway = OpenAIGateway::with_api_key_and_base_url(credential, server.url())
+            .with_transport(server.transport())
             .with_recovery(RecoveryPolicy::default())
             .expect("gateway");
         let error = gateway
@@ -1714,7 +1778,7 @@ async fn uuid_shaped_credential_or_prompt_echo_is_omitted_from_safe_metadata() {
     }
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn truncated_permanent_http_bodies_never_retry_all_public_completion_apis() {
     async fn check<G: RecoveryProvider>(
         inner: G,
@@ -1803,12 +1867,19 @@ async fn truncated_permanent_http_bodies_never_retry_all_public_completion_apis(
             // A second scripted response makes an unauthorized resend observable.
             let replies = vec![(status, "synthetic-secret truncated body".into(), true, false); 3];
             let server = fixture(replies.clone()).await;
-            check(OllamaGateway::with_host(&server.url), status, operation, &server).await;
+            check(
+                OllamaGateway::with_host(&server.url).with_transport(server.transport()),
+                status,
+                operation,
+                &server,
+            )
+            .await;
             let server = fixture(replies.clone()).await;
             check(omlx(&server.url), status, operation, &server).await;
             let server = fixture(replies).await;
             check(
-                OpenAIGateway::with_api_key_and_base_url("synthetic-secret", &server.url),
+                OpenAIGateway::with_api_key_and_base_url("synthetic-secret", &server.url)
+                    .with_transport(server.transport()),
                 status,
                 operation,
                 &server,
@@ -1832,7 +1903,7 @@ impl WireObserver for RejectBodyCapture {
     }
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn body_capture_failure_retains_observed_semantics_without_delivery_all_adapters() {
     async fn check<G: RecoveryProvider>(inner: G, operation: Operation, server: &HttpFixture) {
         let capture = Arc::new(Capture::default());
@@ -1902,7 +1973,13 @@ async fn body_capture_failure_retains_observed_semantics_without_delivery_all_ad
                 let server = fixture(vec![(200, body, false, false)]).await;
                 match provider {
                     Provider::Ollama => {
-                        check(OllamaGateway::with_host(&server.url), operation, &server).await
+                        check(
+                            OllamaGateway::with_host(&server.url)
+                                .with_transport(server.transport()),
+                            operation,
+                            &server,
+                        )
+                        .await
                     }
                     Provider::Omlx => check(omlx(&server.url), operation, &server).await,
                     Provider::OpenAi => {
@@ -1910,7 +1987,8 @@ async fn body_capture_failure_retains_observed_semantics_without_delivery_all_ad
                             OpenAIGateway::with_api_key_and_base_url(
                                 "synthetic-secret",
                                 &server.url,
-                            ),
+                            )
+                            .with_transport(server.transport()),
                             operation,
                             &server,
                         )
@@ -2008,7 +2086,7 @@ async fn cancelled_body<G: RecoveryProvider>(
         .contains("synthetic-secret"));
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn cancellation_terminal_only_body_all_adapters_never_succeeds() {
     for provider in [Provider::Ollama, Provider::Omlx, Provider::OpenAi] {
         let body = if provider == Provider::Ollama {
@@ -2021,7 +2099,7 @@ async fn cancellation_terminal_only_body_all_adapters_never_succeeds() {
         match provider {
             Provider::Ollama => {
                 cancelled_body(
-                    OllamaGateway::with_host(&server.url),
+                    OllamaGateway::with_host(&server.url).with_transport(server.transport()),
                     Operation::Streaming,
                     &server,
                     &body,
@@ -2034,7 +2112,8 @@ async fn cancellation_terminal_only_body_all_adapters_never_succeeds() {
             }
             Provider::OpenAi => {
                 cancelled_body(
-                    OpenAIGateway::with_api_key_and_base_url("synthetic-secret", &server.url),
+                    OpenAIGateway::with_api_key_and_base_url("synthetic-secret", &server.url)
+                        .with_transport(server.transport()),
                     Operation::Streaming,
                     &server,
                     &body,
@@ -2046,7 +2125,7 @@ async fn cancellation_terminal_only_body_all_adapters_never_succeeds() {
     }
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn cancellation_active_body_all_adapters_has_one_ordered_terminal_lifecycle() {
     for provider in [Provider::Ollama, Provider::Omlx, Provider::OpenAi] {
         for operation in [
@@ -2064,7 +2143,8 @@ async fn cancellation_active_body_all_adapters_has_one_ordered_terminal_lifecycl
                 match provider {
                     Provider::Ollama => {
                         cancelled_body(
-                            OllamaGateway::with_host(&server.url),
+                            OllamaGateway::with_host(&server.url)
+                                .with_transport(server.transport()),
                             operation,
                             &server,
                             &body,
@@ -2080,7 +2160,8 @@ async fn cancellation_active_body_all_adapters_has_one_ordered_terminal_lifecycl
                             OpenAIGateway::with_api_key_and_base_url(
                                 "synthetic-secret",
                                 &server.url,
-                            ),
+                            )
+                            .with_transport(server.transport()),
                             operation,
                             &server,
                             &body,
@@ -2095,7 +2176,7 @@ async fn cancellation_active_body_all_adapters_has_one_ordered_terminal_lifecycl
                     }
                 })
                 .await
-                .expect("locally owned response socket closed promptly");
+                .expect("locally owned response body released promptly");
             }
         }
     }
@@ -2105,10 +2186,10 @@ async fn cancellation_active_body_all_adapters_has_one_ordered_terminal_lifecycl
 macro_rules! adapter_case {
     ($check:ident, $provider:expr, $url:expr $(, $arg:expr)*) => {
         match $provider {
-            Provider::Ollama => $check(OllamaGateway::with_host($url), $provider $(, $arg)*).await,
+            Provider::Ollama => $check({ let transport = boundary::transport_for(&($url)); OllamaGateway::with_host($url).with_transport(transport) }, $provider $(, $arg)*).await,
             Provider::Omlx => $check(omlx($url), $provider $(, $arg)*).await,
-            Provider::OpenAi => $check(OpenAIGateway::with_api_key_and_base_url(
-                "synthetic-secret", $url), $provider $(, $arg)*).await,
+            Provider::OpenAi => $check({ let transport = boundary::transport_for(&($url)); OpenAIGateway::with_api_key_and_base_url(
+                "synthetic-secret", $url).with_transport(transport) }, $provider $(, $arg)*).await,
         }
     };
 }
@@ -2168,7 +2249,8 @@ struct BackoffWait;
 #[async_trait]
 impl Timing for BackoffWait {
     fn monotonic(&self) -> Instant {
-        Instant::now()
+        static ORIGIN: std::sync::OnceLock<Instant> = std::sync::OnceLock::new();
+        *ORIGIN.get_or_init(Instant::now)
     }
     fn wall(&self) -> SystemTime {
         SystemTime::UNIX_EPOCH + Duration::from_secs(1_000_000)
@@ -2232,12 +2314,12 @@ const OPERATIONS: [Operation; 3] = [
     Operation::Streaming,
 ];
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn review_retry_after_numeric_date_ceiling_budget_matrix() {
     async fn check<G: RecoveryProvider>(
         inner: G,
         provider: Provider,
-        server: &mut mockito::ServerGuard,
+        server: &mut boundary::FixtureGuard,
         header: &str,
         limit: &str,
         operation: Operation,
@@ -2331,7 +2413,7 @@ async fn review_retry_after_numeric_date_ceiling_budget_matrix() {
         for operation in OPERATIONS {
             for header in ["2", "Mon, 12 Jan 1970 13:46:42 GMT"] {
                 for limit in ["within", "ceiling", "budget"] {
-                    let mut server = mockito::Server::new_async().await;
+                    let mut server = boundary::Fixture::new_async().await;
                     let url = server.url();
                     adapter_case!(check, provider, &url, &mut server, header, limit, operation);
                 }
@@ -2340,7 +2422,7 @@ async fn review_retry_after_numeric_date_ceiling_budget_matrix() {
     }
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn review_pending_and_backoff_cancel_matrix() {
     async fn check<G: RecoveryProvider>(
         inner: G,
@@ -2421,7 +2503,7 @@ async fn review_pending_and_backoff_cancel_matrix() {
     }
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn review_keepalive_and_partial_http200_matrix() {
     async fn check<G: RecoveryProvider>(
         inner: G,
@@ -2541,7 +2623,7 @@ fn assert_fixture_headers(failure: &Failure, body: &str, truncated: bool) {
     assert_eq!(failure.inspect_response_headers(), Some(&expected));
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn review_broker_session_failure_evidence_matrix() {
     async fn check<G: RecoveryProvider + 'static>(
         inner: G,
@@ -2666,12 +2748,15 @@ async fn review_broker_session_failure_evidence_matrix() {
                     cause.downcast_ref::<reqwest::Error>().expect("original body transport error");
                 assert!(original.is_decode());
                 assert_eq!(original.to_string(), "error decoding response body");
-                let source = std::error::Error::source(original).expect("HTTP framing cause");
-                assert_eq!(source.to_string(), "error reading a body from connection");
-                assert_eq!(
-                    source.source().expect("truncation evidence").to_string(),
-                    "end of file before message length reached"
-                );
+                let source = std::error::Error::source(original).expect("body cause");
+                assert_eq!(source.to_string(), "request or response body error");
+                let io = source
+                    .source()
+                    .expect("truncation evidence")
+                    .downcast_ref::<std::io::Error>()
+                    .expect("original I/O cause");
+                assert_eq!(io.kind(), std::io::ErrorKind::UnexpectedEof);
+                assert_eq!(io.to_string(), "contract body interruption");
                 assert_eq!(
                     error.outcome,
                     if kind == "interrupted" {
@@ -2769,7 +2854,7 @@ async fn review_broker_session_failure_evidence_matrix() {
     }
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn review_explicit_pending_admission_all_adapters() {
     async fn check<G: RecoveryProvider>(inner: G, _: Provider, server: &HttpFixture) {
         let capture = Arc::new(Capture::default());
@@ -2815,7 +2900,7 @@ async fn review_explicit_pending_admission_all_adapters() {
     }
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn review_completed_tool_not_reexecuted_after_followup_failure() {
     async fn check<G: RecoveryProvider + 'static>(
         inner: G,
@@ -2902,7 +2987,7 @@ async fn review_completed_tool_not_reexecuted_after_followup_failure() {
     }
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn review_raw_broker_stream_events_remain_single_send_legacy() {
     async fn check<G: RecoveryProvider + 'static>(inner: G, _: Provider, server: &HttpFixture) {
         let capture = Arc::new(Capture::default());
@@ -2935,14 +3020,16 @@ async fn review_raw_broker_stream_events_remain_single_send_legacy() {
     }
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn recovery_metadata_public_red_green() {
     use mojentic::llm::gateway::{LlmGateway, StreamChunk};
     let body = "{\"message\":{},\"done\":false}\n{\"message\":{},\"done\":true,\"done_reason\":\"stop\"}\n";
     let server = fixture(vec![(200, body.into(), false, false)]).await;
-    let gateway =
-        RecoveryGateway::new(OllamaGateway::with_host(&server.url), RecoveryPolicy::default())
-            .expect("gateway");
+    let gateway = RecoveryGateway::new(
+        OllamaGateway::with_host(&server.url).with_transport(server.transport()),
+        RecoveryPolicy::default(),
+    )
+    .expect("gateway");
     let config = CompletionConfig::default();
     let chunks: Vec<_> = gateway.complete_stream("qwen3", &[], None, &config).collect().await;
     assert_eq!(
@@ -2967,7 +3054,7 @@ fn frozen_ollama_telemetry() -> String {
     ].iter().map(|v| format!("{v}\n")).collect()
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn recovery_metadata_frozen_ollama_matches_original_and_compatibility() {
     use mojentic::llm::gateway::{LlmGateway, StreamChunk, StreamMetrics, StreamProgress};
     let body = frozen_ollama_telemetry();
@@ -2983,7 +3070,9 @@ async fn recovery_metadata_frozen_ollama_matches_original_and_compatibility() {
             Duration::ZERO
         }
     }
-    let inner = OllamaGateway::with_host(&server.url).with_stream_clock(Arc::new(FixedClock));
+    let inner = OllamaGateway::with_host(&server.url)
+        .with_transport(server.transport())
+        .with_stream_clock(Arc::new(FixedClock));
     let old: Vec<_> = inner.complete_stream("qwen3", &messages, None, &config).collect().await;
     let capture = Arc::new(Capture::default());
     let gateway = RecoveryGateway::new(inner, policy(1, &capture)).expect("gateway");
@@ -3140,7 +3229,7 @@ async fn recovery_metadata_frozen_ollama_matches_original_and_compatibility() {
     assert_eq!(requests[0].0, result.report.identity);
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn recovery_metadata_frame_accounting_after_503_and_keepalive_failure() {
     for keepalive in [false, true] {
         let prior = if keepalive {
@@ -3154,9 +3243,11 @@ async fn recovery_metadata_frame_accounting_after_503_and_keepalive_failure() {
         ])
         .await;
         let capture = Arc::new(Capture::default());
-        let gateway =
-            RecoveryGateway::new(OllamaGateway::with_host(&server.url), policy(2, &capture))
-                .expect("gateway");
+        let gateway = RecoveryGateway::new(
+            OllamaGateway::with_host(&server.url).with_transport(server.transport()),
+            policy(2, &capture),
+        )
+        .expect("gateway");
         let call = RecoveryCall::default();
         let events: Vec<_> = gateway
             .complete_stream_with_recovery("qwen3", &[], None, &CompletionConfig::default(), &call)
@@ -3204,7 +3295,7 @@ async fn recovery_metadata_frame_accounting_after_503_and_keepalive_failure() {
     }
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn recovery_metadata_absent_counters_are_not_fabricated() {
     let server = fixture(vec![(
         200,
@@ -3213,9 +3304,11 @@ async fn recovery_metadata_absent_counters_are_not_fabricated() {
         false,
     )])
     .await;
-    let gateway =
-        RecoveryGateway::new(OllamaGateway::with_host(&server.url), RecoveryPolicy::default())
-            .expect("gateway");
+    let gateway = RecoveryGateway::new(
+        OllamaGateway::with_host(&server.url).with_transport(server.transport()),
+        RecoveryPolicy::default(),
+    )
+    .expect("gateway");
     let call = RecoveryCall::default();
     let events: Vec<_> = gateway
         .complete_stream_with_recovery("qwen3", &[], None, &CompletionConfig::default(), &call)
@@ -3249,7 +3342,7 @@ async fn recovery_metadata_absent_counters_are_not_fabricated() {
     }
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn recovery_metadata_unsupported_adapters_emit_no_ollama_telemetry() {
     use mojentic::llm::gateway::{LlmGateway, StreamChunk};
     async fn check<G: RecoveryProvider>(inner: G, server: &HttpFixture) {
@@ -3278,7 +3371,8 @@ async fn recovery_metadata_unsupported_adapters_emit_no_ollama_telemetry() {
             Provider::Omlx => check(omlx(&server.url), &server).await,
             Provider::OpenAi => {
                 check(
-                    OpenAIGateway::with_api_key_and_base_url("synthetic-secret", &server.url),
+                    OpenAIGateway::with_api_key_and_base_url("synthetic-secret", &server.url)
+                        .with_transport(server.transport()),
                     &server,
                 )
                 .await
@@ -3288,13 +3382,16 @@ async fn recovery_metadata_unsupported_adapters_emit_no_ollama_telemetry() {
     }
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn recovery_metadata_paused_keepalive_cancellation_has_no_semantic_delivery() {
     let body = "{\"message\":{},\"done\":false}\n";
     let server = fixture(vec![(200, body.into(), false, true)]).await;
     let capture = Arc::new(Capture::default());
-    let gateway = RecoveryGateway::new(OllamaGateway::with_host(&server.url), policy(3, &capture))
-        .expect("gateway");
+    let gateway = RecoveryGateway::new(
+        OllamaGateway::with_host(&server.url).with_transport(server.transport()),
+        policy(3, &capture),
+    )
+    .expect("gateway");
     let call = RecoveryCall::default();
     let mut stream = gateway.complete_stream_with_recovery(
         "qwen3",
@@ -3318,7 +3415,7 @@ async fn recovery_metadata_paused_keepalive_cancellation_has_no_semantic_deliver
         }
     })
     .await
-    .expect("paused consumer still closes socket");
+    .expect("paused consumer still releases body");
     let error = match stream.next().await.expect("terminal failure") {
         RecoveryStreamEvent::Failed(e) => e,
         _ => panic!("cancelled"),
@@ -3341,12 +3438,15 @@ async fn recovery_metadata_paused_keepalive_cancellation_has_no_semantic_deliver
     assert!(stream.next().await.is_none());
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn recovery_metadata_terminal_progress_cancellation_never_completes() {
     let server = fixture(vec![(200,"{\"message\":{},\"done\":true,\"done_reason\":\"stop\",\"eval_count\":12,\"eval_duration\":6000000000}\n".into(),false,false)]).await;
     let capture = Arc::new(Capture::default());
-    let gateway = RecoveryGateway::new(OllamaGateway::with_host(&server.url), policy(3, &capture))
-        .expect("gateway");
+    let gateway = RecoveryGateway::new(
+        OllamaGateway::with_host(&server.url).with_transport(server.transport()),
+        policy(3, &capture),
+    )
+    .expect("gateway");
     let call = RecoveryCall::default();
     let mut stream = gateway.complete_stream_with_recovery(
         "qwen3",
@@ -3382,7 +3482,7 @@ async fn recovery_metadata_terminal_progress_cancellation_never_completes() {
     assert!(stream.next().await.is_none());
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn recovery_rejected_terminal_telemetry_raw_and_compatibility() {
     use mojentic::llm::gateway::{LlmGateway, StreamChunk};
     for semantic in [false, true] {
@@ -3401,7 +3501,9 @@ async fn recovery_rejected_terminal_telemetry_raw_and_compatibility() {
                 Duration::ZERO
             }
         }
-        let inner = OllamaGateway::with_host(&server.url).with_stream_clock(Arc::new(FixedClock));
+        let inner = OllamaGateway::with_host(&server.url)
+            .with_transport(server.transport())
+            .with_stream_clock(Arc::new(FixedClock));
         let old: Vec<_> = inner.complete_stream("qwen3", &[], None, &config).collect().await;
         let expected_progress: Vec<_> = old
             .iter()
@@ -3521,14 +3623,16 @@ async fn recovery_rejected_terminal_telemetry_raw_and_compatibility() {
     }
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn recovery_rejected_terminal_telemetry_compatibility_red_green() {
     use mojentic::llm::gateway::{LlmGateway, StreamChunk};
     let body = "{\"done\":true,\"done_reason\":\"length\",\"eval_count\":12,\"eval_duration\":6000000000}\n";
     let server = fixture(vec![(200, body.into(), false, false)]).await;
-    let gateway =
-        RecoveryGateway::new(OllamaGateway::with_host(&server.url), RecoveryPolicy::default())
-            .expect("gateway");
+    let gateway = RecoveryGateway::new(
+        OllamaGateway::with_host(&server.url).with_transport(server.transport()),
+        RecoveryPolicy::default(),
+    )
+    .expect("gateway");
     let chunks: Vec<_> = gateway
         .complete_stream("qwen3", &[], None, &CompletionConfig::default())
         .collect()
@@ -3542,16 +3646,18 @@ async fn recovery_rejected_terminal_telemetry_compatibility_red_green() {
     assert_eq!(server.sends.load(Ordering::SeqCst), 1);
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn recovery_rejected_terminal_same_frame_semantics_are_observed_only() {
     let body = format!(
         "{}\n",
         json!({"message":{"content":"hé🦀","thinking":"思🦀","tool_calls":[{"function":{"name":"count","arguments":{}}}]},"done":true,"done_reason":"length","eval_count":12,"eval_duration":6000000000_u64})
     );
     let server = fixture(vec![(200, body.clone(), false, false)]).await;
-    let gateway =
-        RecoveryGateway::new(OllamaGateway::with_host(&server.url), RecoveryPolicy::default())
-            .expect("gateway");
+    let gateway = RecoveryGateway::new(
+        OllamaGateway::with_host(&server.url).with_transport(server.transport()),
+        RecoveryPolicy::default(),
+    )
+    .expect("gateway");
     let events: Vec<_> = gateway
         .complete_stream_with_recovery(
             "m",
@@ -3581,7 +3687,7 @@ async fn recovery_rejected_terminal_same_frame_semantics_are_observed_only() {
     assert_eq!(server.sends.load(Ordering::SeqCst), 1);
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn recovery_terminal_invalid_fields_do_not_fabricate_telemetry() {
     use mojentic::llm::gateway::{LlmGateway, StreamChunk};
     async fn check<G: RecoveryProvider>(inner: G, _: Provider, server: &HttpFixture) {
@@ -3612,7 +3718,12 @@ async fn recovery_terminal_invalid_fields_do_not_fabricate_telemetry() {
         json!({"message":{},"done":true,"done_reason":7,"eval_count":12}),
     ] {
         let server = fixture(vec![(200, format!("{body}\n"), false, false); 2]).await;
-        check(OllamaGateway::with_host(&server.url), Provider::Ollama, &server).await;
+        check(
+            OllamaGateway::with_host(&server.url).with_transport(server.transport()),
+            Provider::Ollama,
+            &server,
+        )
+        .await;
     }
     for provider in [Provider::Omlx, Provider::OpenAi] {
         let body = "data: {\"choices\":[{\"delta\":{},\"finish_reason\":\"length\"}],\"usage\":{\"completion_tokens\":12}}\n\ndata: [DONE]\n\n";
@@ -3621,7 +3732,7 @@ async fn recovery_terminal_invalid_fields_do_not_fabricate_telemetry() {
     }
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn recovery_rejected_terminal_capture_retains_evidence_without_delivery() {
     let body = format!(
         "{}\n",
@@ -3631,7 +3742,11 @@ async fn recovery_rejected_terminal_capture_retains_evidence_without_delivery() 
     let capture = Arc::new(Capture::default());
     let mut p = policy(3, &capture);
     p.wire_observer = Some(Arc::new(RejectBodyCapture));
-    let gateway = RecoveryGateway::new(OllamaGateway::with_host(&server.url), p).expect("gateway");
+    let gateway = RecoveryGateway::new(
+        OllamaGateway::with_host(&server.url).with_transport(server.transport()),
+        p,
+    )
+    .expect("gateway");
     let events: Vec<_> = gateway
         .complete_stream_with_recovery(
             "m",
@@ -3671,15 +3786,17 @@ async fn recovery_rejected_terminal_capture_retains_evidence_without_delivery() 
     );
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn recovery_rejected_terminal_metadata_cancellation_wins() {
     for cancel_after_metrics in [false, true] {
         let body = "{\"done\":true,\"done_reason\":\"length\",\"eval_count\":12,\"eval_duration\":6000000000}\n";
         let server = fixture(vec![(200, body.into(), false, false)]).await;
         let capture = Arc::new(Capture::default());
-        let gateway =
-            RecoveryGateway::new(OllamaGateway::with_host(&server.url), policy(3, &capture))
-                .expect("gateway");
+        let gateway = RecoveryGateway::new(
+            OllamaGateway::with_host(&server.url).with_transport(server.transport()),
+            policy(3, &capture),
+        )
+        .expect("gateway");
         let call = RecoveryCall::default();
         let config = CompletionConfig::default();
         let mut stream = gateway.complete_stream_with_recovery("m", &[], None, &config, &call);
@@ -3720,7 +3837,7 @@ impl Admission for Unresolved {
     }
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn admission_unresolved_http_matrix() {
     async fn check<G: RecoveryProvider>(
         inner: G,
@@ -3778,7 +3895,7 @@ async fn admission_unresolved_http_matrix() {
     }
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn admission_unresolved_broker_session_http_matrix() {
     async fn check<G: RecoveryProvider + 'static>(
         inner: G,
@@ -3885,7 +4002,7 @@ async fn admission_unresolved_broker_session_http_matrix() {
     }
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn admission_explicit_decisions_http_matrix() {
     async fn check<G: RecoveryProvider>(
         inner: G,
@@ -3939,7 +4056,7 @@ async fn admission_explicit_decisions_http_matrix() {
     }
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn admission_pending_budget_http_matrix() {
     async fn check<G: RecoveryProvider>(
         inner: G,
@@ -3981,7 +4098,7 @@ async fn admission_pending_budget_http_matrix() {
     }
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn admission_absent_local_remote_http_matrix() {
     async fn check<G: RecoveryProvider>(
         inner: G,
@@ -4106,7 +4223,7 @@ fn capability_contract_public_adapters_v1() {
     );
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn typed_errors_v1_session_length_proof() {
     let body =
         json!({"choices":[{"message":{"content":"partial-secret"},"finish_reason":"length"}]})
@@ -4114,6 +4231,7 @@ async fn typed_errors_v1_session_length_proof() {
     let server = fixture(vec![(200, body.clone(), false, false)]).await;
     let capture = Arc::new(Capture::default());
     let gateway = OpenAIGateway::with_api_key_and_base_url("synthetic-secret", &server.url)
+        .with_transport(server.transport())
         .with_recovery(policy(3, &capture))
         .expect("gateway");
     let broker = LlmBroker::new("fixture-model", Arc::new(gateway), None);
@@ -4175,7 +4293,7 @@ impl WireObserver for ContractCapture {
     }
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn typed_errors_v1_boundaries() {
     async fn check<G: RecoveryProvider + 'static>(
         inner: G,
@@ -4405,7 +4523,7 @@ async fn typed_errors_v1_boundaries() {
     }
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn typed_errors_v1_invalid_policy_prevents_all_entrypoints() {
     let contract = typed_errors_contract();
     for provider in ADAPTERS {
@@ -4439,12 +4557,14 @@ async fn typed_errors_v1_invalid_policy_prevents_all_entrypoints() {
         for (policy, expected) in cases {
             assert_eq!(policy.validate(), Err(expected));
             let error = match provider {
-                Provider::Ollama => {
-                    OllamaGateway::with_host(&server.url).with_recovery(policy).err()
-                }
+                Provider::Ollama => OllamaGateway::with_host(&server.url)
+                    .with_transport(server.transport())
+                    .with_recovery(policy)
+                    .err(),
                 Provider::Omlx => omlx(&server.url).with_recovery(policy).err(),
                 Provider::OpenAi => {
                     OpenAIGateway::with_api_key_and_base_url("synthetic-secret", &server.url)
+                        .with_transport(server.transport())
                         .with_recovery(policy)
                         .err()
                 }
@@ -4474,7 +4594,7 @@ async fn typed_errors_v1_invalid_policy_prevents_all_entrypoints() {
     .expect("representable limits are valid");
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn typed_errors_v1_optional_fields_and_legacy_length() {
     async fn check<G: RecoveryProvider>(inner: G, _: Provider, body: &str, legacy: bool) {
         let response = if legacy {
@@ -4713,7 +4833,7 @@ async fn status_selection_case<G: RecoveryProvider + 'static>(
     bodies[0].clone()
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn recovery_status_selection_v1() {
     let contract: Value =
         serde_json::from_str(include_str!("contracts/recovery_status_selection_v1.json"))

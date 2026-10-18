@@ -134,7 +134,7 @@ pub(crate) trait FrameParser {
 /// The returned stream owns the HTTP response. Dropping the stream drops the
 /// response body, which closes the connection and cancels the request.
 pub(crate) fn drive_event_stream<'a, P>(
-    request: reqwest::RequestBuilder,
+    request: crate::llm::transport::RequestBuilder,
     mut parser: P,
     clock: std::sync::Arc<dyn crate::llm::stream_timing::StreamClock>,
     provider: &'static str,
@@ -248,72 +248,37 @@ impl LineBuffer {
 
 #[cfg(test)]
 pub(crate) mod testing {
-    //! A local HTTP server that streams forever, for cancellation tests.
-
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
-    use tokio::net::TcpListener;
-    use tokio::sync::oneshot;
-
-    /// Serve one chunked response that sends `first_frame` and then never ends.
-    ///
-    /// Returns the base URL and a receiver that resolves when the client
-    /// closes the connection.
-    pub(crate) async fn endless_stream_server(
-        first_frame: &'static str,
-    ) -> (String, oneshot::Receiver<()>) {
-        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind test server");
-        let address = listener.local_addr().expect("test server address");
-        let (closed_tx, closed_rx) = oneshot::channel();
-
-        tokio::spawn(async move {
-            let (mut socket, _) = listener.accept().await.expect("accept client");
-            read_request(&mut socket).await;
-            let head = "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\ntransfer-encoding: chunked\r\n\r\n";
-            let chunk = format!("{:x}\r\n{}\r\n", first_frame.len(), first_frame);
-            socket.write_all(head.as_bytes()).await.expect("write head");
-            socket.write_all(chunk.as_bytes()).await.expect("write first frame");
-
-            // The response never ends. A read of zero bytes means the client hung up.
-            let mut buffer = [0u8; 64];
-            while let Ok(read) = socket.read(&mut buffer).await {
-                if read == 0 {
-                    break;
-                }
-            }
-            let _ = closed_tx.send(());
+    use crate::test_boundary::Fixture;
+    pub(crate) async fn endless_stream_fixture(
+        body: &'static str,
+    ) -> (Fixture, tokio::sync::oneshot::Receiver<()>) {
+        let fixture = Fixture::new();
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        let sender = std::sync::Mutex::new(Some(sender));
+        fixture.respond(move |request| {
+            assert!(request.timeout().is_none(), "streaming has no whole-response timeout");
+            let sender = sender.lock().expect("sender").take().expect("one request");
+            let stream = async_stream::stream! {
+                struct Close(Option<tokio::sync::oneshot::Sender<()>>);
+                impl Drop for Close { fn drop(&mut self) { if let Some(sender) = self.0.take() { let _ = sender.send(()); } } }
+                let _close = Close(Some(sender));
+                yield Ok::<_, std::io::Error>(body.as_bytes().to_vec());
+                futures::future::pending::<()>().await;
+            };
+            http::Response::new(reqwest::Body::wrap_stream(stream)).into()
         });
-
-        (format!("http://{address}"), closed_rx)
+        (fixture, receiver)
     }
-
-    /// Serve one chunked response that sends each of `parts` as its own
-    /// network write, pausing between them so the client reads them apart.
-    ///
-    /// Returns the base URL.
-    pub(crate) async fn split_body_server(parts: Vec<Vec<u8>>) -> String {
-        let listener = TcpListener::bind("127.0.0.1:0").await.expect("bind test server");
-        let address = listener.local_addr().expect("test server address");
-
-        tokio::spawn(async move {
-            let (mut socket, _) = listener.accept().await.expect("accept client");
-            read_request(&mut socket).await;
-            let head = "HTTP/1.1 200 OK\r\ncontent-type: text/event-stream\r\ntransfer-encoding: chunked\r\n\r\n";
-            socket.write_all(head.as_bytes()).await.expect("write head");
-            for part in parts {
-                let mut chunk = format!("{:x}\r\n", part.len()).into_bytes();
-                chunk.extend_from_slice(&part);
-                chunk.extend_from_slice(b"\r\n");
-                socket.write_all(&chunk).await.expect("write part");
-                socket.flush().await.expect("flush part");
-                tokio::time::sleep(std::time::Duration::from_millis(30)).await;
-            }
-            socket.write_all(b"0\r\n\r\n").await.expect("write end");
-            socket.flush().await.expect("flush end");
+    pub(crate) async fn split_body_fixture(parts: Vec<Vec<u8>>) -> Fixture {
+        let fixture = Fixture::new();
+        fixture.respond(move |_| {
+            http::Response::new(reqwest::Body::wrap_stream(futures::stream::iter(
+                parts.clone().into_iter().map(Ok::<_, std::io::Error>),
+            )))
+            .into()
         });
-
-        format!("http://{address}")
+        fixture
     }
-
     /// `body` split into two parts inside the first multi-byte UTF-8 character.
     pub(crate) fn split_inside_first_multibyte_char(body: &str) -> Vec<Vec<u8>> {
         let (index, _) = body
@@ -322,32 +287,6 @@ pub(crate) mod testing {
             .expect("body has a multi-byte character");
         let bytes = body.as_bytes();
         vec![bytes[..index + 1].to_vec(), bytes[index + 1..].to_vec()]
-    }
-
-    async fn read_request(socket: &mut tokio::net::TcpStream) {
-        let mut request = Vec::new();
-        let mut buffer = [0u8; 4096];
-        loop {
-            let read = socket.read(&mut buffer).await.expect("read request");
-            request.extend_from_slice(&buffer[..read]);
-            let text = String::from_utf8_lossy(&request);
-            if let Some(head_end) = text.find("\r\n\r\n") {
-                let length = text[..head_end]
-                    .lines()
-                    .find_map(|line| {
-                        let (name, value) = line.split_once(':')?;
-                        name.eq_ignore_ascii_case("content-length")
-                            .then(|| value.trim().parse::<usize>().ok())?
-                    })
-                    .unwrap_or(0);
-                if request.len() >= head_end + 4 + length {
-                    return;
-                }
-            }
-            if read == 0 {
-                return;
-            }
-        }
     }
 }
 
