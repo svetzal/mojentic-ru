@@ -1,0 +1,20 @@
+Crate:     rustls-webpki
+Version:   0.103.15
+Title:     Certificate verification may accept distrusted intermediates
+Date:      2026-10-20
+ID:        RUSTSEC-2026-0382
+URL:       https://rustsec.org/advisories/RUSTSEC-2026-0382
+Solution:  Upgrade to >=0.103.16, <0.104.0-alpha.1 OR >=0.104.0-alpha.8
+
+Crate:     webpki-root-certs
+Version:   1.0.9
+Title:     Bundled root certificates allow trust in distrusted emSign intermediates
+Date:      2026-10-19
+ID:        RUSTSEC-2026-0383
+URL:       https://rustsec.org/advisories/RUSTSEC-2026-0383
+Solution:  Upgrade to >=1.0.10
+
+Crate:     yoke-derive
+Version:   0.8.3
+Warning:   yanked
+

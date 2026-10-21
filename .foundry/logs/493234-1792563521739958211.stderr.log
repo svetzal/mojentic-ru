@@ -1,0 +1,545 @@
+warning[duplicate]: found 2 duplicate entries for crate 'base64'
+   ┌─ /home/svetzal/Work/Projects/Personal/mojentic-unify/mojentic-ru/Cargo.lock:11:1
+   │  
+11 │ ╭ base64 0.22.1 registry+https://github.com/rust-lang/crates.io-index
+12 │ │ base64 0.23.1 registry+https://github.com/rust-lang/crates.io-index
+   │ ╰───────────────────────────────────────────────────────────────────┘ lock entries
+   │  
+   ├ base64 v0.22.1
+     └── tiktoken-rs v0.12.1
+         └── mojentic v3.0.1
+   ├ base64 v0.23.1
+     ├── hyper-util v0.1.21
+     │   ├── hyper-rustls v0.27.10
+     │   │   └── reqwest v0.13.5
+     │   │       └── mojentic v3.0.1
+     │   └── reqwest v0.13.5 (*)
+     ├── mojentic v3.0.1 (*)
+     └── reqwest v0.13.5 (*)
+
+warning[duplicate]: found 2 duplicate entries for crate 'getrandom'
+   ┌─ /home/svetzal/Work/Projects/Personal/mojentic-unify/mojentic-ru/Cargo.lock:58:1
+   │  
+58 │ ╭ getrandom 0.3.4 registry+https://github.com/rust-lang/crates.io-index
+59 │ │ getrandom 0.4.3 registry+https://github.com/rust-lang/crates.io-index
+   │ ╰─────────────────────────────────────────────────────────────────────┘ lock entries
+   │  
+   ├ getrandom v0.3.4
+     └── tempfile v3.27.0
+         ├── (dev) mojentic v3.0.1
+         └── native-tls v0.2.18
+             ├── tokio-native-tls v0.3.1
+             │   └── tokio-tungstenite v0.30.0
+             │       └── mojentic v3.0.1 (*)
+             ├── tokio-tungstenite v0.30.0 (*)
+             └── tungstenite v0.30.0
+                 └── tokio-tungstenite v0.30.0 (*)
+   ├ getrandom v0.4.3
+     ├── jobserver v0.1.35
+     │   └── cc v1.4.7
+     │       ├── (build) aws-lc-sys v0.45.0
+     │       │   └── aws-lc-rs v1.18.1
+     │       │       ├── rustls v0.23.46
+     │       │       │   ├── hyper-rustls v0.27.10
+     │       │       │   │   └── reqwest v0.13.5
+     │       │       │   │       └── mojentic v3.0.1
+     │       │       │   ├── reqwest v0.13.5 (*)
+     │       │       │   ├── rustls-platform-verifier v0.7.1
+     │       │       │   │   └── reqwest v0.13.5 (*)
+     │       │       │   └── tokio-rustls v0.26.5
+     │       │       │       ├── hyper-rustls v0.27.10 (*)
+     │       │       │       └── reqwest v0.13.5 (*)
+     │       │       └── rustls-webpki v0.103.15
+     │       │           ├── rustls v0.23.46 (*)
+     │       │           └── rustls-platform-verifier v0.7.1 (*)
+     │       ├── cmake v0.1.58
+     │       │   └── (build) aws-lc-sys v0.45.0 (*)
+     │       ├── (build) iana-time-zone-haiku v0.1.2
+     │       │   └── iana-time-zone v0.1.65
+     │       │       └── chrono v0.4.45
+     │       │           └── mojentic v3.0.1 (*)
+     │       └── (build) openssl-sys v0.9.117
+     │           ├── native-tls v0.2.18
+     │           │   ├── tokio-native-tls v0.3.1
+     │           │   │   └── tokio-tungstenite v0.30.0
+     │           │   │       └── mojentic v3.0.1 (*)
+     │           │   ├── tokio-tungstenite v0.30.0 (*)
+     │           │   └── tungstenite v0.30.0
+     │           │       └── tokio-tungstenite v0.30.0 (*)
+     │           └── openssl v0.10.81
+     │               └── native-tls v0.2.18 (*)
+     ├── rand v0.10.3
+     │   └── tungstenite v0.30.0 (*)
+     └── uuid v1.28.0
+         └── mojentic v3.0.1 (*)
+
+warning[duplicate]: found 2 duplicate entries for crate 'r-efi'
+    ┌─ /home/svetzal/Work/Projects/Personal/mojentic-unify/mojentic-ru/Cargo.lock:119:1
+    │  
+119 │ ╭ r-efi 5.3.0 registry+https://github.com/rust-lang/crates.io-index
+120 │ │ r-efi 6.0.0 registry+https://github.com/rust-lang/crates.io-index
+    │ ╰─────────────────────────────────────────────────────────────────┘ lock entries
+    │  
+    ├ r-efi v5.3.0
+      └── getrandom v0.3.4
+          └── tempfile v3.27.0
+              ├── (dev) mojentic v3.0.1
+              └── native-tls v0.2.18
+                  ├── tokio-native-tls v0.3.1
+                  │   └── tokio-tungstenite v0.30.0
+                  │       └── mojentic v3.0.1 (*)
+                  ├── tokio-tungstenite v0.30.0 (*)
+                  └── tungstenite v0.30.0
+                      └── tokio-tungstenite v0.30.0 (*)
+    ├ r-efi v6.0.0
+      └── getrandom v0.4.3
+          ├── jobserver v0.1.35
+          │   └── cc v1.4.7
+          │       ├── (build) aws-lc-sys v0.45.0
+          │       │   └── aws-lc-rs v1.18.1
+          │       │       ├── rustls v0.23.46
+          │       │       │   ├── hyper-rustls v0.27.10
+          │       │       │   │   └── reqwest v0.13.5
+          │       │       │   │       └── mojentic v3.0.1
+          │       │       │   ├── reqwest v0.13.5 (*)
+          │       │       │   ├── rustls-platform-verifier v0.7.1
+          │       │       │   │   └── reqwest v0.13.5 (*)
+          │       │       │   └── tokio-rustls v0.26.5
+          │       │       │       ├── hyper-rustls v0.27.10 (*)
+          │       │       │       └── reqwest v0.13.5 (*)
+          │       │       └── rustls-webpki v0.103.15
+          │       │           ├── rustls v0.23.46 (*)
+          │       │           └── rustls-platform-verifier v0.7.1 (*)
+          │       ├── cmake v0.1.58
+          │       │   └── (build) aws-lc-sys v0.45.0 (*)
+          │       ├── (build) iana-time-zone-haiku v0.1.2
+          │       │   └── iana-time-zone v0.1.65
+          │       │       └── chrono v0.4.45
+          │       │           └── mojentic v3.0.1 (*)
+          │       └── (build) openssl-sys v0.9.117
+          │           ├── native-tls v0.2.18
+          │           │   ├── tokio-native-tls v0.3.1
+          │           │   │   └── tokio-tungstenite v0.30.0
+          │           │   │       └── mojentic v3.0.1 (*)
+          │           │   ├── tokio-tungstenite v0.30.0 (*)
+          │           │   └── tungstenite v0.30.0
+          │           │       └── tokio-tungstenite v0.30.0 (*)
+          │           └── openssl v0.10.81
+          │               └── native-tls v0.2.18 (*)
+          ├── rand v0.10.3
+          │   └── tungstenite v0.30.0 (*)
+          └── uuid v1.28.0
+              └── mojentic v3.0.1 (*)
+
+warning[duplicate]: found 2 duplicate entries for crate 'syn'
+    ┌─ /home/svetzal/Work/Projects/Personal/mojentic-unify/mojentic-ru/Cargo.lock:164:1
+    │  
+164 │ ╭ syn 2.0.119 registry+https://github.com/rust-lang/crates.io-index
+165 │ │ syn 3.0.6 registry+https://github.com/rust-lang/crates.io-index
+    │ ╰───────────────────────────────────────────────────────────────┘ lock entries
+    │  
+    ├ syn v2.0.119
+      ├── async-stream-impl v0.3.6
+      │   └── async-stream v0.3.6
+      │       └── mojentic v3.0.1
+      ├── jni-macros v0.22.4
+      │   └── jni v0.22.4
+      │       └── rustls-platform-verifier v0.7.1
+      │           └── reqwest v0.13.5
+      │               └── mojentic v3.0.1 (*)
+      ├── jni-sys-macros v0.4.1
+      │   └── jni-sys v0.4.1
+      │       └── jni v0.22.4 (*)
+      ├── openssl-macros v0.1.1
+      │   └── openssl v0.10.81
+      │       └── native-tls v0.2.18
+      │           ├── tokio-native-tls v0.3.1
+      │           │   └── tokio-tungstenite v0.30.0
+      │           │       └── mojentic v3.0.1 (*)
+      │           ├── tokio-tungstenite v0.30.0 (*)
+      │           └── tungstenite v0.30.0
+      │               └── tokio-tungstenite v0.30.0 (*)
+      ├── tracing-attributes v0.1.31
+      │   └── tracing v0.1.44
+      │       ├── h2 v0.4.19
+      │       │   ├── hyper v1.11.1
+      │       │   │   ├── hyper-rustls v0.27.10
+      │       │   │   │   └── reqwest v0.13.5 (*)
+      │       │   │   ├── hyper-util v0.1.21
+      │       │   │   │   ├── hyper-rustls v0.27.10 (*)
+      │       │   │   │   └── reqwest v0.13.5 (*)
+      │       │   │   └── reqwest v0.13.5 (*)
+      │       │   └── reqwest v0.13.5 (*)
+      │       ├── hyper-util v0.1.21 (*)
+      │       ├── mojentic v3.0.1 (*)
+      │       └── tracing-subscriber v0.3.23
+      │           └── mojentic v3.0.1 (*)
+      ├── windows-implement v0.60.2
+      │   └── windows-core v0.62.2
+      │       └── iana-time-zone v0.1.65
+      │           └── chrono v0.4.45
+      │               └── mojentic v3.0.1 (*)
+      └── windows-interface v0.59.3
+          └── windows-core v0.62.2 (*)
+    ├ syn v3.0.6
+      ├── async-trait v0.1.92
+      │   └── mojentic v3.0.1
+      ├── displaydoc v0.2.7
+      │   ├── icu_collections v2.3.0
+      │   │   ├── icu_normalizer v2.3.0
+      │   │   │   └── idna_adapter v1.2.2
+      │   │   │       └── idna v1.1.0
+      │   │   │           └── url v2.5.8
+      │   │   │               ├── reqwest v0.13.5
+      │   │   │               │   └── mojentic v3.0.1 (*)
+      │   │   │               └── tower-http v0.6.11
+      │   │   │                   └── reqwest v0.13.5 (*)
+      │   │   └── icu_properties v2.3.0
+      │   │       └── idna_adapter v1.2.2 (*)
+      │   ├── icu_locale_core v2.3.0
+      │   │   ├── icu_properties v2.3.0 (*)
+      │   │   └── icu_provider v2.3.1
+      │   │       ├── icu_normalizer v2.3.0 (*)
+      │   │       └── icu_properties v2.3.0 (*)
+      │   ├── icu_properties v2.3.0 (*)
+      │   ├── icu_provider v2.3.1 (*)
+      │   ├── tinystr v0.8.4
+      │   │   └── icu_locale_core v2.3.0 (*)
+      │   └── zerotrie v0.2.5
+      │       ├── icu_properties v2.3.0 (*)
+      │       └── icu_provider v2.3.1 (*)
+      ├── futures-macro v0.3.34
+      │   └── futures-util v0.3.34
+      │       ├── futures v0.3.34
+      │       │   └── mojentic v3.0.1 (*)
+      │       ├── futures-executor v0.3.34
+      │       │   └── futures v0.3.34 (*)
+      │       ├── hyper-util v0.1.21
+      │       │   ├── hyper-rustls v0.27.10
+      │       │   │   └── reqwest v0.13.5 (*)
+      │       │   └── reqwest v0.13.5 (*)
+      │       ├── js-sys v0.3.106
+      │       │   ├── chrono v0.4.45
+      │       │   │   └── mojentic v3.0.1 (*)
+      │       │   ├── iana-time-zone v0.1.65
+      │       │   │   └── chrono v0.4.45 (*)
+      │       │   ├── reqwest v0.13.5 (*)
+      │       │   ├── wasm-bindgen-futures v0.4.79
+      │       │   │   ├── reqwest v0.13.5 (*)
+      │       │   │   └── wasm-streams v0.5.0
+      │       │   │       └── reqwest v0.13.5 (*)
+      │       │   ├── wasm-streams v0.5.0 (*)
+      │       │   └── web-sys v0.3.106
+      │       │       ├── reqwest v0.13.5 (*)
+      │       │       └── wasm-streams v0.5.0 (*)
+      │       ├── mojentic v3.0.1 (*)
+      │       ├── reqwest v0.13.5 (*)
+      │       ├── tokio-tungstenite v0.30.0
+      │       │   └── mojentic v3.0.1 (*)
+      │       ├── tokio-util v0.7.20
+      │       │   ├── h2 v0.4.19
+      │       │   │   ├── hyper v1.11.1
+      │       │   │   │   ├── hyper-rustls v0.27.10 (*)
+      │       │   │   │   ├── hyper-util v0.1.21 (*)
+      │       │   │   │   └── reqwest v0.13.5 (*)
+      │       │   │   └── reqwest v0.13.5 (*)
+      │       │   ├── mojentic v3.0.1 (*)
+      │       │   └── reqwest v0.13.5 (*)
+      │       ├── tower v0.5.3
+      │       │   ├── reqwest v0.13.5 (*)
+      │       │   └── tower-http v0.6.11 (*)
+      │       ├── tower-http v0.6.11 (*)
+      │       └── wasm-streams v0.5.0 (*)
+      ├── ref-cast-impl v1.0.27
+      │   └── ref-cast v1.0.27
+      │       └── schemars v1.2.3
+      │           └── mojentic v3.0.1 (*)
+      ├── schemars_derive v1.2.3
+      │   └── schemars v1.2.3 (*)
+      ├── serde_derive v1.0.229
+      │   └── serde v1.0.229
+      │       ├── mojentic v3.0.1 (*)
+      │       ├── reqwest v0.13.5 (*)
+      │       └── schemars v1.2.3 (*)
+      ├── serde_derive_internals v0.30.0
+      │   └── schemars_derive v1.2.3 (*)
+      ├── synstructure v0.14.0
+      │   ├── yoke-derive v0.8.3
+      │   │   └── yoke v0.8.3
+      │   │       ├── icu_collections v2.3.0 (*)
+      │   │       ├── icu_provider v2.3.1 (*)
+      │   │       ├── zerotrie v0.2.5 (*)
+      │   │       └── zerovec v0.11.8
+      │   │           ├── icu_collections v2.3.0 (*)
+      │   │           ├── icu_locale_core v2.3.0 (*)
+      │   │           ├── icu_normalizer v2.3.0 (*)
+      │   │           ├── icu_properties v2.3.0 (*)
+      │   │           ├── icu_provider v2.3.1 (*)
+      │   │           ├── potential_utf v0.1.6
+      │   │           │   └── icu_collections v2.3.0 (*)
+      │   │           └── tinystr v0.8.4 (*)
+      │   └── zerofrom-derive v0.1.8
+      │       └── zerofrom v0.1.8
+      │           ├── icu_collections v2.3.0 (*)
+      │           ├── icu_provider v2.3.1 (*)
+      │           ├── yoke v0.8.3 (*)
+      │           ├── zerotrie v0.2.5 (*)
+      │           └── zerovec v0.11.8 (*)
+      ├── thiserror-impl v2.0.21
+      │   └── thiserror v2.0.21
+      │       ├── jni v0.22.4
+      │       │   └── rustls-platform-verifier v0.7.1
+      │       │       └── reqwest v0.13.5 (*)
+      │       ├── mojentic v3.0.1 (*)
+      │       └── tungstenite v0.30.0
+      │           └── tokio-tungstenite v0.30.0 (*)
+      ├── tokio-macros v2.7.2
+      │   └── tokio v1.54.0
+      │       ├── h2 v0.4.19 (*)
+      │       ├── hyper v1.11.1 (*)
+      │       ├── hyper-rustls v0.27.10 (*)
+      │       ├── hyper-util v0.1.21 (*)
+      │       ├── mojentic v3.0.1 (*)
+      │       ├── reqwest v0.13.5 (*)
+      │       ├── tokio-native-tls v0.3.1
+      │       │   └── tokio-tungstenite v0.30.0 (*)
+      │       ├── tokio-rustls v0.26.5
+      │       │   ├── hyper-rustls v0.27.10 (*)
+      │       │   └── reqwest v0.13.5 (*)
+      │       ├── tokio-stream v0.1.19
+      │       │   └── tokio-test v0.4.6
+      │       │       └── (dev) mojentic v3.0.1 (*)
+      │       ├── tokio-test v0.4.6 (*)
+      │       ├── tokio-tungstenite v0.30.0 (*)
+      │       ├── tokio-util v0.7.20 (*)
+      │       ├── tower v0.5.3 (*)
+      │       └── wasm-bindgen-futures v0.4.79 (*)
+      ├── wasm-bindgen-macro-support v0.2.129
+      │   └── wasm-bindgen-macro v0.2.129
+      │       └── wasm-bindgen v0.2.129
+      │           ├── chrono v0.4.45 (*)
+      │           ├── iana-time-zone v0.1.65 (*)
+      │           ├── js-sys v0.3.106 (*)
+      │           ├── reqwest v0.13.5 (*)
+      │           ├── wasm-bindgen-futures v0.4.79 (*)
+      │           ├── wasm-streams v0.5.0 (*)
+      │           └── web-sys v0.3.106 (*)
+      ├── yoke-derive v0.8.3 (*)
+      ├── zerofrom-derive v0.1.8 (*)
+      └── zerovec-derive v0.11.6
+          └── zerovec v0.11.8 (*)
+
+warning[duplicate]: found 2 duplicate entries for crate 'windows-sys'
+    ┌─ /home/svetzal/Work/Projects/Personal/mojentic-unify/mojentic-ru/Cargo.lock:222:1
+    │  
+222 │ ╭ windows-sys 0.52.0 registry+https://github.com/rust-lang/crates.io-index
+223 │ │ windows-sys 0.61.2 registry+https://github.com/rust-lang/crates.io-index
+    │ ╰────────────────────────────────────────────────────────────────────────┘ lock entries
+    │  
+    ├ windows-sys v0.52.0
+      ├── errno v0.3.14
+      │   ├── rustix v1.1.5
+      │   │   └── tempfile v3.27.0
+      │   │       ├── (dev) mojentic v3.0.1
+      │   │       └── native-tls v0.2.18
+      │   │           ├── tokio-native-tls v0.3.1
+      │   │           │   └── tokio-tungstenite v0.30.0
+      │   │           │       └── mojentic v3.0.1 (*)
+      │   │           ├── tokio-tungstenite v0.30.0 (*)
+      │   │           └── tungstenite v0.30.0
+      │   │               └── tokio-tungstenite v0.30.0 (*)
+      │   └── signal-hook-registry v1.4.8
+      │       └── tokio v1.54.0
+      │           ├── h2 v0.4.19
+      │           │   ├── hyper v1.11.1
+      │           │   │   ├── hyper-rustls v0.27.10
+      │           │   │   │   └── reqwest v0.13.5
+      │           │   │   │       └── mojentic v3.0.1 (*)
+      │           │   │   ├── hyper-util v0.1.21
+      │           │   │   │   ├── hyper-rustls v0.27.10 (*)
+      │           │   │   │   └── reqwest v0.13.5 (*)
+      │           │   │   └── reqwest v0.13.5 (*)
+      │           │   └── reqwest v0.13.5 (*)
+      │           ├── hyper v1.11.1 (*)
+      │           ├── hyper-rustls v0.27.10 (*)
+      │           ├── hyper-util v0.1.21 (*)
+      │           ├── mojentic v3.0.1 (*)
+      │           ├── reqwest v0.13.5 (*)
+      │           ├── tokio-native-tls v0.3.1 (*)
+      │           ├── tokio-rustls v0.26.5
+      │           │   ├── hyper-rustls v0.27.10 (*)
+      │           │   └── reqwest v0.13.5 (*)
+      │           ├── tokio-stream v0.1.19
+      │           │   └── tokio-test v0.4.6
+      │           │       └── (dev) mojentic v3.0.1 (*)
+      │           ├── tokio-test v0.4.6 (*)
+      │           ├── tokio-tungstenite v0.30.0 (*)
+      │           ├── tokio-util v0.7.20
+      │           │   ├── h2 v0.4.19 (*)
+      │           │   ├── mojentic v3.0.1 (*)
+      │           │   └── reqwest v0.13.5 (*)
+      │           ├── tower v0.5.3
+      │           │   ├── reqwest v0.13.5 (*)
+      │           │   └── tower-http v0.6.11
+      │           │       └── reqwest v0.13.5 (*)
+      │           └── wasm-bindgen-futures v0.4.79
+      │               ├── reqwest v0.13.5 (*)
+      │               └── wasm-streams v0.5.0
+      │                   └── reqwest v0.13.5 (*)
+      ├── rustix v1.1.5 (*)
+      ├── rustls-platform-verifier v0.7.1
+      │   └── reqwest v0.13.5 (*)
+      ├── tempfile v3.27.0 (*)
+      └── winapi-util v0.1.11
+          ├── same-file v1.0.6
+          │   └── walkdir v2.5.0
+          │       └── (build) jni v0.22.4
+          │           └── rustls-platform-verifier v0.7.1 (*)
+          └── walkdir v2.5.0 (*)
+    ├ windows-sys v0.61.2
+      ├── mio v1.2.3
+      │   └── tokio v1.54.0
+      │       ├── h2 v0.4.19
+      │       │   ├── hyper v1.11.1
+      │       │   │   ├── hyper-rustls v0.27.10
+      │       │   │   │   └── reqwest v0.13.5
+      │       │   │   │       └── mojentic v3.0.1
+      │       │   │   ├── hyper-util v0.1.21
+      │       │   │   │   ├── hyper-rustls v0.27.10 (*)
+      │       │   │   │   └── reqwest v0.13.5 (*)
+      │       │   │   └── reqwest v0.13.5 (*)
+      │       │   └── reqwest v0.13.5 (*)
+      │       ├── hyper v1.11.1 (*)
+      │       ├── hyper-rustls v0.27.10 (*)
+      │       ├── hyper-util v0.1.21 (*)
+      │       ├── mojentic v3.0.1 (*)
+      │       ├── reqwest v0.13.5 (*)
+      │       ├── tokio-native-tls v0.3.1
+      │       │   └── tokio-tungstenite v0.30.0
+      │       │       └── mojentic v3.0.1 (*)
+      │       ├── tokio-rustls v0.26.5
+      │       │   ├── hyper-rustls v0.27.10 (*)
+      │       │   └── reqwest v0.13.5 (*)
+      │       ├── tokio-stream v0.1.19
+      │       │   └── tokio-test v0.4.6
+      │       │       └── (dev) mojentic v3.0.1 (*)
+      │       ├── tokio-test v0.4.6 (*)
+      │       ├── tokio-tungstenite v0.30.0 (*)
+      │       ├── tokio-util v0.7.20
+      │       │   ├── h2 v0.4.19 (*)
+      │       │   ├── mojentic v3.0.1 (*)
+      │       │   └── reqwest v0.13.5 (*)
+      │       ├── tower v0.5.3
+      │       │   ├── reqwest v0.13.5 (*)
+      │       │   └── tower-http v0.6.11
+      │       │       └── reqwest v0.13.5 (*)
+      │       └── wasm-bindgen-futures v0.4.79
+      │           ├── reqwest v0.13.5 (*)
+      │           └── wasm-streams v0.5.0
+      │               └── reqwest v0.13.5 (*)
+      ├── nu-ansi-term v0.50.3
+      │   └── tracing-subscriber v0.3.23
+      │       └── mojentic v3.0.1 (*)
+      ├── schannel v0.1.29
+      │   ├── native-tls v0.2.18
+      │   │   ├── tokio-native-tls v0.3.1 (*)
+      │   │   ├── tokio-tungstenite v0.30.0 (*)
+      │   │   └── tungstenite v0.30.0
+      │   │       └── tokio-tungstenite v0.30.0 (*)
+      │   └── rustls-native-certs v0.8.4
+      │       └── rustls-platform-verifier v0.7.1
+      │           └── reqwest v0.13.5 (*)
+      ├── socket2 v0.6.5
+      │   ├── hyper-util v0.1.21 (*)
+      │   └── tokio v1.54.0 (*)
+      └── tokio v1.54.0 (*)
+
+error[vulnerability]: Certificate verification may accept distrusted intermediates
+    ┌─ /home/svetzal/Work/Projects/Personal/mojentic-unify/mojentic-ru/Cargo.lock:138:1
+    │
+138 │ rustls-webpki 0.103.15 registry+https://github.com/rust-lang/crates.io-index
+    │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ security vulnerability detected
+    │
+    ├ ID: RUSTSEC-2026-0382
+    ├ Advisory: https://rustsec.org/advisories/RUSTSEC-2026-0382
+    ├ Affected versions may accept certificate paths containing distrusted emSign
+      intermediate public keys when the configured trust anchors allow such paths.
+      The private keys corresponding to these intermediates are now well known.
+      
+      Versions 0.103.16 and 0.104.0-alpha.8 reject paths containing these public keys.
+    ├ Announcement: https://github.com/rustls/webpki/pull/546
+    ├ Solution: Upgrade to >=0.103.16, <0.104.0-alpha.1 OR >=0.104.0-alpha.8 (try `cargo update -p rustls-webpki`)
+    ├ rustls-webpki v0.103.15
+      ├── rustls v0.23.46
+      │   ├── hyper-rustls v0.27.10
+      │   │   └── reqwest v0.13.5
+      │   │       └── mojentic v3.0.1
+      │   ├── reqwest v0.13.5 (*)
+      │   ├── rustls-platform-verifier v0.7.1
+      │   │   └── reqwest v0.13.5 (*)
+      │   └── tokio-rustls v0.26.5
+      │       ├── hyper-rustls v0.27.10 (*)
+      │       └── reqwest v0.13.5 (*)
+      └── rustls-platform-verifier v0.7.1 (*)
+
+error[vulnerability]: Bundled root certificates allow trust in distrusted emSign intermediates
+    ┌─ /home/svetzal/Work/Projects/Personal/mojentic-unify/mojentic-ru/Cargo.lock:213:1
+    │
+213 │ webpki-root-certs 1.0.9 registry+https://github.com/rust-lang/crates.io-index
+    │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ security vulnerability detected
+    │
+    ├ ID: RUSTSEC-2026-0383
+    ├ Advisory: https://rustsec.org/advisories/RUSTSEC-2026-0383
+    ├ Affected versions include `emSign ECC Root CA - G3`, which can allow certificate
+      paths through distrusted emSign intermediates.
+      
+      Affected versions may accept certificate paths containing distrusted emSign
+      intermediate public keys. The private keys corresponding to these intermediates
+      are now well known.
+      
+      Version 1.0.10+ removes this root.
+    ├ Announcement: https://github.com/rustls/webpki-roots/pull/133
+    ├ Solution: Upgrade to >=1.0.10 (try `cargo update -p webpki-root-certs`)
+    ├ webpki-root-certs v1.0.9
+      └── rustls-platform-verifier v0.7.1
+          └── reqwest v0.13.5
+              └── mojentic v3.0.1
+
+warning[yanked]: detected yanked crate (try `cargo update -p yoke-derive`)
+    ┌─ /home/svetzal/Work/Projects/Personal/mojentic-unify/mojentic-ru/Cargo.lock:236:1
+    │
+236 │ yoke-derive 0.8.3 registry+https://github.com/rust-lang/crates.io-index
+    │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ yanked version
+    │
+    ├ yoke-derive v0.8.3
+      └── yoke v0.8.3
+          ├── icu_collections v2.3.0
+          │   ├── icu_normalizer v2.3.0
+          │   │   └── idna_adapter v1.2.2
+          │   │       └── idna v1.1.0
+          │   │           └── url v2.5.8
+          │   │               ├── reqwest v0.13.5
+          │   │               │   └── mojentic v3.0.1
+          │   │               └── tower-http v0.6.11
+          │   │                   └── reqwest v0.13.5 (*)
+          │   └── icu_properties v2.3.0
+          │       └── idna_adapter v1.2.2 (*)
+          ├── icu_provider v2.3.1
+          │   ├── icu_normalizer v2.3.0 (*)
+          │   └── icu_properties v2.3.0 (*)
+          ├── zerotrie v0.2.5
+          │   ├── icu_properties v2.3.0 (*)
+          │   └── icu_provider v2.3.1 (*)
+          └── zerovec v0.11.8
+              ├── icu_collections v2.3.0 (*)
+              ├── icu_locale_core v2.3.0
+              │   ├── icu_properties v2.3.0 (*)
+              │   └── icu_provider v2.3.1 (*)
+              ├── icu_normalizer v2.3.0 (*)
+              ├── icu_properties v2.3.0 (*)
+              ├── icu_provider v2.3.1 (*)
+              ├── potential_utf v0.1.6
+              │   └── icu_collections v2.3.0 (*)
+              └── tinystr v0.8.4
+                  └── icu_locale_core v2.3.0 (*)
+
