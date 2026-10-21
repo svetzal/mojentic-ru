@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- Resolved transitive TLS dependencies to patched releases: `rustls-webpki`
+  0.103.16 (RUSTSEC-2026-0382, distrusted intermediates could be accepted) and
+  `webpki-root-certs` 1.0.10 (RUSTSEC-2026-0383). Both are semver-compatible
+  with the existing `reqwest` 0.13 requirement, so fresh resolution by
+  dependents picks them up without manifest changes.
+
 ## [3.0.1] - 2026-10-18
 
 ### Fixed
