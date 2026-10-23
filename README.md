@@ -139,6 +139,35 @@ cargo clippy --all-targets --all-features -- -D warnings
 cargo deny check
 ```
 
+### Dependency verification
+
+The yoke-derive repair starts from the registered-checkout lockfile at source
+revision `b2682f37afb60a2bb3084500dd5a6e0e76ebafe5`, with baseline SHA-256
+`c78e607eafcb04650a3b9adaebc1fc1c80f4047e89b98c2db908d6261072e204`.
+The earlier attempt (`wi_4ce9c27c0b4a4c1dacf1b874`) re-resolved unrelated
+dependencies, so its generated lockfile was not reused. Native Cargo selection,
+`cargo update -p yoke-derive@0.8.3 --precise 0.8.4`, replaces the yanked release.
+Only that package's version and checksum differ from the baseline; no coupled
+changes were necessary. The resulting Cargo.lock SHA-256 is
+`30c5c353576489607c611f416515a5635f81f5cba1d157acdc0473b580b0953b`.
+
+Cargo.lock is retained in version control so native advisory checks use the
+reviewed resolution. Manifest constraints, public APIs, features, Rust edition
+and Tokio remain unchanged. The manifest has no declared MSRV; specifying one
+remains separate work. No advisory policy or suppression was changed. This is
+a bounded dependency correction, not a guarantee of supply-chain safety.
+
+All seven `.hone-gates.json` commands passed (exit 0) against this resolution:
+format, strict all-target/all-feature Clippy, all-feature tests and build,
+Tarpaulin, cargo-deny and cargo-audit. Tests passed 717 cases with 24 ignored
+doctests; coverage was **71.96% (3647/5068 lines)** against the unchanged 56%
+floor. Audit reported no vulnerabilities; deny passed with duplicate-version
+warnings. The additional default-feature `cargo test` run also passed (exit 0).
+Detailed output is in the Foundry execution logs for worktree
+`83b8d108983b`: update capture `4056342-1792757679789403631`, coverage capture
+`4074120-1792757863835432449`, audit capture `4057433-1792757698637401532`
+and deny capture `4057434-1792757698648057225`.
+
 ## 📄 License
 
 MIT License - see [LICENSE](LICENSE)
