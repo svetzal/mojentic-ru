@@ -1,0 +1,902 @@
+[2m2026-10-24T06:11:11.021904Z[0m [32m INFO[0m [2mcargo_tarpaulin::config[0m[2m:[0m Creating config
+[2m2026-10-24T06:11:11.201875Z[0m [32m INFO[0m [2mcargo_tarpaulin[0m[2m:[0m Running config run
+[2m2026-10-24T06:11:11.201899Z[0m [32m INFO[0m [2mcargo_tarpaulin[0m[2m:[0m Running Tarpaulin
+[2m2026-10-24T06:11:11.201903Z[0m [32m INFO[0m [2mcargo_tarpaulin[0m[2m:[0m Building project
+[2m2026-10-24T06:11:45.857983Z[0m [32m INFO[0m [2mcargo_tarpaulin::process_handling::linux[0m[2m:[0m Launching test
+[2m2026-10-24T06:11:45.858051Z[0m [32m INFO[0m [2mcargo_tarpaulin::process_handling[0m[2m:[0m running /home/svetzal/Work/Projects/Personal/mojentic-unify/mojentic-ru/target/debug/deps/reasoning_contract-667614128fb869a3
+
+running 3 tests
+test qwen_profile_rejects_high_before_http ... ok
+test broker_retains_exact_reasoning_at_tool_boundaries_when_opted_in ... ok
+test effort_is_faithful_for_ordinary_streaming_and_structured_requests ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.51s
+
+[2m2026-10-24T06:12:23.767967Z[0m [32m INFO[0m [2mcargo_tarpaulin::process_handling::linux[0m[2m:[0m Launching test
+[2m2026-10-24T06:12:23.768012Z[0m [32m INFO[0m [2mcargo_tarpaulin::process_handling[0m[2m:[0m running /home/svetzal/Work/Projects/Personal/mojentic-unify/mojentic-ru/target/debug/deps/transport_boundary-35ce52bf56fcf55f
+
+running 1 test
+test interrupted_public_stream_preserves_request_and_terminal_error ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.26s
+
+[2m2026-10-24T06:12:57.992015Z[0m [32m INFO[0m [2mcargo_tarpaulin::process_handling::linux[0m[2m:[0m Launching test
+[2m2026-10-24T06:12:57.992085Z[0m [32m INFO[0m [2mcargo_tarpaulin::process_handling[0m[2m:[0m running /home/svetzal/Work/Projects/Personal/mojentic-unify/mojentic-ru/target/debug/deps/omlx_gateway-9e4a8572fc090b61
+
+running 50 tests
+test configuration::an_empty_key_or_unreadable_timeout_falls_back_to_the_default ... ok
+test configuration::defaults_to_localhost_8000_without_a_key_and_a_ten_minute_timeout ... ok
+test embeddings::a_chat_model_is_a_provider_error ... ok
+test configuration::sends_no_authorization_header_without_a_key ... ok
+test configuration::a_trailing_slash_on_the_host_is_ignored ... ok
+test embeddings::a_missing_or_empty_model_is_rejected_before_any_request ... ok
+test configuration::reads_host_key_and_millisecond_timeout_from_the_environment ... ok
+test configuration::new_uses_the_environment_host_and_key_under_v1 ... ok
+test configuration::explicit_values_take_precedence_over_the_environment ... ok
+test embeddings::sends_one_request_with_the_whole_text ... ok
+test models::encodes_the_model_id_as_one_path_segment ... ok
+test models::lists_model_ids_sorted ... ok
+test explicit_blank_keys_send_no_authorization_header ... ok
+test legacy_streaming::an_error_status_is_a_gateway_error_with_the_body ... ok
+test models::lists_the_captured_models_from_a_real_json_response ... ok
+test models::unloading_a_model_that_is_not_loaded_is_a_provider_error ... ok
+test models::loads_and_unloads_a_model ... ok
+test legacy_streaming::reasoning_deltas_become_thinking_chunks ... ok
+test legacy_streaming::sends_tools_and_a_stream_flag_without_usage_options ... ok
+test legacy_streaming::keepalive_frames_are_dropped ... ok
+test legacy_streaming::a_streamed_tool_call_yields_one_complete_tool_call ... ok
+test request_body::omits_unset_optional_settings ... ok
+test request_body::disabled_reasoning_effort_turns_thinking_off ... ok
+test request_body::sends_explicit_zero_output_limit ... ok
+test request_body::forwards_every_setting_without_per_model_adaptation ... ok
+test response_mapping::truncation_during_thinking_keeps_the_fields_as_reported ... ok
+test response_mapping::reasoning_content_becomes_thinking_and_usage_is_kept_whole ... ok
+test response_mapping::a_response_without_reasoning_content_has_no_thinking ... ok
+test response_mapping::an_error_status_is_a_gateway_error_with_status_and_body ... ok
+test request_body::sends_tools_for_any_model_name ... ok
+test request_body::forwards_low_medium_and_high_reasoning_effort_as_strings ... ok
+test request_body::forwards_each_configured_response_format ... ok
+test stream_events::an_error_status_is_a_provider_error_with_the_body ... ok
+test stream_events::a_keepalive_only_stream_is_incomplete_with_no_provider_model ... ok
+test stream_events::a_tool_call_stream_is_unexpected_tool_calls ... ok
+test stream_events::a_length_stream_is_an_incomplete_completion ... ok
+test request_body::disabled_reasoning_effort_turns_thinking_off_when_streaming ... ok
+test stream_events::requests_a_stream_with_usage_and_no_tools ... ok
+test stream_events::a_thinking_stream_completes_with_content_only ... ok
+test structured_output::a_request_without_a_format_does_not_record_a_warning ... ok
+test structured_output::a_text_request_does_not_record_a_warning ... ok
+test structured_output::a_configured_json_format_records_the_warning_on_complete ... ok
+test structured_output::a_configured_json_schema_format_records_the_warning_on_complete ... ok
+test structured_output::records_the_warning_header_in_metadata ... ok
+test structured_output::joins_several_warning_headers ... ok
+test structured_output::complete_json_returns_the_object ... ok
+test structured_output::sends_a_json_schema_response_format_and_parses_the_object ... ok
+test stream_events::the_broker_streams_events_through_the_gateway ... ok
+test tools::parses_a_tool_call_and_its_reasoning ... ok
+test tools::round_trips_a_tool_result_through_the_broker ... ok
+
+test result: ok. 50 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.72s
+
+[2m2026-10-24T06:13:34.162127Z[0m [32m INFO[0m [2mcargo_tarpaulin::process_handling::linux[0m[2m:[0m Launching test
+[2m2026-10-24T06:13:34.162281Z[0m [32m INFO[0m [2mcargo_tarpaulin::process_handling[0m[2m:[0m running /home/svetzal/Work/Projects/Personal/mojentic-unify/mojentic-ru/target/debug/deps/model_metadata-f14cd2c2e7041ce7
+
+running 9 tests
+test section1_contract_reuses_coordinating_captures ... ok
+test section1_existing_third_party_gateway_is_source_compatible ... ok
+test section1_effective_precedence_and_clamping ... ok
+test section1_request_observer_rejects_ignored_post_failure - should panic ... ok
+test section1_configured_authenticated_boundary ... ok
+test section1_transport_failure_direct_and_wrapped ... ok
+test section1_registry_exact_lookup_is_request_free ... ok
+test section1_lookup_preserves_subsequent_completion_payload ... ok
+test section1_http_contract_exact_outcomes_direct_and_wrapped ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.90s
+
+[2m2026-10-24T06:14:22.935964Z[0m [32m INFO[0m [2mcargo_tarpaulin::process_handling::linux[0m[2m:[0m Launching test
+[2m2026-10-24T06:14:22.936013Z[0m [32m INFO[0m [2mcargo_tarpaulin::process_handling[0m[2m:[0m running /home/svetzal/Work/Projects/Personal/mojentic-unify/mojentic-ru/target/debug/deps/openai_tool_round_trip-65d87e8c18aa5a3a
+
+running 4 tests
+test omlx_preserves_split_stream_tool_call_id_in_follow_up ... ok
+test openai_preserves_split_stream_tool_call_id_in_follow_up ... ok
+test test_openai_tool_call_round_trip ... ok
+test test_openai_tool_call_max_iterations_exceeded ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.49s
+
+[2m2026-10-24T06:14:57.180071Z[0m [32m INFO[0m [2mcargo_tarpaulin::process_handling::linux[0m[2m:[0m Launching test
+[2m2026-10-24T06:14:57.180150Z[0m [32m INFO[0m [2mcargo_tarpaulin::process_handling[0m[2m:[0m running /home/svetzal/Work/Projects/Personal/mojentic-unify/mojentic-ru/target/debug/deps/stream_timing-dc820f2f66b1ee1f
+
+running 10 tests
+test section2_old_metric_documents_remain_readable ... ok
+test first_frame_precedence_crosses_public_http_boundary ... ok
+test section2_transport_interruption_broker ... ok
+test section2_transport_interruption_gateway ... ok
+test section2_retry_does_not_relabel_prior_attempt_provider_usage ... ok
+test section2_retry_keeps_first_dispatch_clock ... ok
+test section2_native_recovery_terminal_success_and_failure_retain_timing ... ok
+test section2_broker_session_tool_continuations_start_fresh_clocks ... ok
+test section2_transport_interruption_session ... ok
+test section2_exact_clocks_all_public_http_streams ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 27.75s
+
+[2m2026-10-24T06:15:58.972991Z[0m [32m INFO[0m [2mcargo_tarpaulin::process_handling::linux[0m[2m:[0m Launching test
+[2m2026-10-24T06:15:58.973070Z[0m [32m INFO[0m [2mcargo_tarpaulin::process_handling[0m[2m:[0m running /home/svetzal/Work/Projects/Personal/mojentic-unify/mojentic-ru/target/debug/deps/request_fidelity-325d7cb599b9c554
+
+running 12 tests
+test dropped_openai_reasoning_warns_at_http_boundary ... ok
+test artifact_error_and_optional_response_fields_through_broker ... ok
+test openai_model_restrictions_preserve_selected_output_limits ... ok
+test trace_temperature_reads_old_numeric_and_new_absent_fields ... ok
+test native_reasoning_mappings_keep_request_fidelity ... ok
+test unset_controls_cross_http_boundary ... ok
+test session_default_and_temperature_builder_preserve_absence_and_zero ... ok
+test artifact_cases_through_broker_all_http_entrypoints ... ok
+test artifact_cases_recovery_replays_bytes_and_real_attempt_identities ... ok
+test artifact_cases_recovery_through_broker_and_session has been running for over 60 seconds
+test artifact_cases_through_session_send_and_stream has been running for over 60 seconds
+test artifact_tool_continuations_preserve_session_controls_and_history has been running for over 60 seconds
+test artifact_cases_through_session_send_and_stream ... ok
+test artifact_tool_continuations_preserve_session_controls_and_history ... ok
+test artifact_cases_recovery_through_broker_and_session ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 117.96s
+
+[2m2026-10-24T06:18:32.640946Z[0m [32m INFO[0m [2mcargo_tarpaulin::process_handling::linux[0m[2m:[0m Launching test
+[2m2026-10-24T06:18:32.641026Z[0m [32m INFO[0m [2mcargo_tarpaulin::process_handling[0m[2m:[0m running /home/svetzal/Work/Projects/Personal/mojentic-unify/mojentic-ru/target/debug/deps/recovery-e2f3331aa954d061
+
+running 66 tests
+test absolute_deadline_refuses_retry_without_timing_out_initial_request ... ok
+test budgets_retry_after_and_exact_exponential_delays ... ok
+test bounded_errors_privacy_and_disabled ... ok
+test cancellation_active_ordinary_retains_headers_raw_and_no_resend ... ok
+test cancellation_before_dispatch_has_no_phantom_wire_attempt ... ok
+test cancellation_pending_admission_and_backoff ... ok
+test admission_pending_budget_http_matrix ... ok
+test admission_unresolved_http_matrix ... ok
+test admission_absent_local_remote_http_matrix ... ok
+test cancellation_retains_received_semantics_and_closes_when_consumer_pauses ... ok
+test cancellation_terminal_only_body_all_adapters_never_succeeds ... ok
+test capture_failure_is_terminal_accounted_and_preserves_original_cause ... ok
+test keepalive_only_recovers_raw_without_semantic_progress ... ok
+test local_ambiguity_requires_admission_rejection_preserves_failure ... ok
+test capability_contract_public_adapters_v1 ... ok
+test immutable_reasoning_tools_schema_and_sampling_all_adapters ... ok
+test cancellation_active_body_all_adapters_has_one_ordered_terminal_lifecycle ... ok
+test body_capture_failure_retains_observed_semantics_without_delivery_all_adapters ... ok
+test native_history_tool_schema_combination_is_frozen_all_adapters ... ok
+test pending_is_not_permission_then_explicit_allow_dispatches ... ok
+test predispatch_capture_failure_has_zero_wire_attempts ... ok
+test admission_explicit_decisions_http_matrix ... ok
+test partial_http200_body_and_malformed_protocol_never_replayed ... ok
+test native_reasoning_streamed_tool_turn_is_retained_and_tool_runs_once ... ok
+test public_503_success_all_adapters ... ok
+test provider_response_category_codes_and_causes_all_adapters ... ok
+test recovery_budget_and_provider_timeout_do_not_cut_off_admitted_generation ... ok
+test recovery_metadata_absent_counters_are_not_fabricated ... ok
+test public_broker_recovery_never_reexecutes_tool ... ok
+test partial_reasoning_content_and_tools_all_adapters_never_replay ... ok
+test recovery_metadata_frame_accounting_after_503_and_keepalive_failure ... ok
+test recovery_metadata_paused_keepalive_cancellation_has_no_semantic_delivery ... ok
+test public_broker_and_session_preserve_structured_failure_and_history ... ok
+test permanent_and_bounded_errors_all_adapters ... ok
+test recovery_metadata_terminal_progress_cancellation_never_completes ... ok
+test recovery_metadata_public_red_green ... ok
+test recovery_rejected_terminal_same_frame_semantics_are_observed_only ... ok
+test recovery_rejected_terminal_capture_retains_evidence_without_delivery ... ok
+test recovery_preserves_omlx_structured_warning_evidence_without_logging_it ... ok
+test recovery_rejected_terminal_metadata_cancellation_wins ... ok
+test recovery_metadata_unsupported_adapters_emit_no_ollama_telemetry ... ok
+test recovery_rejected_terminal_telemetry_compatibility_red_green ... ok
+test recovery_rejected_terminal_telemetry_raw_and_compatibility ... ok
+test recovery_metadata_frozen_ollama_matches_original_and_compatibility ... ok
+test no_newline_semantic_or_truncated_frames_never_replay ... ok
+test review_explicit_pending_admission_all_adapters ... ok
+test recovery_terminal_invalid_fields_do_not_fabricate_telemetry ... ok
+test retry_after_floors_dates_invalid_and_refusals ... ok
+test review_keepalive_and_partial_http200_matrix ... ok
+test rfc850_century_is_resolved_before_weekday_and_floor_validation ... ok
+test review_raw_broker_stream_events_remain_single_send_legacy ... ok
+test streaming_503_success_preserves_payload_and_accounting_all_adapters ... ok
+test session_interruption_never_commits_partial_assistant_or_executes_tools ... ok
+test review_pending_and_backoff_cancel_matrix ... ok
+test admission_unresolved_broker_session_http_matrix ... ok
+test review_completed_tool_not_reexecuted_after_followup_failure ... ok
+test typed_errors_v1_session_length_proof ... ok
+test typed_errors_v1_invalid_policy_prevents_all_entrypoints ... ok
+test unsupported_reasoning_rejected_before_send_and_capabilities_truthful ... ok
+test typed_errors_v1_optional_fields_and_legacy_length ... ok
+test uuid_shaped_credential_or_prompt_echo_is_omitted_from_safe_metadata ... ok
+test truncated_permanent_http_bodies_never_retry_all_public_completion_apis ... ok
+test review_retry_after_numeric_date_ceiling_budget_matrix ... ok
+test recovery_status_selection_v1 has been running for over 60 seconds
+test review_broker_session_failure_evidence_matrix has been running for over 60 seconds
+test review_broker_session_failure_evidence_matrix ... ok
+test typed_errors_v1_boundaries has been running for over 60 seconds
+test recovery_status_selection_v1 ... ok
+test typed_errors_v1_boundaries ... ok
+
+test result: ok. 66 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 134.85s
+
+[2m2026-10-24T06:21:26.229952Z[0m [32m INFO[0m [2mcargo_tarpaulin::process_handling::linux[0m[2m:[0m Launching test
+[2m2026-10-24T06:21:26.230021Z[0m [32m INFO[0m [2mcargo_tarpaulin::process_handling[0m[2m:[0m running /home/svetzal/Work/Projects/Personal/mojentic-unify/mojentic-ru/target/debug/deps/mojentic-88802adff3e58dc5
+
+running 542 tests
+test agents::async_aggregator_agent::tests::test_new_aggregator ... ok
+test agents::async_llm_agent::tests::test_add_tool ... ok
+test agents::async_aggregator_agent::tests::test_event_without_correlation_id_fails ... ok
+test agents::async_aggregator_agent::tests::test_single_event_does_not_trigger ... ok
+test agents::async_aggregator_agent::tests::test_wait_for_events_timeout ... ok
+test agents::async_aggregator_agent::tests::test_process_events_override ... ok
+test agents::async_llm_agent::tests::test_new_agent ... ok
+test agents::async_llm_agent::tests::test_new_agent_with_tools ... ok
+test agents::async_aggregator_agent::tests::test_both_events_trigger_processing ... ok
+test agents::async_aggregator_agent::tests::test_different_correlation_ids ... ok
+test agents::base_agent::tests::test_agent_can_return_multiple_events ... ok
+test agents::base_agent::tests::test_agent_preserves_correlation_id ... ok
+test agents::async_aggregator_agent::tests::test_wait_for_events ... ok
+test agents::base_agent::tests::test_echo_agent_returns_event ... ok
+test agents::base_agent::tests::test_agent_without_correlation_id ... ok
+test agents::base_async_agent::tests::test_echo_agent_returns_event ... ok
+test agents::base_agent::tests::test_simple_agent_returns_empty ... ok
+test agents::base_async_agent::tests::test_agent_preserves_correlation_id ... ok
+test agents::base_async_agent::tests::test_simple_agent_returns_empty ... ok
+test agents::async_llm_agent::tests::test_receive_event_async_default ... ok
+test agents::async_llm_agent::tests::test_agent_with_custom_behaviour ... ok
+test agents::async_llm_agent::tests::test_generate_response_with_correlation_id ... ok
+test agents::async_llm_agent::tests::test_generate_response ... ok
+test agents::async_llm_agent::tests::test_generate_object ... ok
+test agents::iterative_problem_solver::tests::test_builder_default_settings ... ok
+test agents::iterative_problem_solver::tests::test_builder_with_tools ... ok
+test agents::iterative_problem_solver::tests::test_builder_custom_max_iterations ... ok
+test agents::iterative_problem_solver::tests::test_done_substring_detection ... ok
+test agents::iterative_problem_solver::tests::test_multiple_iterations_before_done ... ok
+test agents::iterative_problem_solver::tests::test_fail_substring_detection ... ok
+test agents::iterative_problem_solver::tests::test_custom_system_prompt ... ok
+test agents::iterative_problem_solver::tests::test_solve_case_insensitive_done ... ok
+test agents::simple_recursive_agent::tests::test_builder_custom_system_prompt ... ok
+test agents::simple_recursive_agent::tests::test_builder_default_settings ... ok
+test agents::simple_recursive_agent::tests::test_builder_custom_max_iterations ... ok
+test agents::simple_recursive_agent::tests::test_builder_with_tools ... ok
+test agents::simple_recursive_agent::tests::test_event_emitter_subscribe_and_emit ... ok
+test agents::simple_recursive_agent::tests::test_goal_state_creation ... ok
+test agents::simple_recursive_agent::tests::test_handler_panic_surfaces_as_error ... ok
+test agents::iterative_problem_solver::tests::test_solve_fails_with_fail ... ok
+test agents::iterative_problem_solver::tests::test_solve_completes_with_done ... ok
+test agents::iterative_problem_solver::tests::test_solve_case_insensitive_fail ... ok
+test agents::iterative_problem_solver::tests::test_solve_stops_at_max_iterations ... ok
+test agents::iterative_problem_solver::tests::test_step_method ... ok
+test agents::simple_recursive_agent::tests::test_solve_case_insensitive_done ... ok
+test agents::simple_recursive_agent::tests::test_event_emission_during_solve ... ok
+test agents::simple_recursive_agent::tests::test_event_emission_on_failure ... ok
+test agents::simple_recursive_agent::tests::test_solve_case_insensitive_fail ... ok
+test agents::simple_recursive_agent::tests::test_solve_fails_with_fail ... ok
+test agents::simple_recursive_agent::tests::test_solve_completes_with_done ... ok
+test async_dispatcher::tests::test_dispatcher_new ... ok
+test async_dispatcher::tests::test_dispatcher_with_batch_size ... ok
+test async_dispatcher::tests::test_queue_len ... ok
+test async_dispatcher::tests::test_dispatch_event ... ok
+test async_dispatcher::tests::test_dispatch_assigns_correlation_id ... ok
+test async_dispatcher::tests::test_multiple_agents_receive_event ... ok
+test async_dispatcher::tests::test_start_and_stop ... ok
+test async_dispatcher::tests::test_wait_for_empty_queue ... ok
+test async_dispatcher::tests::test_start_twice_fails ... ok
+test async_dispatcher::tests::test_wait_for_empty_queue_waits_for_in_flight_handlers ... ok
+test async_dispatcher::tests::test_wait_for_empty_queue_timeout ... ok
+test context::shared_working_memory::tests::test_deep_merge_arrays ... ok
+test context::shared_working_memory::tests::test_deep_merge_mixed_types ... ok
+test context::shared_working_memory::tests::test_deep_merge_empty_objects ... ok
+test context::shared_working_memory::tests::test_deep_merge_primitives ... ok
+test context::shared_working_memory::tests::test_clone_memory ... ok
+test context::shared_working_memory::tests::test_get_working_memory ... ok
+test context::shared_working_memory::tests::test_default ... ok
+test context::shared_working_memory::tests::test_merge_nested_objects ... ok
+test context::shared_working_memory::tests::test_merge_to_working_memory_replace_array ... ok
+test context::shared_working_memory::tests::test_merge_to_working_memory_deep ... ok
+test context::shared_working_memory::tests::test_merge_to_working_memory_replace_primitive ... ok
+test context::shared_working_memory::tests::test_multiple_merges ... ok
+test context::shared_working_memory::tests::test_merge_to_working_memory_simple ... ok
+test async_dispatcher::tests::test_terminate_event_stops_dispatcher ... ok
+test context::shared_working_memory::tests::test_new ... ok
+test error::tests::test_api_error_display ... ok
+test error::tests::test_config_error_display ... ok
+test error::tests::test_error_debug ... ok
+test error::tests::test_gateway_error_display ... ok
+test error::tests::test_handler_error_display ... ok
+test error::tests::test_http_error_conversion ... ok
+test error::tests::test_io_error_conversion ... ok
+test error::tests::test_max_tool_iterations_exceeded_display ... ok
+test error::tests::test_model_not_supported_display ... ok
+test error::tests::test_result_type ... ok
+test context::shared_working_memory::tests::test_thread_safety ... ok
+test error::tests::test_serialization_error_conversion ... ok
+test error::tests::test_tool_error_display ... ok
+test event::tests::test_event_as_any ... ok
+test event::tests::test_event_clone_box ... ok
+test event::tests::test_event_correlation_id ... ok
+test event::tests::test_event_source ... ok
+test event::tests::test_terminate_event ... ok
+test examples::react::decisioning_agent::tests::test_decisioning_agent_ignores_wrong_event_type ... ok
+test examples::react::events::tests::test_event_clone_box ... ok
+test examples::react::events::tests::test_failure_occurred_event ... ok
+test examples::react::decisioning_agent::tests::test_decisioning_agent_max_iterations ... ok
+test examples::react::events::tests::test_invoke_decisioning_event ... ok
+test examples::react::events::tests::test_finish_and_summarize_event ... ok
+test examples::react::events::tests::test_invoke_thinking_event ... ok
+test examples::react::formatters::tests::test_format_available_tools_empty ... ok
+test examples::react::formatters::tests::test_format_available_tools_with_tools ... ok
+test examples::react::formatters::tests::test_format_available_tools_multiple ... ok
+test examples::react::decisioning_agent::tests::test_decisioning_agent_with_plan ... ok
+test examples::react::formatters::tests::test_format_current_context_empty ... ok
+test examples::react::decisioning_agent::tests::test_decisioning_agent_prompt_generation ... ok
+test examples::react::formatters::tests::test_format_current_context_with_plan ... ok
+test examples::react::models::tests::test_current_context_new ... ok
+test examples::react::models::tests::test_current_context_with_history ... ok
+test examples::react::models::tests::test_next_action_serialization ... ok
+test examples::react::models::tests::test_plan_default ... ok
+test examples::react::models::tests::test_plan_serialization ... ok
+test examples::react::models::tests::test_thought_action_observation ... ok
+test agents::simple_recursive_agent::tests::test_solve_word_boundary_done ... ok
+test agents::simple_recursive_agent::tests::test_solve_word_boundary_fail ... ok
+test examples::react::formatters::tests::test_format_current_context_with_history ... ok
+test examples::react::summarization_agent::tests::test_summarization_agent_with_plan ... ok
+test examples::react::summarization_agent::tests::test_summarization_agent_prompt_generation ... ok
+test examples::react::tool_call_agent::tests::test_tool_call_agent_default ... ok
+test examples::react::thinking_agent::tests::test_thinking_agent_prompt_generation ... ok
+test examples::react::thinking_agent::tests::test_thinking_agent_with_existing_plan ... ok
+test examples::react::summarization_agent::tests::test_summarization_agent_ignores_wrong_event_type ... ok
+test examples::react::tool_call_agent::tests::test_tool_call_agent_ignores_wrong_event_type ... ok
+test examples::react::thinking_agent::tests::test_thinking_agent_ignores_wrong_event_type ... ok
+test llm::broker::tests::native_response_leaves_tool_dispatch_to_caller ... ok
+test llm::broker::tests::stream_events::an_unsupported_gateway_yields_one_error_without_a_trace ... ok
+test llm::broker::tests::generate_response_traces_reported_evidence_unchanged ... ok
+test llm::broker::tests::generate_response_traces_unknown_usage_as_none ... ok
+test llm::broker::tests::stream_events::content_then_completed_is_forwarded_and_traced_with_evidence ... ok
+test llm::broker::tests::stream_events::a_gateway_stream_without_terminal_event_ends_incomplete ... ok
+test llm::broker::tests::stream_events::incomplete_stream_is_traced_with_its_partial_evidence ... ok
+test llm::broker::tests::stream_events::nothing_follows_the_terminal_event ... ok
+test llm::broker::tests::stream_events::incomplete_completion_is_traced_with_its_evidence ... ok
+test llm::broker::tests::stream_events::stopping_early_traces_the_call_but_no_response ... ok
+test llm::broker::tests::stream_events::the_event_stream_can_move_across_threads ... ok
+test llm::broker::tests::test_broker_new ... ok
+test llm::broker::tests::test_broker_new_string_conversion ... ok
+test llm::broker::tests::stream_events::tool_iterations_are_forced_to_zero ... ok
+test llm::broker::tests::test_broker_with_max_tool_iterations ... ok
+test llm::broker::tests::generate_object_traces_reported_evidence_unchanged ... ok
+test llm::broker::tests::test_generate_empty_response_content ... ok
+test llm::broker::tests::test_generate_simple_response ... ok
+test examples::react::tool_call_agent::tests::test_tool_call_agent_successful_execution ... ok
+test llm::broker::tests::test_generate_stream_basic ... ok
+test llm::broker::tests::test_generate_object_with_config ... ok
+test llm::broker::tests::test_generate_object ... ok
+test llm::broker::tests::test_generate_stream_without_tools ... ok
+test llm::broker::tests::test_generate_with_custom_config ... ok
+test llm::broker::tests::test_generate_with_tool_call_no_tools_provided ... ok
+test llm::broker::tests::test_multiple_messages ... ok
+test llm::broker::tests::test_generate_stream_max_tool_iterations_exceeded ... ok
+test llm::broker::tests::test_generate_stream_with_tool_calls ... ok
+test llm::broker::tests::test_generate_with_tool_call ... ok
+test llm::broker::tests::unlimited_execution_can_continue_past_default_rounds ... ok
+test llm::broker::tests::test_generate_max_tool_iterations_exceeded ... ok
+test llm::broker::tests::test_tracer_integration ... ok
+test llm::broker::tests::test_tracer_with_tool_calls ... ok
+test agents::simple_recursive_agent::tests::test_solve_multiple_iterations_before_done ... ok
+test agents::simple_recursive_agent::tests::test_solve_stops_at_max_iterations ... ok
+test llm::chat_session::tests::test_builder_custom_max_context ... ok
+test llm::chat_session::tests::test_builder_custom_temperature ... ok
+test llm::chat_session::tests::test_builder_custom_system_prompt ... ok
+test llm::chat_session::tests::test_builder_with_tools ... ok
+test llm::chat_session::tests::test_context_window_preserves_system_prompt ... ok
+test llm::broker::tests::stream_events::dropping_the_broker_stream_cancels_the_provider_request ... ok
+test llm::chat_session::tests::test_insert_message_calculates_token_length ... ok
+test llm::chat_session::tests::test_context_window_trimming ... ok
+test llm::chat_session::tests::test_new_session_has_system_message ... ok
+test llm::chat_session::tests::test_messages_accessor ... ok
+test llm::chat_session::tests::test_message_with_no_content_has_zero_tokens ... ok
+test llm::chat_session::tests::test_sized_message_creation ... ok
+test llm::chat_session::tests::test_send_adds_messages_to_history ... ok
+test llm::gateway::tests::test_completion_config_clone ... ok
+test llm::gateway::tests::test_completion_config_custom ... ok
+test llm::gateway::tests::test_completion_config_default ... ok
+test llm::gateway::tests::test_completion_config_with_all_sampling_params ... ok
+test llm::gateway::tests::test_completion_config_with_reasoning_effort ... ok
+test llm::gateway::tests::test_reasoning_effort_deserialization ... ok
+test llm::gateway::tests::test_reasoning_effort_serialization ... ok
+test llm::gateway::tests::test_response_format_json_no_schema ... ok
+test llm::gateway::tests::test_response_format_json_with_schema ... ok
+test llm::gateway::tests::test_response_format_text ... ok
+test llm::chat_session::tests::test_send_multiple_turns ... ok
+test llm::gateways::ollama::tests::complete_carries_reported_evidence_unchanged ... ok
+test llm::gateways::ollama::tests::complete_leaves_unreported_usage_unknown ... ok
+test llm::gateways::ollama::tests::complete_json_response_carries_object_and_evidence ... ok
+test llm::gateways::ollama::tests::stream_events::dropping_the_stream_cancels_the_request ... ok
+test llm::chat_session::tests::test_send_stream_records_user_message ... ok
+test llm::chat_session::tests::test_send_stream_grows_message_history ... ok
+test llm::chat_session::tests::test_send_stream_records_assembled_response ... ok
+test llm::gateways::ollama::tests::stream_events::end_of_stream_without_done_is_incomplete_stream ... ok
+test llm::gateways::ollama::tests::stream_events::http_error_status_is_reported_with_body ... ok
+test llm::chat_session::tests::test_send_stream_respects_context_capacity ... ok
+test llm::chat_session::tests::test_send_stream_yields_content_chunks ... ok
+test llm::gateways::ollama::tests::test_adapt_messages_empty_content ... ok
+test llm::gateways::ollama::tests::stream_events::request_streams_without_tools_and_honours_config ... ok
+test llm::gateways::ollama::tests::stream_events::completes_over_http_with_durations ... ok
+test llm::chat_session::tests::test_total_tokens ... ok
+test llm::gateways::ollama::tests::test_adapt_messages_to_ollama_simple ... ok
+test llm::gateways::ollama::tests::test_adapt_messages_tool_role ... ok
+test llm::gateways::ollama::tests::test_add_response_format_json_no_schema ... ok
+test llm::gateways::ollama::tests::test_add_response_format_none ... ok
+test llm::gateways::ollama::tests::test_add_response_format_json_with_schema ... ok
+test llm::gateways::ollama::tests::test_add_response_format_text ... ok
+test llm::gateways::ollama::tests::test_adapt_messages_with_tool_calls ... ok
+test llm::gateways::ollama::tests::test_adapt_messages_with_images ... ok
+test llm::gateways::ollama::tests::streaming_request_omits_format_for_text ... ok
+test llm::gateways::ollama::tests::streaming_request_forwards_json_object_format ... ok
+test llm::gateways::ollama::tests::streaming_request_without_format_leaves_body_unchanged ... ok
+test llm::gateways::ollama::tests::streaming_request_forwards_json_schema_format ... ok
+test llm::gateways::ollama::tests::test_complete_error ... ok
+test llm::gateways::ollama::tests::test_complete_json ... ok
+test llm::gateways::ollama::tests::test_complete_simple ... ok
+test llm::gateways::ollama::tests::test_complete_with_reasoning_effort ... ok
+test llm::gateways::ollama::tests::test_extract_ollama_options_unset_output_limit ... ok
+test llm::gateways::ollama::tests::test_calculate_embeddings ... ok
+test llm::gateways::ollama::tests::test_calculate_embeddings_custom_model ... ok
+test llm::gateways::ollama::tests::test_extract_ollama_options_output_limit ... ok
+test llm::gateways::ollama::tests::test_extract_ollama_options_basic ... ok
+test llm::gateways::ollama::tests::test_extract_ollama_options_zero_max_tokens ... ok
+test llm::gateways::ollama::tests::test_extract_ollama_options_with_top_p ... ok
+test llm::gateways::ollama::tests::test_extract_ollama_options_with_top_k ... ok
+test llm::gateways::ollama::tests::test_extract_ollama_options_with_all_sampling_params ... ok
+test llm::gateways::ollama::tests::test_complete_with_tools ... ok
+test llm::gateways::ollama::tests::test_ollama_config_custom ... ok
+test llm::gateways::ollama::tests::test_ollama_config_default ... ok
+test llm::gateways::ollama::tests::test_ollama_config_from_env ... ok
+test llm::gateways::ollama::tests::test_gateway_new ... ok
+test llm::gateways::ollama::tests::test_gateway_default ... ok
+test llm::gateways::ollama::tests::test_complete_stream_surfaces_thinking_chunks ... ok
+test llm::gateways::ollama::tests::test_complete_stream_disables_thinking ... ok
+test llm::gateways::ollama::tests::test_gateway_with_config ... ok
+test llm::gateways::ollama_stream_events::tests::content_in_the_final_frame_precedes_the_terminal_event ... ok
+test llm::gateways::ollama::tests::test_gateway_with_host ... ok
+test llm::gateways::ollama_stream_events::tests::a_terminal_frame_cannot_borrow_an_earlier_stop_reason ... ok
+test llm::gateways::ollama_stream_events::tests::done_with_length_is_incomplete_completion_with_evidence ... ok
+test llm::gateways::ollama_stream_events::tests::content_then_done_with_stop_completes_with_evidence ... ok
+test llm::gateways::ollama_stream_events::tests::done_without_reason_is_incomplete_completion ... ok
+test llm::gateways::ollama_stream_events::tests::partial_evidence_holds_the_model_seen_before_the_end ... ok
+test llm::gateways::ollama_stream_events::tests::frames_without_evidence_preserve_previously_reported_values ... ok
+test llm::gateways::ollama_stream_events::tests::tool_call_frame_is_unexpected ... ok
+test llm::gateways::ollama_stream_events::tests::error_frame_is_provider_error ... ok
+test llm::gateways::omlx::tests::debug_output_hides_the_api_key ... ok
+test llm::gateways::ollama_stream_events::tests::malformed_frames_are_invalid_stream_events ... ok
+test llm::gateways::omlx::tests::a_keepalive_line_has_exactly_the_keepalive_model ... ok
+test llm::gateways::omlx::tests::only_json_formats_request_structured_output ... ok
+test llm::gateways::ollama::tests::test_get_available_models ... ok
+test llm::gateways::ollama::tests::test_pull_model_success ... ok
+test llm::gateways::ollama::tests::test_pull_model_failure ... ok
+test llm::gateways::omlx::tests::timeout_env_is_milliseconds_with_a_ten_minute_default ... ok
+test llm::gateways::omlx::tests::the_event_parser_ignores_keepalive_evidence ... ok
+test llm::gateways::omlx::tests::reasoning_comes_before_content_in_one_delta ... ok
+test llm::gateways::omlx::tests::blank_model_actions_fail_before_a_request ... ok
+test llm::gateways::omlx::tests::legacy_stream_outlives_the_timeout_and_cancels_on_drop ... ok
+test llm::gateways::omlx::tests::legacy_stream_keeps_a_character_split_across_network_chunks ... ok
+test llm::gateways::omlx::tests::event_stream_is_not_cut_off_by_the_whole_response_timeout ... ok
+test llm::gateways::openai::tests::legacy_stream_reports_http_error_status ... ok
+test llm::gateways::openai::tests::legacy_stream_keeps_a_character_split_across_network_chunks ... ok
+test llm::gateways::openai::tests::legacy_stream_yields_non_empty_content_and_skips_unreadable_frames ... ok
+test llm::gateways::openai::tests::complete_carries_reported_evidence_unchanged ... ok
+test llm::gateways::openai::tests::complete_leaves_unreported_usage_unknown ... ok
+test llm::gateways::openai::tests::complete_json_response_carries_object_and_evidence ... ok
+test llm::gateways::openai::tests::legacy_stream_yields_pending_tool_calls_at_done ... ok
+test llm::gateways::openai::tests::non_streaming_request_forwards_configured_format ... ok
+test llm::gateways::openai::tests::legacy_stream_accumulates_tool_call_fragments_until_the_finish_reason ... ok
+test llm::gateways::openai::tests::streaming_request_forwards_json_schema_format ... ok
+test llm::gateways::openai::tests::streaming_request_forwards_json_object_format ... ok
+test llm::gateways::openai::tests::streaming_request_forwards_text_format ... ok
+test llm::gateways::openai::tests::stream_events::dropping_the_stream_cancels_the_request ... ok
+test llm::gateways::openai::tests::stream_events::http_error_status_is_reported_with_body ... ok
+test llm::gateways::openai::tests::stream_events::request_streams_without_tools_and_asks_for_usage ... ok
+test llm::gateways::openai::tests::stream_events::end_of_stream_without_done_is_incomplete_stream ... ok
+test llm::gateways::openai::tests::stream_events::completes_over_http_with_usage ... ok
+test llm::gateways::openai::tests::streaming_request_without_format_leaves_body_unchanged ... ok
+test llm::gateways::openai::tests::test_adapt_parameters_chat_model ... ok
+test llm::gateways::openai::tests::test_adapt_parameters_reasoning_model ... ok
+test llm::gateways::openai::tests::test_complete_error ... ok
+test llm::gateways::openai::tests::test_complete_success ... ok
+test llm::gateways::openai::tests::test_complete_json ... ok
+test llm::gateways::openai::tests::test_gateway_default ... ok
+test llm::gateways::openai::tests::test_complete_with_tool_calls ... ok
+test llm::gateways::openai::tests::test_gateway_new ... ok
+test llm::gateways::openai::tests::test_gateway_with_api_key ... ok
+test llm::gateways::openai::tests::test_openai_config_default ... ok
+test llm::gateways::openai::tests::test_openai_config_from_env ... ok
+test llm::gateways::openai::tests::test_gateway_with_api_key_and_base_url ... ok
+test llm::gateways::openai::tests::test_weighted_average_embeddings_empty ... ok
+test llm::gateways::openai::tests::test_get_available_models ... ok
+test llm::gateways::openai::tests::unsupported_new_reasoning_controls_fail_instead_of_disappearing ... ok
+test llm::gateways::openai_legacy_stream::tests::a_complete_tool_call_in_one_delta_is_yielded_at_the_finish_reason ... ok
+test llm::gateways::openai_legacy_stream::tests::lines_without_data_carry_nothing ... ok
+test llm::gateways::openai_legacy_stream::tests::test_build_complete_tool_calls ... ok
+test llm::gateways::openai_legacy_stream::tests::test_build_complete_tool_calls_missing_name ... ok
+test llm::gateways::openai_legacy_stream::tests::the_body_stream_decodes_a_character_split_across_chunks ... ok
+test llm::gateways::openai::tests::test_weighted_average_embeddings_multiple ... ok
+test llm::gateways::openai::tests::test_weighted_average_embeddings_single ... ok
+test llm::gateways::openai_messages_adapter::tests::test_adapt_assistant_message ... ok
+test llm::gateways::openai_messages_adapter::tests::test_adapt_system_message ... ok
+test llm::gateways::openai_messages_adapter::tests::test_adapt_user_message ... ok
+test llm::gateways::openai_messages_adapter::tests::test_adapt_tool_message ... ok
+test llm::gateways::openai_messages_adapter::tests::test_adapt_assistant_with_tool_calls ... ok
+test llm::gateways::openai_messages_adapter::tests::test_convert_tool_calls ... ok
+test llm::gateways::openai_messages_adapter::tests::test_convert_tool_calls_empty_args ... ok
+test llm::gateways::openai_messages_adapter::tests::test_adapt_user_message_preserves_remote_and_data_images ... ok
+test llm::gateways::openai_messages_adapter::tests::test_get_image_type_jpg ... ok
+test llm::gateways::openai_messages_adapter::tests::test_get_image_type_png ... ok
+test llm::gateways::openai_messages_adapter::tests::test_get_image_type_gif ... ok
+test llm::gateways::openai_messages_adapter::tests::test_get_image_type_unknown ... ok
+test llm::gateways::openai_messages_adapter::tests::test_adapt_user_message_with_images ... ok
+test llm::gateways::openai_messages_adapter::tests::test_get_image_type_webp ... ok
+test llm::gateways::openai_model_registry::tests::test_audio_preview_no_tools_no_streaming ... ok
+test llm::gateways::openai_model_registry::tests::test_both_endpoint_model_flags ... ok
+test llm::gateways::openai_model_registry::tests::test_chat_only_model_endpoint_flags ... ok
+test llm::gateways::openai_model_registry::tests::test_chatgpt_4o_latest_no_tools ... ok
+test llm::gateways::openai_model_registry::tests::test_codex_mini_latest_responses_only ... ok
+test llm::gateways::openai_model_registry::tests::test_completions_only_model_flags ... ok
+test llm::gateways::openai_model_registry::tests::test_embedding_model_endpoint_flags ... ok
+test llm::gateways::openai_model_registry::tests::test_embedding_models ... ok
+test llm::gateways::openai_model_registry::tests::test_deprecated_models_removed ... ok
+test llm::gateways::openai_model_registry::tests::test_get_known_model_capabilities ... ok
+test llm::gateways::openai_model_registry::tests::test_get_reasoning_model_capabilities ... ok
+test llm::gateways::openai_model_registry::tests::test_get_registered_models ... ok
+test llm::gateways::openai_model_registry::tests::test_get_token_limit_param_reasoning ... ok
+test llm::gateways::openai_model_registry::tests::test_default_capabilities_include_endpoint_flags ... ok
+test llm::gateways::openai_model_registry::tests::test_get_token_limit_param_chat ... ok
+test llm::gateways::openai_model_registry::tests::test_get_unknown_model_default ... ok
+test llm::gateways::openai_model_registry::tests::test_global_registry ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt35_instruct_no_tools ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt41_nano_base_no_tools ... ok
+test llm::gateways::openai_model_registry::tests::test_get_unknown_model_pattern_matching ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt41_nano_dated_has_tools ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt51_all_temperatures ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt51_both_chat_and_completions ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt51_pattern_matching ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt52_all_temperatures ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt52_pattern_matching ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt53_pattern_matching ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt54_base_capabilities ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt54_dated_capabilities ... ok
+test llm::gateways::openai::tests::test_chunk_text_short ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt54_mini_capabilities ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt54_mini_dated_capabilities ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt54_nano_capabilities ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt54_nano_dated_capabilities ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt54_pattern_matching ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt54_uses_completion_token_param ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt55_base_capabilities ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt55_dated_capabilities ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt55_pattern_matching ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt55_pro_capabilities ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt55_pro_dated_capabilities ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt5_chat_latest_is_chat_type ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt5_mini_base_no_tools ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt5_mini_dated_has_tools ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt5_pro_exists ... ok
+test llm::gateways::openai_model_registry::tests::test_gpt5_search_api_no_tools_no_temperature ... ok
+test llm::gateways::openai_model_registry::tests::test_legacy_completions_model_flags ... ok
+test llm::gateways::openai_model_registry::tests::test_is_reasoning_model ... ok
+test llm::gateways::openai_model_registry::tests::test_model_capabilities_default ... ok
+test llm::gateways::openai_model_registry::tests::test_o3_mini_supports_tools_and_streaming ... ok
+test llm::gateways::openai_model_registry::tests::test_o1_supports_tools_and_streaming ... ok
+test llm::gateways::openai_model_registry::tests::test_model_type_enum ... ok
+test llm::gateways::openai_model_registry::tests::test_o3_supports_tools_and_streaming_and_temperature ... ok
+test llm::gateways::openai_model_registry::tests::test_o4_mini_dated_supports_tools ... ok
+test llm::gateways::openai_model_registry::tests::test_o4_mini_no_tools_but_supports_streaming ... ok
+test llm::gateways::openai_model_registry::tests::test_register_model ... ok
+test llm::gateways::openai_model_registry::tests::test_registry_new ... ok
+test llm::gateways::openai_model_registry::tests::test_register_pattern ... ok
+test llm::gateways::openai_model_registry::tests::test_responses_only_model_flags ... ok
+test llm::gateways::openai_model_registry::tests::test_supports_temperature_restricted ... ok
+test llm::gateways::openai_model_registry::tests::test_search_preview_no_tools_no_temperature ... ok
+test llm::gateways::openai_model_registry::tests::test_supports_temperature_unrestricted ... ok
+test llm::gateways::openai_model_registry::tests::test_supports_temperature_none_allowed ... ok
+test llm::gateways::openai::tests::test_calculate_embeddings_custom_model ... ok
+test llm::gateways::openai_stream_events::tests::done_without_finish_reason_is_incomplete_completion ... ok
+test llm::gateways::openai_stream_events::tests::comments_and_other_fields_are_ignored ... ok
+test llm::gateways::openai::tests::test_calculate_embeddings ... ok
+test llm::gateways::openai_stream_events::tests::done_after_length_is_incomplete_completion_with_evidence ... ok
+test llm::gateways::openai_stream_events::tests::content_then_stop_then_done_completes_with_evidence ... ok
+test llm::gateways::openai_stream_events::tests::partial_evidence_holds_what_arrived_before_the_end ... ok
+test llm::gateways::openai_stream_events::tests::error_frame_is_provider_error ... ok
+test llm::gateways::openai_stream_events::tests::tool_call_delta_is_unexpected ... ok
+test llm::gateways::openai_stream_events::tests::malformed_frames_are_invalid_stream_events ... ok
+test llm::gateways::openai::tests::test_chunk_text_long ... ok
+test llm::gateways::tokenizer_gateway::tests::test_count_tokens_matches_encode ... ok
+test llm::gateways::tokenizer_gateway::tests::test_count_tokens ... ok
+test llm::gateways::openai::tests::test_calculate_embeddings_weights_by_token_count ... ok
+test llm::gateways::tokenizer_gateway::tests::test_decode_basic ... ok
+test llm::gateways::tokenizer_gateway::tests::test_decode_empty ... ok
+test llm::models::tests::test_assistant_message ... ok
+test llm::models::tests::test_llm_message_default_role ... ok
+test llm::gateways::tokenizer_gateway::tests::test_encode_basic ... ok
+test llm::models::tests::test_llm_message_deserialization ... ok
+test llm::models::tests::test_llm_message_serialization ... ok
+test llm::models::tests::test_llm_tool_call_serialization ... ok
+test llm::models::tests::test_llm_tool_call_without_id ... ok
+test llm::models::tests::test_message_role_deserialization ... ok
+test llm::gateways::tokenizer_gateway::tests::test_encode_consistent ... ok
+test llm::models::tests::test_message_role_serialization ... ok
+test llm::models::tests::test_message_with_images ... ok
+test llm::models::tests::test_system_message ... ok
+test llm::models::tests::test_user_message ... ok
+test llm::stream_events::tests::http_provider_error_keeps_a_non_json_body_as_text ... ok
+test llm::stream_events::tests::http_provider_error_keeps_status_and_error_field ... ok
+test llm::stream_events::tests::incomplete_completion_names_its_finish_reason ... ok
+test llm::reasoning::tests::qwen_accepts_exact_controls_without_inventing_a_default ... ok
+test llm::reasoning::tests::boolean_model_profile_rejects_named_effort_and_native_history ... ok
+test llm::stream_events::tests::line_buffer_keeps_utf8_sequences_split_across_chunks ... ok
+test llm::stream_events::tests::line_buffer_returns_only_complete_lines ... ok
+test llm::stream_events::tests::only_content_is_non_terminal ... ok
+test llm::tools::ask_user_tool::tests::test_descriptor ... ok
+test llm::tools::ask_user_tool::tests::test_default_implementation ... ok
+test llm::tools::ask_user_tool::tests::test_tool_matches ... ok
+test llm::tools::current_datetime_tool::tests::test_descriptor ... ok
+test llm::tools::ask_user_tool::tests::test_missing_argument ... ok
+test llm::tools::current_datetime_tool::tests::test_format_with_day_name ... ok
+test llm::tools::current_datetime_tool::tests::test_run_with_custom_format ... ok
+test llm::tools::current_datetime_tool::tests::test_format_with_month_name ... ok
+test llm::tools::current_datetime_tool::tests::test_run_with_default_format ... ok
+test llm::tools::current_datetime_tool::tests::test_timestamp_is_reasonable ... ok
+test llm::tools::current_datetime_tool::tests::test_timezone_is_present ... ok
+test llm::tools::current_datetime_tool::tests::test_tool_matches ... ok
+test llm::tools::ephemeral_task_manager::complete_task::tests::test_descriptor ... ok
+test llm::tools::ephemeral_task_manager::insert_task_after::tests::test_descriptor ... ok
+test llm::gateways::tokenizer_gateway::tests::test_different_encodings ... ok
+test llm::tools::ephemeral_task_manager::list_tasks::tests::test_descriptor ... ok
+test llm::tools::ephemeral_task_manager::list_tasks::tests::test_list_tasks_empty ... ok
+test llm::tools::ephemeral_task_manager::list_tasks::tests::test_list_tasks_with_items ... ok
+test llm::tools::ephemeral_task_manager::prepend_task::tests::test_descriptor ... ok
+test llm::tools::ephemeral_task_manager::insert_task_after::tests::test_insert_task_after_run ... ok
+test llm::tools::ephemeral_task_manager::start_task::tests::test_descriptor ... ok
+test llm::tools::ephemeral_task_manager::task::tests::test_task_creation ... ok
+test llm::tools::ephemeral_task_manager::complete_task::tests::test_complete_task_run ... ok
+test llm::tools::ephemeral_task_manager::task_list::tests::test_append_task ... ok
+test llm::tools::ephemeral_task_manager::task::tests::test_task_status_str ... ok
+test llm::tools::ephemeral_task_manager::task_list::tests::test_clear_tasks ... ok
+test llm::tools::ephemeral_task_manager::task_list::tests::test_complete_task ... ok
+test llm::tools::ephemeral_task_manager::task_list::tests::test_complete_non_in_progress_task ... ok
+test llm::tools::ephemeral_task_manager::task_list::tests::test_insert_task_after ... ok
+test llm::tools::ephemeral_task_manager::task_list::tests::test_maintain_task_ids ... ok
+test llm::tools::ephemeral_task_manager::task_list::tests::test_new_task_list ... ok
+test llm::tools::ephemeral_task_manager::task_list::tests::test_prepend_task ... ok
+test llm::tools::ephemeral_task_manager::task_list::tests::test_insert_task_after_nonexistent ... ok
+test llm::tools::ephemeral_task_manager::start_task::tests::test_start_task_run ... ok
+test llm::tools::ephemeral_task_manager::prepend_task::tests::test_prepend_task_run ... ok
+test llm::tools::ephemeral_task_manager::task_list::tests::test_start_task ... ok
+test llm::tools::ephemeral_task_manager::task_list::tests::test_start_non_pending_task ... ok
+test llm::tools::file_manager::tests::test_filesystem_gateway_new ... ok
+test llm::tools::file_manager::tests::test_resolve_path_security ... ok
+test llm::tools::file_manager::tests::test_read_write ... ok
+test llm::tools::file_manager::tests::test_ls ... ok
+test llm::tools::ephemeral_task_manager::tests::test_all_tools_returns_seven_tools ... ok
+test llm::tools::runner::tests::serial_preserves_input_order ... ok
+test llm::tools::runner::tests::unknown_tools_return_not_found ... ok
+test llm::tools::simple_date_tool::tests::test_descriptor ... ok
+test llm::tools::simple_date_tool::tests::test_missing_argument ... ok
+test llm::tools::simple_date_tool::tests::test_resolve_days_ago ... ok
+test llm::tools::simple_date_tool::tests::test_resolve_days_from_now ... ok
+test llm::tools::simple_date_tool::tests::test_resolve_today ... ok
+test llm::tools::simple_date_tool::tests::test_extract_days_offset ... ok
+test llm::tools::runner::tests::pre_cancelled_batch_skips_dispatch ... ok
+test llm::tools::runner::tests::parallel_preserves_output_order ... ok
+test llm::tools::simple_date_tool::tests::test_resolve_tomorrow ... ok
+test llm::tools::tell_user_tool::tests::test_default_implementation ... ok
+test llm::tools::tell_user_tool::tests::test_descriptor ... ok
+test llm::tools::tell_user_tool::tests::test_run_with_message ... ok
+test llm::tools::tell_user_tool::tests::test_run_without_message ... ok
+test llm::tools::tell_user_tool::tests::test_multiline_message ... ok
+test llm::tools::tell_user_tool::tests::test_tool_matches ... ok
+test llm::tools::tool::tests::test_function_descriptor_clone ... ok
+test llm::tools::tool::tests::test_tool_descriptor_deserialization ... ok
+test llm::gateways::tokenizer_gateway::tests::test_encode_empty ... ok
+test llm::tools::tool::tests::test_tool_descriptor_serialization ... ok
+test llm::gateways::tokenizer_gateway::tests::test_long_text ... ok
+test llm::tools::tool::tests::test_tool_run ... ok
+test llm::gateways::tokenizer_gateway::tests::test_round_trip ... ok
+test llm::tools::tool::tests::test_tool_matches ... ok
+test llm::tools::tool_wrapper::tests::test_tool_wrapper_descriptor ... ok
+test llm::tools::tool_wrapper::tests::test_tool_wrapper_matches ... ok
+test llm::gateways::tokenizer_gateway::tests::test_unicode_handling ... ok
+test llm::tools::tool_wrapper::tests::test_tool_wrapper_missing_input ... ok
+test llm::tools::web_search_tool::tests::test_clean_text ... ok
+test llm::tools::tool_wrapper::tests::test_tool_wrapper_execution ... ok
+test llm::tools::tool_wrapper::tests::test_tool_wrapper_with_tools ... ok
+test llm::tools::web_search_tool::tests::test_decode_url ... ok
+test llm::tools::web_search_tool::tests::test_clone_box ... ok
+test llm::tools::web_search_tool::tests::test_descriptor ... ok
+test llm::tools::web_search_tool::tests::test_parse_empty_html ... ok
+test llm::tools::web_search_tool::tests::test_parse_malformed_html ... ok
+test llm::tools::web_search_tool::tests::test_search_result_serialization ... ok
+test llm::tools::web_search_tool::tests::test_max_results_limit ... ok
+test llm::tools::web_search_tool::tests::test_parse_results ... ok
+test realtime::schemas::tests::passes_through_known_events ... ok
+test realtime::schemas::tests::passes_through_unknown_types ... ok
+test realtime::codec::tests::round_trip_pcm16_bytes ... ok
+test realtime::codec::tests::round_trip_pcm16 ... ok
+test llm::tools::web_search_tool::tests::test_run_empty_query ... ok
+test realtime::schemas::tests::unknown_marker_for_typeless ... ok
+test router::tests::test_add_multiple_routes_same_type ... ok
+test router::tests::test_add_route ... ok
+test router::tests::test_get_agents_different_type ... ok
+test router::tests::test_get_agents_no_routes ... ok
+test router::tests::test_add_routes_different_types ... ok
+test router::tests::test_router_new ... ok
+test router::tests::test_router_default ... ok
+test tracer::event_store::tests::test_callback_triggered ... ok
+test llm::tools::web_search_tool::tests::test_perform_search_http_error ... ok
+test llm::tools::web_search_tool::tests::test_run_missing_query ... ok
+test tracer::event_store::tests::test_multiple_events ... ok
+test tracer::event_store::tests::test_store_event ... ok
+test llm::tools::web_search_tool::tests::test_tool_matches ... ok
+test tracer::event_store::tests::test_len_and_is_empty ... ok
+test tracer::event_store::tests::test_clear ... ok
+test tracer::null_tracer::tests::test_null_tracer_clear ... ok
+test tracer::null_tracer::tests::test_null_tracer_len ... ok
+test tracer::null_tracer::tests::test_null_tracer_is_disabled ... ok
+test tracer::tracer_events::tests::built_in_events_downcast_through_as_any ... ok
+test tracer::tracer_events::tests::llm_response_event_deserializes_records_without_evidence ... ok
+test tracer::null_tracer::tests::test_null_tracer_record_methods ... ok
+test llm::tools::web_search_tool::tests::test_perform_search_success ... ok
+test tracer::tracer_events::tests::llm_response_event_serializes_unknown_evidence_as_null ... ok
+test tracer::tracer_events::tests::llm_response_event_serializes_evidence_as_flat_fields ... ok
+test tracer::null_tracer::tests::test_null_tracer_enable_disable ... ok
+test tracer::null_tracer::tests::test_null_tracer_query_methods ... ok
+test tracer::tracer_events::tests::test_llm_response_event ... ok
+test tracer::tracer_events::tests::test_tool_call_event ... ok
+test tracer::tracer_system::tests::test_disabled_tracer_doesnt_record ... ok
+test tracer::tracer_events::tests::test_llm_call_event ... ok
+test tracer::tracer_system::tests::test_enable_disable ... ok
+test tracer::tracer_system::tests::test_new_tracer_system ... ok
+test tracer::tracer_events::tests::llm_response_summary_shows_reported_evidence ... ok
+test tracer::tracer_events::tests::test_agent_interaction_event ... ok
+test tracer::tracer_system::tests::test_record_llm_call ... ok
+test tracer::tracer_system::tests::record_llm_response_with_evidence_keeps_evidence_unchanged ... ok
+test tracer::tracer_system::tests::test_clear ... ok
+test tracer::tracer_system::tests::test_multiple_events ... ok
+test tracer::tracer_system::tests::test_record_agent_interaction ... ok
+test tracer::tracer_system::tests::test_record_llm_response ... ok
+test tracer::tracer_system::tests::test_record_tool_call ... ok
+test realtime::session::tests::build_session_update_text_only ... ok
+test realtime::session::tests::build_session_update_includes_voice ... ok
+
+test result: ok. 542 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 41.29s
+
+[2m2026-10-24T06:22:45.357222Z[0m [32m INFO[0m [2mcargo_tarpaulin::report[0m[2m:[0m Coverage Results:
+|| Uncovered Lines:
+|| src/agents/async_aggregator_agent.rs: 82, 86, 104-105, 117-118
+|| src/agents/async_llm_agent.rs: 92
+|| src/agents/iterative_problem_solver.rs: 134
+|| src/agents/simple_recursive_agent.rs: 117, 131, 143, 155, 167, 186-187, 190, 283-284, 387-389, 394, 418, 425, 427-431, 433-435, 437, 439, 540-544, 546-548
+|| src/async_dispatcher.rs: 109, 215, 218-219
+|| src/event.rs: 92-93
+|| src/examples/react/decisioning_agent.rs: 103, 107-108, 110-111, 114, 116-117, 119-122, 124-125, 127, 129-136, 140, 143-149, 152-153, 155-160, 165, 167, 169-174, 178-182, 184-186, 189-193
+|| src/examples/react/events.rs: 69-70, 77-78, 103-111, 117-118, 121-122, 125-126, 133, 135-142, 166-167, 170-171, 174, 178-179, 202-203, 206-207, 214-215
+|| src/examples/react/formatters.rs: 97
+|| src/examples/react/summarization_agent.rs: 55, 59-60, 63, 65-66, 68-71, 74-75, 77, 79-86, 90-94, 97
+|| src/examples/react/thinking_agent.rs: 64, 68-69, 72, 74-75, 77-80, 82-83, 85, 87-94, 98, 101-102, 105-108, 111-115
+|| src/examples/react/tool_call_agent.rs: 28-29, 53-60, 75, 91
+|| src/lib.rs: 34
+|| src/llm/broker.rs: 58, 214, 219, 240, 316-320, 324-326, 335, 337-338, 386, 393, 403, 456, 459, 472-474, 476, 480-481, 483-491, 493, 495, 498-504, 508-511, 514, 517-521, 524-529, 531-532, 534-535, 537-541, 543-545, 550, 553-562, 564, 566, 569, 572-579, 585-587, 591-593, 596, 599-604, 607-612, 614, 616-619, 623-626, 628-631, 635-636, 638, 640-645, 650-655, 658-659, 662, 729, 739, 765
+|| src/llm/chat_session.rs: 216, 218, 279-281, 329-331
+|| src/llm/gateway.rs: 144-145
+|| src/llm/gateways/ollama.rs: 321, 323, 350, 352, 385, 387, 421, 437-439, 445, 448, 470, 485-487, 498, 527, 545-546, 554, 571, 577, 657, 689
+|| src/llm/gateways/ollama_stream_events.rs: 22, 39
+|| src/llm/gateways/omlx.rs: 302-303, 599, 607, 614-616, 624-626, 633, 657, 665
+|| src/llm/gateways/openai.rs: 92, 236, 268, 312, 392-394, 427, 429, 454, 476, 478, 487, 516, 524-526, 528, 533-535, 554-556, 562, 565, 597
+|| src/llm/gateways/openai_legacy_stream.rs: 132-133, 135-142, 145, 149-151
+|| src/llm/gateways/openai_messages_adapter.rs: 126-127, 137, 139
+|| src/llm/gateways/openai_model_registry.rs: 160, 562-563
+|| src/llm/gateways/tokenizer_gateway.rs: 57-58, 110-111
+|| src/llm/models.rs: 107-109
+|| src/llm/recovery/adapter.rs: 22, 100, 114, 128-129, 144-147, 159, 171-172, 191, 198-202, 216-217, 219-220, 235, 241
+|| src/llm/recovery/engine.rs: 66-67, 104, 109, 123-124, 129-130, 134-135, 143-144, 148, 154, 157-158, 200, 211, 215, 248, 259, 311, 315, 320, 324-325, 328, 331, 364-365, 368, 380-381, 384-386, 389-390, 403-404, 411-413, 435, 440, 446-448, 450-451, 453, 455-456, 516, 531, 549, 649, 660, 719, 731, 749
+|| src/llm/recovery/frames.rs: 90, 111, 221, 225, 233, 240, 246, 257, 268, 277, 376, 398
+|| src/llm/recovery/types.rs: 319-323
+|| src/llm/stream_events.rs: 111, 151-153, 161, 169-171, 178, 184
+|| src/llm/stream_timing.rs: 134
+|| src/llm/tools/ask_user_tool.rs: 39-42, 44-47, 49, 54-55, 72-73, 96-97
+|| src/llm/tools/current_datetime_tool.rs: 35-36, 84-85
+|| src/llm/tools/ephemeral_task_manager/append_task.rs: 24, 29, 32-33, 35, 38-39, 43, 45-46, 62-63
+|| src/llm/tools/ephemeral_task_manager/clear_tasks.rs: 24, 29-30, 32, 34, 38, 40-41, 51-52
+|| src/llm/tools/ephemeral_task_manager/complete_task.rs: 65-66
+|| src/llm/tools/ephemeral_task_manager/insert_task_after.rs: 69-70
+|| src/llm/tools/ephemeral_task_manager/list_tasks.rs: 66-67
+|| src/llm/tools/ephemeral_task_manager/prepend_task.rs: 62-63
+|| src/llm/tools/ephemeral_task_manager/start_task.rs: 64-65
+|| src/llm/tools/ephemeral_task_manager/task_list.rs: 74, 93, 123-124
+|| src/llm/tools/file_manager.rs: 26-28, 47, 50-52, 55, 57-59, 63, 67, 71, 78-79, 107-109, 111, 113, 116-118, 121, 123-125, 127-128, 130, 132, 136, 140, 145-147, 149-151, 153-156, 159, 163, 167, 172-174, 176-177, 179, 182, 188-189, 192, 194-196, 198-204, 208, 214, 218, 224-227, 229-230, 232-236, 241, 267, 274, 276-277, 299, 304, 306-307, 309, 311, 313-314, 316, 319, 321-322, 333, 340, 342-343, 361, 366, 368-369, 371-373, 375-376, 387, 394, 396-397, 419, 424, 426-427, 429, 431-432, 434-436, 438-439, 450, 457, 459-460, 478, 483, 485-486, 488-489, 491-492, 503, 510, 512-513, 535, 540, 542-543, 545, 547-548, 550-551, 553-554, 565, 572, 574-575, 597, 602, 604-605, 607, 609-610, 612-613, 615-616, 627, 634, 636-637, 659, 664, 666-667, 669, 671-672, 674-676, 678-679, 690, 697, 699-700, 718, 723, 725-726, 728-730, 732-733, 737-741
+|| src/llm/tools/runner.rs: 71, 112, 127, 179-180, 183-184, 193-194
+|| src/llm/tools/simple_date_tool.rs: 50, 64-65, 69-70, 74, 98-100, 105, 156-157
+|| src/llm/tools/tell_user_tool.rs: 48-49, 86-87
+|| src/llm/tools/tool_wrapper.rs: 111-117
+|| src/llm/tools/web_search_tool.rs: 65, 67, 161-162, 185
+|| src/llm/transport.rs: 43
+|| src/realtime/broker.rs: 33, 37, 46-48, 51-56, 58
+|| src/realtime/config.rs: 86, 88-101, 112, 114
+|| src/realtime/openai_gateway.rs: 25-26, 28, 30-32, 39, 46, 49-51, 53-54, 57, 59-61, 75-76, 79-81, 83-85, 88-93, 95, 98, 100, 105-107, 109-110, 113-114
+|| src/realtime/session.rs: 65-66, 69-72, 75-76, 79-80, 83-84, 87-90, 93-94, 100, 107-108, 121, 144-148, 152, 180-181, 183, 191-192, 195-196, 198, 200, 202, 205-207, 210-212, 214, 218, 221-223, 225, 228-231, 234-235, 239-240, 245-248, 251-255, 258-260, 262-263, 265-266, 268-275, 277-278, 280-283, 285, 288-289, 293-296, 298-300, 305-308, 310-312, 317-318, 321-325, 327, 329, 332-333, 336-337, 340-342, 346-350, 354-357, 361-362, 365-367, 371-372, 374-376, 380-381, 384, 387-389, 391, 395-396, 399-402, 407-408, 411-414, 419-420, 423-426, 431-432, 435-438, 443-444, 447, 450-453, 458-460, 462-463, 465, 469-471, 474-475, 479-480, 483, 486, 488, 491-492, 497-500, 503-504, 506-512, 518-521, 525, 529, 533, 536-540, 545-547, 550, 552-557, 560-563, 568-575, 577, 580-584, 587-588, 590, 594-598, 600, 604, 607-610, 613, 615, 617, 625-626, 629-632, 634, 639-645, 673, 675, 702, 705, 707-709, 717, 720-721, 731-732, 738, 740-742, 746-750, 752-753, 755-756, 758-759, 761-762, 764-765, 767, 770-774, 776, 782-784
+|| src/realtime/transport.rs: 24-25, 43, 47, 49-55, 58-60, 62-64, 69, 71-76, 80-83, 87-88, 94-95, 99, 102-105, 112-116, 119-121, 124-125
+|| src/tracer/event_store.rs: 67, 73-74, 76-77, 80-81, 86-87, 93-94, 99, 102, 132, 138, 145, 166, 171, 173-174, 176, 179-180, 182, 185
+|| src/tracer/null_tracer.rs: 37, 157-158
+|| src/tracer/tracer_events.rs: 27-28, 67-68, 93-94, 101-102, 170-171, 174-175, 178-179, 195, 254-255, 258-259, 262-263, 283, 324-325, 328-329, 332-333, 336-341, 346, 353, 378-379, 382-383, 386-387, 408
+|| src/tracer/tracer_system.rs: 59-60, 63, 86, 95, 129, 159, 169, 199, 210, 218, 229-230, 233-242, 245, 268, 314, 319, 333, 339
+|| Tested/Total Lines:
+|| src/agents/async_aggregator_agent.rs: 47/53 +0.00%
+|| src/agents/async_llm_agent.rs: 19/20 +0.00%
+|| src/agents/iterative_problem_solver.rs: 38/39 -2.56%
+|| src/agents/simple_recursive_agent.rs: 130/164 +0.00%
+|| src/async_dispatcher.rs: 74/78 +0.00%
+|| src/context/shared_working_memory.rs: 19/19 +0.00%
+|| src/error.rs: 1/1 +0.00%
+|| src/event.rs: 9/11 +0.00%
+|| src/examples/react/decisioning_agent.rs: 17/77 +0.00%
+|| src/examples/react/events.rs: 20/61 +0.00%
+|| src/examples/react/formatters.rs: 36/37 +0.00%
+|| src/examples/react/models.rs: 4/4 +0.00%
+|| src/examples/react/summarization_agent.rs: 7/34 +0.00%
+|| src/examples/react/thinking_agent.rs: 10/43 +0.00%
+|| src/examples/react/tool_call_agent.rs: 26/38 +0.00%
+|| src/lib.rs: 0/1 +0.00%
+|| src/llm/broker.rs: 218/365 +0.00%
+|| src/llm/chat_session.rs: 83/91 +0.00%
+|| src/llm/gateway.rs: 27/29 +0.00%
+|| src/llm/gateways/ollama.rs: 345/370 +0.00%
+|| src/llm/gateways/ollama_stream_events.rs: 43/45 +0.00%
+|| src/llm/gateways/omlx.rs: 252/265 +0.00%
+|| src/llm/gateways/openai.rs: 268/295 +0.00%
+|| src/llm/gateways/openai_legacy_stream.rs: 57/71 +0.00%
+|| src/llm/gateways/openai_messages_adapter.rs: 69/73 +0.00%
+|| src/llm/gateways/openai_model_registry.rs: 160/163 +0.00%
+|| src/llm/gateways/openai_stream_events.rs: 49/49 +0.00%
+|| src/llm/gateways/tokenizer_gateway.rs: 14/18 +0.00%
+|| src/llm/models.rs: 9/12 +0.00%
+|| src/llm/reasoning.rs: 10/10 +0.00%
+|| src/llm/recovery/adapter.rs: 75/99 +0.00%
+|| src/llm/recovery/capabilities.rs: 23/23 +0.00%
+|| src/llm/recovery/engine.rs: 428/489 +0.00%
+|| src/llm/recovery/frames.rs: 211/223 +0.00%
+|| src/llm/recovery/policy.rs: 27/27 +0.00%
+|| src/llm/recovery/types.rs: 52/57 +0.00%
+|| src/llm/stream_events.rs: 60/70 +0.00%
+|| src/llm/stream_timing.rs: 71/72 +0.00%
+|| src/llm/tools/ask_user_tool.rs: 7/22 +0.00%
+|| src/llm/tools/current_datetime_tool.rs: 11/15 +0.00%
+|| src/llm/tools/ephemeral_task_manager/append_task.rs: 1/13 +0.00%
+|| src/llm/tools/ephemeral_task_manager/clear_tasks.rs: 1/11 +0.00%
+|| src/llm/tools/ephemeral_task_manager/complete_task.rs: 11/13 +0.00%
+|| src/llm/tools/ephemeral_task_manager/insert_task_after.rs: 12/14 +0.00%
+|| src/llm/tools/ephemeral_task_manager/list_tasks.rs: 16/18 +0.00%
+|| src/llm/tools/ephemeral_task_manager/mod.rs: 9/9 +0.00%
+|| src/llm/tools/ephemeral_task_manager/prepend_task.rs: 11/13 +0.00%
+|| src/llm/tools/ephemeral_task_manager/start_task.rs: 11/13 +0.00%
+|| src/llm/tools/ephemeral_task_manager/task.rs: 6/6 +0.00%
+|| src/llm/tools/ephemeral_task_manager/task_list.rs: 39/43 +0.00%
+|| src/llm/tools/file_manager.rs: 31/234 +0.00%
+|| src/llm/tools/runner.rs: 44/53 +0.00%
+|| src/llm/tools/simple_date_tool.rs: 37/49 +0.00%
+|| src/llm/tools/tell_user_tool.rs: 7/11 +0.00%
+|| src/llm/tools/tool.rs: 2/2 +0.00%
+|| src/llm/tools/tool_wrapper.rs: 24/31 +0.00%
+|| src/llm/tools/web_search_tool.rs: 60/65 +0.00%
+|| src/llm/transport.rs: 34/35 +0.00%
+|| src/realtime/broker.rs: 0/12 +0.00%
+|| src/realtime/codec.rs: 15/15 +0.00%
+|| src/realtime/config.rs: 2/19 +0.00%
+|| src/realtime/openai_gateway.rs: 0/41 +0.00%
+|| src/realtime/schemas.rs: 6/6 +0.00%
+|| src/realtime/session.rs: 45/366 +0.00%
+|| src/realtime/transport.rs: 0/47 +0.00%
+|| src/router.rs: 9/9 +0.00%
+|| src/tracer/event_store.rs: 28/53 +0.00%
+|| src/tracer/null_tracer.rs: 15/18 +0.00%
+|| src/tracer/tracer_events.rs: 72/115 +0.00%
+|| src/tracer/tracer_system.rs: 72/101 +0.00%
+|| 
+71.94% coverage, 3646/5068 lines covered, -0.02% change in coverage

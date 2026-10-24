@@ -1,0 +1,19 @@
+   Compiling yoke-derive v0.8.4
+   Compiling uuid v1.29.0
+   Compiling yoke v0.8.3
+   Compiling zerovec v0.11.8
+   Compiling zerotrie v0.2.5
+   Compiling tinystr v0.8.4
+   Compiling potential_utf v0.1.6
+   Compiling icu_collections v2.3.0
+   Compiling icu_locale_core v2.3.0
+   Compiling icu_provider v2.3.1
+   Compiling icu_properties v2.3.0
+   Compiling icu_normalizer v2.3.0
+   Compiling idna_adapter v1.2.2
+   Compiling idna v1.1.0
+   Compiling url v2.5.8
+   Compiling tower-http v0.6.11
+   Compiling reqwest v0.13.5
+   Compiling mojentic v3.0.1 (/home/svetzal/Work/Projects/Personal/mojentic-unify/mojentic-ru)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 34.27s
