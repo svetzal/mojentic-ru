@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- Resolved transitive QUIC and system dependencies to patched releases:
+  `quinn-proto` 0.11.19 (RUSTSEC-2026-0523, MAX_STREAM_DATA could open streams
+  beyond the stream limit; RUSTSEC-2026-0524, long Retry token could panic or
+  exhaust memory), `quinn-udp` 0.5.16 (RUSTSEC-2026-0538, receive loop could
+  spin after a truncated datagram) and `rustix` 1.1.6 (RUSTSEC-2026-0486,
+  unsound xattr functions). Lockfile-only, semver-compatible updates.
 - Resolved transitive TLS dependencies to patched releases: `rustls-webpki`
   0.103.16 (RUSTSEC-2026-0382, distrusted intermediates could be accepted) and
   `webpki-root-certs` 1.0.10 (RUSTSEC-2026-0383). Both are semver-compatible
