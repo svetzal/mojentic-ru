@@ -5,7 +5,7 @@
 //! `TracerEvent` trait which provides timestamps, correlation IDs, and printable summaries.
 
 use crate::llm::models::ResponseEvidence;
-use chrono::{DateTime, Local};
+use jiff::{tz::TimeZone, Timestamp};
 use serde::{Deserialize, Serialize};
 use std::any::Any;
 use std::collections::HashMap;
@@ -103,10 +103,10 @@ impl TracerEvent for LlmCallTracerEvent {
     }
 
     fn printable_summary(&self) -> String {
-        let dt = DateTime::from_timestamp(self.timestamp as i64, 0)
-            .unwrap_or_else(|| DateTime::from_timestamp(0, 0).unwrap())
-            .with_timezone(&Local);
-        let time_str = dt.format("%H:%M:%S%.3f").to_string();
+        let dt = Timestamp::from_second(self.timestamp as i64)
+            .unwrap_or(Timestamp::UNIX_EPOCH)
+            .to_zoned_datetime(TimeZone::system());
+        let time_str = dt.strftime("%H:%M:%S%.3f").to_string();
 
         let mut summary = format!(
             "[{}] LlmCallTracerEvent (correlation_id: {})\n   Model: {}",
@@ -180,10 +180,10 @@ impl TracerEvent for LlmResponseTracerEvent {
     }
 
     fn printable_summary(&self) -> String {
-        let dt = DateTime::from_timestamp(self.timestamp as i64, 0)
-            .unwrap_or_else(|| DateTime::from_timestamp(0, 0).unwrap())
-            .with_timezone(&Local);
-        let time_str = dt.format("%H:%M:%S%.3f").to_string();
+        let dt = Timestamp::from_second(self.timestamp as i64)
+            .unwrap_or(Timestamp::UNIX_EPOCH)
+            .to_zoned_datetime(TimeZone::system());
+        let time_str = dt.strftime("%H:%M:%S%.3f").to_string();
 
         let mut summary = format!(
             "[{}] LlmResponseTracerEvent (correlation_id: {})\n   Model: {}",
@@ -264,10 +264,10 @@ impl TracerEvent for ToolCallTracerEvent {
     }
 
     fn printable_summary(&self) -> String {
-        let dt = DateTime::from_timestamp(self.timestamp as i64, 0)
-            .unwrap_or_else(|| DateTime::from_timestamp(0, 0).unwrap())
-            .with_timezone(&Local);
-        let time_str = dt.format("%H:%M:%S%.3f").to_string();
+        let dt = Timestamp::from_second(self.timestamp as i64)
+            .unwrap_or(Timestamp::UNIX_EPOCH)
+            .to_zoned_datetime(TimeZone::system());
+        let time_str = dt.strftime("%H:%M:%S%.3f").to_string();
 
         let mut summary = format!(
             "[{}] ToolCallTracerEvent (correlation_id: {})\n   Tool: {}",
@@ -334,10 +334,10 @@ impl TracerEvent for ToolBatchTracerEvent {
     }
 
     fn printable_summary(&self) -> String {
-        let dt = DateTime::from_timestamp(self.timestamp as i64, 0)
-            .unwrap_or_else(|| DateTime::from_timestamp(0, 0).unwrap())
-            .with_timezone(&Local);
-        let time_str = dt.format("%H:%M:%S%.3f").to_string();
+        let dt = Timestamp::from_second(self.timestamp as i64)
+            .unwrap_or(Timestamp::UNIX_EPOCH)
+            .to_zoned_datetime(TimeZone::system());
+        let time_str = dt.strftime("%H:%M:%S%.3f").to_string();
         format!(
             "[{}] ToolBatchTracerEvent (correlation_id: {})\n   Batch: {}\n   Tools: {}\n   Outcome: {} ok / {} failed\n   Duration: {:.2}ms",
             time_str,
@@ -388,10 +388,10 @@ impl TracerEvent for AgentInteractionTracerEvent {
     }
 
     fn printable_summary(&self) -> String {
-        let dt = DateTime::from_timestamp(self.timestamp as i64, 0)
-            .unwrap_or_else(|| DateTime::from_timestamp(0, 0).unwrap())
-            .with_timezone(&Local);
-        let time_str = dt.format("%H:%M:%S%.3f").to_string();
+        let dt = Timestamp::from_second(self.timestamp as i64)
+            .unwrap_or(Timestamp::UNIX_EPOCH)
+            .to_zoned_datetime(TimeZone::system());
+        let time_str = dt.strftime("%H:%M:%S%.3f").to_string();
 
         let mut summary = format!(
             "[{}] AgentInteractionTracerEvent (correlation_id: {})\n   From: {} → To: {}\n   Event Type: {}",

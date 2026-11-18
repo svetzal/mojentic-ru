@@ -521,30 +521,36 @@ fn parse_retry_after(
     }
     let value = value.trim();
     // Resolve obsolete two-digit years against the observed wall clock before
-    // validating the weekday. Chrono's fixed %y pivot is not HTTP's moving pivot.
+    // validating the weekday. A fixed %y pivot is not HTTP's moving pivot.
     let obsolete = || {
-        use chrono::Datelike;
         let (weekday, rest) = value.split_once(", ")?;
         let (date, time) = rest.split_once(' ')?;
         let (day_month, short_year) = date.rsplit_once('-')?;
         if short_year.len() != 2 || !short_year.bytes().all(|b| b.is_ascii_digit()) {
             return None;
         }
-        let horizon = chrono::DateTime::<chrono::Utc>::from(wall).year().saturating_add(50);
+        let horizon = i32::from(
+            jiff::Timestamp::try_from(wall)
+                .ok()?
+                .to_zoned_datetime(jiff::tz::TimeZone::UTC)
+                .year(),
+        )
+        .saturating_add(50);
         let mut year = horizon.div_euclid(100) * 100 + short_year.parse::<i32>().ok()?;
         if year > horizon {
             year -= 100;
         }
         let expanded = format!("{weekday}, {day_month}-{year:04} {time}");
-        chrono::NaiveDateTime::parse_from_str(&expanded, "%A, %d-%b-%Y %H:%M:%S GMT").ok()
+        jiff::civil::DateTime::strptime("%A, %d-%b-%Y %H:%M:%S GMT", &expanded).ok()
     };
-    let parsed = chrono::NaiveDateTime::parse_from_str(value, "%a, %d %b %Y %H:%M:%S GMT")
+    let parsed = jiff::civil::DateTime::strptime("%a, %d %b %Y %H:%M:%S GMT", value)
         .ok()
         .or_else(obsolete)
-        .or_else(|| chrono::NaiveDateTime::parse_from_str(value, "%a %b %e %H:%M:%S %Y").ok());
+        .or_else(|| jiff::civil::DateTime::strptime("%a %b %e %H:%M:%S %Y", value).ok());
+    let parsed = parsed.and_then(|date| date.to_zoned_datetime(jiff::tz::TimeZone::UTC).ok());
     match parsed {
         Some(date) => {
-            let seconds = date.and_utc().timestamp();
+            let seconds = date.timestamp().as_second();
             let remaining = if seconds < 0 {
                 Duration::ZERO
             } else {

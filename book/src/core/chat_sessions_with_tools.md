@@ -60,6 +60,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 All of this happens in a single `send()` call.
 
+`resolve_date` uses the local calendar date and returns `resolved_date` as
+`YYYY-MM-DD`, including leap days. `get_current_datetime` returns an integer Unix
+`timestamp`, a numeric `timezone` offset, and `current_datetime` (by default
+`YYYY-MM-DD HH:MM:SS`). Set its `format_string` to `%+` for RFC 3339 output with
+the local offset and fractional seconds. These payloads remain compatible with
+records written before 3.0.2.
+
 ## Multiple Tools
 
 Provide multiple tools for different capabilities:

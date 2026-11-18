@@ -1,0 +1,330 @@
+{
+  "contract": "datetime-compat-v1",
+  "current_default": {
+    "current_datetime": "2024-02-28 23:45:12",
+    "timestamp": 1709144112,
+    "timezone": "+05:30"
+  },
+  "current_rfc3339": {
+    "current_datetime": "2024-02-28T23:45:12.123456789+05:30",
+    "timestamp": 1709144112,
+    "timezone": "+05:30"
+  },
+  "dates": [
+    {
+      "relative_date": "today",
+      "resolved_date": "2024-02-28",
+      "summary": "The date 'today' is 2024-02-28"
+    },
+    {
+      "relative_date": "tomorrow",
+      "resolved_date": "2024-02-29",
+      "summary": "The date 'tomorrow' is 2024-02-29"
+    },
+    {
+      "relative_date": "yesterday",
+      "resolved_date": "2024-02-27",
+      "summary": "The date 'yesterday' is 2024-02-27"
+    },
+    {
+      "relative_date": "3 days from now",
+      "resolved_date": "2024-03-02",
+      "summary": "The date '3 days from now' is 2024-03-02"
+    },
+    {
+      "relative_date": "2 days ago",
+      "resolved_date": "2024-02-26",
+      "summary": "The date '2 days ago' is 2024-02-26"
+    },
+    {
+      "relative_date": "next week",
+      "resolved_date": "2024-03-06",
+      "summary": "The date 'next week' is 2024-03-06"
+    },
+    {
+      "relative_date": "last week",
+      "resolved_date": "2024-02-21",
+      "summary": "The date 'last week' is 2024-02-21"
+    },
+    {
+      "relative_date": "unknown",
+      "resolved_date": "2024-02-28",
+      "summary": "The date 'unknown' is 2024-02-28"
+    }
+  ],
+  "rfc3339": "2024-02-28T23:45:12.123456789+05:30",
+  "tracer_event": {
+    "correlation_id": "chrono-era",
+    "messages": [],
+    "model": "fixture-model",
+    "source": "fixture",
+    "timestamp": 1709144112.1234567,
+    "tools": null
+  },
+  "formats": [
+    {
+      "rfc3339": "2024-02-28T23:45:12+05:30",
+      "format_string": "%+",
+      "current_datetime": "2024-02-28T23:45:12+05:30",
+      "timezone": "+05:30"
+    },
+    {
+      "rfc3339": "2024-02-28T23:45:12+05:30",
+      "format_string": "%A, %B %d, %Y",
+      "current_datetime": "Wednesday, February 28, 2024",
+      "timezone": "+05:30"
+    },
+    {
+      "rfc3339": "2024-02-28T23:45:12+05:30",
+      "format_string": "%Y-%m-%d",
+      "current_datetime": "2024-02-28",
+      "timezone": "+05:30"
+    },
+    {
+      "rfc3339": "2024-02-28T23:45:12+05:30",
+      "format_string": "%H:%M:%S%.3f",
+      "current_datetime": "23:45:12.000",
+      "timezone": "+05:30"
+    },
+    {
+      "rfc3339": "2024-02-28T23:45:12+05:30",
+      "format_string": "%%+ %Y",
+      "current_datetime": "%+ 2024",
+      "timezone": "+05:30"
+    },
+    {
+      "rfc3339": "2024-02-28T23:45:12+05:30",
+      "format_string": "%Z",
+      "current_datetime": "+05:30",
+      "timezone": "+05:30"
+    },
+    {
+      "rfc3339": "2024-02-28T23:45:12+05:30",
+      "format_string": "%c",
+      "current_datetime": "Wed Feb 28 23:45:12 2024",
+      "timezone": "+05:30"
+    },
+    {
+      "rfc3339": "2024-02-28T23:45:12+05:30",
+      "format_string": "%x",
+      "current_datetime": "02/28/24",
+      "timezone": "+05:30"
+    },
+    {
+      "rfc3339": "2024-02-28T23:45:12+05:30",
+      "format_string": "%X",
+      "current_datetime": "23:45:12",
+      "timezone": "+05:30"
+    },
+    {
+      "rfc3339": "2024-02-28T23:45:12+05:30",
+      "format_string": "%r",
+      "current_datetime": "11:45:12 PM",
+      "timezone": "+05:30"
+    },
+    {
+      "rfc3339": "2024-02-28T23:45:12+05:30",
+      "format_string": "%f %.f",
+      "current_datetime": "000000000 ",
+      "timezone": "+05:30"
+    },
+    {
+      "rfc3339": "2024-02-28T23:45:12.123+05:30",
+      "format_string": "%+",
+      "current_datetime": "2024-02-28T23:45:12.123+05:30",
+      "timezone": "+05:30"
+    },
+    {
+      "rfc3339": "2024-02-28T23:45:12.123+05:30",
+      "format_string": "%A, %B %d, %Y",
+      "current_datetime": "Wednesday, February 28, 2024",
+      "timezone": "+05:30"
+    },
+    {
+      "rfc3339": "2024-02-28T23:45:12.123+05:30",
+      "format_string": "%Y-%m-%d",
+      "current_datetime": "2024-02-28",
+      "timezone": "+05:30"
+    },
+    {
+      "rfc3339": "2024-02-28T23:45:12.123+05:30",
+      "format_string": "%H:%M:%S%.3f",
+      "current_datetime": "23:45:12.123",
+      "timezone": "+05:30"
+    },
+    {
+      "rfc3339": "2024-02-28T23:45:12.123+05:30",
+      "format_string": "%%+ %Y",
+      "current_datetime": "%+ 2024",
+      "timezone": "+05:30"
+    },
+    {
+      "rfc3339": "2024-02-28T23:45:12.123+05:30",
+      "format_string": "%Z",
+      "current_datetime": "+05:30",
+      "timezone": "+05:30"
+    },
+    {
+      "rfc3339": "2024-02-28T23:45:12.123+05:30",
+      "format_string": "%c",
+      "current_datetime": "Wed Feb 28 23:45:12 2024",
+      "timezone": "+05:30"
+    },
+    {
+      "rfc3339": "2024-02-28T23:45:12.123+05:30",
+      "format_string": "%x",
+      "current_datetime": "02/28/24",
+      "timezone": "+05:30"
+    },
+    {
+      "rfc3339": "2024-02-28T23:45:12.123+05:30",
+      "format_string": "%X",
+      "current_datetime": "23:45:12",
+      "timezone": "+05:30"
+    },
+    {
+      "rfc3339": "2024-02-28T23:45:12.123+05:30",
+      "format_string": "%r",
+      "current_datetime": "11:45:12 PM",
+      "timezone": "+05:30"
+    },
+    {
+      "rfc3339": "2024-02-28T23:45:12.123+05:30",
+      "format_string": "%f %.f",
+      "current_datetime": "123000000 .123",
+      "timezone": "+05:30"
+    },
+    {
+      "rfc3339": "2024-02-28T23:45:12.123400+05:30",
+      "format_string": "%+",
+      "current_datetime": "2024-02-28T23:45:12.123400+05:30",
+      "timezone": "+05:30"
+    },
+    {
+      "rfc3339": "2024-02-28T23:45:12.123400+05:30",
+      "format_string": "%A, %B %d, %Y",
+      "current_datetime": "Wednesday, February 28, 2024",
+      "timezone": "+05:30"
+    },
+    {
+      "rfc3339": "2024-02-28T23:45:12.123400+05:30",
+      "format_string": "%Y-%m-%d",
+      "current_datetime": "2024-02-28",
+      "timezone": "+05:30"
+    },
+    {
+      "rfc3339": "2024-02-28T23:45:12.123400+05:30",
+      "format_string": "%H:%M:%S%.3f",
+      "current_datetime": "23:45:12.123",
+      "timezone": "+05:30"
+    },
+    {
+      "rfc3339": "2024-02-28T23:45:12.123400+05:30",
+      "format_string": "%%+ %Y",
+      "current_datetime": "%+ 2024",
+      "timezone": "+05:30"
+    },
+    {
+      "rfc3339": "2024-02-28T23:45:12.123400+05:30",
+      "format_string": "%Z",
+      "current_datetime": "+05:30",
+      "timezone": "+05:30"
+    },
+    {
+      "rfc3339": "2024-02-28T23:45:12.123400+05:30",
+      "format_string": "%c",
+      "current_datetime": "Wed Feb 28 23:45:12 2024",
+      "timezone": "+05:30"
+    },
+    {
+      "rfc3339": "2024-02-28T23:45:12.123400+05:30",
+      "format_string": "%x",
+      "current_datetime": "02/28/24",
+      "timezone": "+05:30"
+    },
+    {
+      "rfc3339": "2024-02-28T23:45:12.123400+05:30",
+      "format_string": "%X",
+      "current_datetime": "23:45:12",
+      "timezone": "+05:30"
+    },
+    {
+      "rfc3339": "2024-02-28T23:45:12.123400+05:30",
+      "format_string": "%r",
+      "current_datetime": "11:45:12 PM",
+      "timezone": "+05:30"
+    },
+    {
+      "rfc3339": "2024-02-28T23:45:12.123400+05:30",
+      "format_string": "%f %.f",
+      "current_datetime": "123400000 .123400",
+      "timezone": "+05:30"
+    },
+    {
+      "rfc3339": "1969-12-31T23:59:59.999999999+00:00",
+      "format_string": "%+",
+      "current_datetime": "1969-12-31T23:59:59.999999999+00:00",
+      "timezone": "+00:00"
+    },
+    {
+      "rfc3339": "1969-12-31T23:59:59.999999999+00:00",
+      "format_string": "%A, %B %d, %Y",
+      "current_datetime": "Wednesday, December 31, 1969",
+      "timezone": "+00:00"
+    },
+    {
+      "rfc3339": "1969-12-31T23:59:59.999999999+00:00",
+      "format_string": "%Y-%m-%d",
+      "current_datetime": "1969-12-31",
+      "timezone": "+00:00"
+    },
+    {
+      "rfc3339": "1969-12-31T23:59:59.999999999+00:00",
+      "format_string": "%H:%M:%S%.3f",
+      "current_datetime": "23:59:59.999",
+      "timezone": "+00:00"
+    },
+    {
+      "rfc3339": "1969-12-31T23:59:59.999999999+00:00",
+      "format_string": "%%+ %Y",
+      "current_datetime": "%+ 1969",
+      "timezone": "+00:00"
+    },
+    {
+      "rfc3339": "1969-12-31T23:59:59.999999999+00:00",
+      "format_string": "%Z",
+      "current_datetime": "+00:00",
+      "timezone": "+00:00"
+    },
+    {
+      "rfc3339": "1969-12-31T23:59:59.999999999+00:00",
+      "format_string": "%c",
+      "current_datetime": "Wed Dec 31 23:59:59 1969",
+      "timezone": "+00:00"
+    },
+    {
+      "rfc3339": "1969-12-31T23:59:59.999999999+00:00",
+      "format_string": "%x",
+      "current_datetime": "12/31/69",
+      "timezone": "+00:00"
+    },
+    {
+      "rfc3339": "1969-12-31T23:59:59.999999999+00:00",
+      "format_string": "%X",
+      "current_datetime": "23:59:59",
+      "timezone": "+00:00"
+    },
+    {
+      "rfc3339": "1969-12-31T23:59:59.999999999+00:00",
+      "format_string": "%r",
+      "current_datetime": "11:59:59 PM",
+      "timezone": "+00:00"
+    },
+    {
+      "rfc3339": "1969-12-31T23:59:59.999999999+00:00",
+      "format_string": "%f %.f",
+      "current_datetime": "999999999 .999999999",
+      "timezone": "+00:00"
+    }
+  ]
+}

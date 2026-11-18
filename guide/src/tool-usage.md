@@ -279,7 +279,7 @@ Ok(json!({
             "age": 30
         }
     },
-    "timestamp": chrono::Utc::now()
+    "timestamp": jiff::Timestamp::now().to_string()
 }))
 ```
 

@@ -1665,9 +1665,10 @@ async fn rfc850_century_is_resolved_before_weekday_and_floor_validation() {
         .expect(1)
         .create_async()
         .await;
-    let wall_seconds = chrono::DateTime::parse_from_rfc3339("2026-10-10T00:00:00Z")
+    let wall_seconds = "2026-10-10T00:00:00Z"
+        .parse::<jiff::Timestamp>()
         .expect("fixture clock")
-        .timestamp() as u64;
+        .as_second() as u64;
     let clock = Arc::new(Clock {
         wall_seconds,
         ..Default::default()
@@ -1698,9 +1699,9 @@ async fn rfc850_century_is_resolved_before_weekday_and_floor_validation() {
         panic!("valid HTTP date")
     };
     assert_eq!(
-        chrono::DateTime::from_timestamp(unix_seconds, 0)
+        jiff::Timestamp::from_second(unix_seconds)
             .expect("date")
-            .format("%Y")
+            .strftime("%Y")
             .to_string(),
         "2075"
     );
@@ -4182,9 +4183,9 @@ fn capability_contract_public_adapters_v1() {
             ));
             assert!(evidence["documentation"].as_str().expect("citation").starts_with("https://"));
             assert!(!evidence["basis"].as_str().expect("basis").is_empty());
-            assert!(chrono::NaiveDate::parse_from_str(
-                evidence["inspected_on"].as_str().expect("date"),
-                "%Y-%m-%d"
+            assert!(jiff::civil::Date::strptime(
+                "%Y-%m-%d",
+                evidence["inspected_on"].as_str().expect("date")
             )
             .is_ok());
             expected_values.insert(key.into(), evidence["value"].clone());

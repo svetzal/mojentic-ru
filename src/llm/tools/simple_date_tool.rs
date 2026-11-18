@@ -1,7 +1,7 @@
 use crate::error::Result;
 use crate::llm::tools::{FunctionDescriptor, LlmTool, ToolDescriptor};
 use async_trait::async_trait;
-use chrono::{Local, NaiveDate};
+use jiff::civil::Date;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 
@@ -33,45 +33,33 @@ impl SimpleDateTool {
     /// - "today", "tomorrow", "yesterday"
     /// - "X days from now", "X days ago"
     /// - "next week", "last week"
-    fn parse_relative_date(&self, relative_date: &str) -> Result<NaiveDate> {
-        let today = Local::now().date_naive();
+    fn parse_relative_date(&self, relative_date: &str) -> Result<Date> {
+        let today = super::datetime::now().date();
         let lower = relative_date.to_lowercase();
 
-        // Simple pattern matching for common cases
-        if lower.contains("today") {
-            return Ok(today);
-        }
-
-        if lower.contains("tomorrow") {
-            return Ok(today + chrono::Duration::days(1));
-        }
-
-        if lower.contains("yesterday") {
-            return Ok(today - chrono::Duration::days(1));
-        }
-
-        // Parse "X days from now"
-        if let Some(days) = self.extract_days_offset(&lower, "from now") {
-            return Ok(today + chrono::Duration::days(days));
-        }
-
-        // Parse "X days ago"
-        if let Some(days) = self.extract_days_offset(&lower, "ago") {
-            return Ok(today - chrono::Duration::days(days));
-        }
-
-        // Parse "next week"
-        if lower.contains("next week") {
-            return Ok(today + chrono::Duration::weeks(1));
-        }
-
-        // Parse "last week"
-        if lower.contains("last week") {
-            return Ok(today - chrono::Duration::weeks(1));
-        }
-
-        // Default to today if we can't parse
-        Ok(today)
+        let days = if lower.contains("today") {
+            0
+        } else if lower.contains("tomorrow") {
+            1
+        } else if lower.contains("yesterday") {
+            -1
+        } else if let Some(days) = self.extract_days_offset(&lower, "from now") {
+            days
+        } else if let Some(days) = self.extract_days_offset(&lower, "ago") {
+            days.checked_neg().ok_or_else(|| {
+                crate::error::MojenticError::ToolError("Date offset out of range".into())
+            })?
+        } else if lower.contains("next week") {
+            7
+        } else if lower.contains("last week") {
+            -7
+        } else {
+            0
+        };
+        jiff::Span::new()
+            .try_days(days)
+            .and_then(|offset| today.checked_add(offset))
+            .map_err(|error| crate::error::MojenticError::ToolError(error.to_string()))
     }
 
     /// Extract numeric offset from phrases like "3 days from now"
@@ -121,7 +109,7 @@ impl LlmTool for SimpleDateTool {
             })?;
 
         let resolved_date = self.parse_relative_date(relative_date)?;
-        let formatted_date = resolved_date.format("%Y-%m-%d").to_string();
+        let formatted_date = resolved_date.to_string();
 
         Ok(json!({
             "relative_date": relative_date,
@@ -170,58 +158,6 @@ mod tests {
         assert_eq!(desc.r#type, "function");
         assert_eq!(desc.function.name, "resolve_date");
         assert!(desc.function.description.contains("relative date"));
-    }
-
-    #[tokio::test]
-    async fn test_resolve_today() {
-        let tool = SimpleDateTool;
-        let args = HashMap::from([("relative_date".to_string(), json!("today"))]);
-
-        let result = tool.run(&args, &crate::llm::tools::ToolRunCtx::default()).await.unwrap();
-        let today = Local::now().date_naive().format("%Y-%m-%d").to_string();
-
-        assert_eq!(result["relative_date"], "today");
-        assert_eq!(result["resolved_date"], today);
-    }
-
-    #[tokio::test]
-    async fn test_resolve_tomorrow() {
-        let tool = SimpleDateTool;
-        let args = HashMap::from([("relative_date".to_string(), json!("tomorrow"))]);
-
-        let result = tool.run(&args, &crate::llm::tools::ToolRunCtx::default()).await.unwrap();
-        let tomorrow = (Local::now().date_naive() + chrono::Duration::days(1))
-            .format("%Y-%m-%d")
-            .to_string();
-
-        assert_eq!(result["relative_date"], "tomorrow");
-        assert_eq!(result["resolved_date"], tomorrow);
-    }
-
-    #[tokio::test]
-    async fn test_resolve_days_from_now() {
-        let tool = SimpleDateTool;
-        let args = HashMap::from([("relative_date".to_string(), json!("3 days from now"))]);
-
-        let result = tool.run(&args, &crate::llm::tools::ToolRunCtx::default()).await.unwrap();
-        let expected = (Local::now().date_naive() + chrono::Duration::days(3))
-            .format("%Y-%m-%d")
-            .to_string();
-
-        assert_eq!(result["resolved_date"], expected);
-    }
-
-    #[tokio::test]
-    async fn test_resolve_days_ago() {
-        let tool = SimpleDateTool;
-        let args = HashMap::from([("relative_date".to_string(), json!("2 days ago"))]);
-
-        let result = tool.run(&args, &crate::llm::tools::ToolRunCtx::default()).await.unwrap();
-        let expected = (Local::now().date_naive() - chrono::Duration::days(2))
-            .format("%Y-%m-%d")
-            .to_string();
-
-        assert_eq!(result["resolved_date"], expected);
     }
 
     #[tokio::test]

@@ -7,8 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.2] - 2026-11-18
+
 ### Security
 
+- Replaced the unmaintained `chrono` dependency (RUSTSEC-2026-0543) with
+  `jiff` 1.x. Public timestamp types and JSON representations remain unchanged;
+  chrono-era tracer records and date-tool output are covered by a fixed-clock
+  compatibility fixture, including RFC 3339 offsets and fractional seconds.
 - Resolved transitive QUIC and system dependencies to patched releases:
   `quinn-proto` 0.11.19 (RUSTSEC-2026-0523, MAX_STREAM_DATA could open streams
   beyond the stream limit; RUSTSEC-2026-0524, long Retry token could panic or

@@ -1,6 +1,6 @@
 [package]
 name = "mojentic"
-version = "3.0.1"
+version = "3.0.2"
 edition = "2021"
 authors = ["Stacey Vetzal <stacey@vetzal.com>"]
 description = "An LLM integration framework for Rust"
@@ -57,7 +57,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1.0", features = ["v4", "serde"] }
 
 # Date/time handling
-chrono = "0.4"
+jiff = "1"
 
 # Tokenization
 tiktoken-rs = "0.12"
