@@ -20,8 +20,11 @@ Run it with `cargo test --all-features chrono_era_v1_payloads_remain_compatible`
 this is also part of the normal test and coverage gates.
 
 Producer fixture generation passed at the baseline above. Consumer verification
-passed in the 3.0.2 working tree based on that commit; Foundry assigns the final
-commit. The existing public recovery suite separately verifies numeric and all
+passed at mojentic 3.0.2, commit `65cac2aef2602ada0447dc33b66a24ffc3e95232`
+(jiff 1.0.1), and was re-run on 2026-11-20 with fixture SHA-256 unchanged.
+At that commit `cargo tree -i chrono --all-features --target all` matches no
+package, and `cargo deny check` reports advisories, bans, licenses and sources
+ok with no ignore entries added. The existing public recovery suite separately verifies numeric and all
 three HTTP Retry-After date forms, errors and the moving RFC 850 century pivot.
 This change replaces an internal dependency; it does not change an application
 or repository protocol or require changes in another authorized repository.
