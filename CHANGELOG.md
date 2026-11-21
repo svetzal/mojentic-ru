@@ -7,8 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [3.0.2] - 2026-11-20
-
 ### Changed
 
 - `tracing-subscriber` is now a dev-dependency used only by the examples. The
@@ -28,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unescaped `Arc<dyn LlmTool>`) now render; `cargo doc` is warning-free.
 - The packaged-consumer verifier compares resolved paths, so it also passes
   where the temporary directory is a symlink (macOS `/var` → `/private/var`).
+
+## [3.0.2] - 2026-11-20
 
 ### Security
 
