@@ -21,16 +21,16 @@ jobs:
     # Skip job if actor is github-actions[bot] to ensure agent safety
     if: ${{ github.actor != 'github-actions[bot]' }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Set up Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
           toolchain: stable
           components: rustfmt, clippy
 
       - name: Cache cargo registry
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cargo/registry
           key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
@@ -38,7 +38,7 @@ jobs:
             ${{ runner.os }}-cargo-registry-
 
       - name: Cache cargo index
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: ~/.cargo/git
           key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
@@ -46,7 +46,7 @@ jobs:
             ${{ runner.os }}-cargo-git-
 
       - name: Cache cargo build
-        uses: actions/cache@v5
+        uses: actions/cache@v6
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
@@ -63,16 +63,16 @@ jobs:
     # Skip job if actor is github-actions[bot] to ensure agent safety
     if: ${{ github.actor != 'github-actions[bot]' }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Set up Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
           toolchain: stable
           components: rustfmt
 
       - name: Restore cargo registry cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: ~/.cargo/registry
           key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
@@ -80,7 +80,7 @@ jobs:
             ${{ runner.os }}-cargo-registry-
 
       - name: Restore cargo index cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: ~/.cargo/git
           key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
@@ -88,7 +88,7 @@ jobs:
             ${{ runner.os }}-cargo-git-
 
       - name: Restore cargo build cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
@@ -105,16 +105,16 @@ jobs:
     # Skip job if actor is github-actions[bot] to ensure agent safety
     if: ${{ github.actor != 'github-actions[bot]' }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Set up Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
           toolchain: stable
           components: clippy
 
       - name: Restore cargo registry cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: ~/.cargo/registry
           key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
@@ -122,7 +122,7 @@ jobs:
             ${{ runner.os }}-cargo-registry-
 
       - name: Restore cargo index cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: ~/.cargo/git
           key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
@@ -130,7 +130,7 @@ jobs:
             ${{ runner.os }}-cargo-git-
 
       - name: Restore cargo build cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
@@ -147,15 +147,15 @@ jobs:
     # Skip job if actor is github-actions[bot] to ensure agent safety
     if: ${{ github.actor != 'github-actions[bot]' }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Set up Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
           toolchain: stable
 
       - name: Restore cargo registry cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: ~/.cargo/registry
           key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
@@ -163,7 +163,7 @@ jobs:
             ${{ runner.os }}-cargo-registry-
 
       - name: Restore cargo index cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: ~/.cargo/git
           key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
@@ -171,7 +171,7 @@ jobs:
             ${{ runner.os }}-cargo-git-
 
       - name: Restore cargo build cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
@@ -188,15 +188,15 @@ jobs:
     # Skip job if actor is github-actions[bot] to ensure agent safety
     if: ${{ github.actor != 'github-actions[bot]' }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Set up Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
           toolchain: stable
 
       - name: Restore cargo registry cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: ~/.cargo/registry
           key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
@@ -204,7 +204,7 @@ jobs:
             ${{ runner.os }}-cargo-registry-
 
       - name: Restore cargo index cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: ~/.cargo/git
           key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
@@ -212,7 +212,7 @@ jobs:
             ${{ runner.os }}-cargo-git-
 
       - name: Restore cargo build cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
@@ -236,15 +236,15 @@ jobs:
     # Skip job if actor is github-actions[bot] to ensure agent safety
     if: ${{ github.actor != 'github-actions[bot]' }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Set up Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
           toolchain: stable
 
       - name: Restore cargo registry cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: ~/.cargo/registry
           key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
@@ -252,7 +252,7 @@ jobs:
             ${{ runner.os }}-cargo-registry-
 
       - name: Restore cargo index cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: ~/.cargo/git
           key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
@@ -260,7 +260,7 @@ jobs:
             ${{ runner.os }}-cargo-git-
 
       - name: Restore cargo build cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
@@ -268,13 +268,13 @@ jobs:
             ${{ runner.os }}-cargo-build-
 
       - name: Install cargo-audit
-        run: cargo install cargo-audit --quiet 2>&1 | grep -E "(Installed|already installed)" || echo "Installing cargo-audit..."
+        run: cargo install --locked cargo-audit --quiet 2>&1 | grep -E "(Installed|already installed)" || echo "Installing cargo-audit..."
 
       - name: Run security audit
         run: cargo audit
 
       - name: Install cargo-deny
-        run: cargo install cargo-deny --quiet 2>&1 | grep -E "(Installed|already installed)" || echo "Installing cargo-deny..."
+        run: cargo install --locked cargo-deny --quiet 2>&1 | grep -E "(Installed|already installed)" || echo "Installing cargo-deny..."
 
       - name: Run license and advisory check
         run: cargo deny check
@@ -286,19 +286,19 @@ jobs:
     # Only run on release publish events
     if: github.event_name == 'release' && github.event.action == 'published'
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Set up Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
           toolchain: stable
 
       - name: Install mdBook
         run: |
-          cargo install mdbook --quiet 2>&1 | grep -E "(Installed|already installed)" || echo "Installing mdBook..."
+          cargo install --locked mdbook --quiet 2>&1 | grep -E "(Installed|already installed)" || echo "Installing mdBook..."
 
       - name: Restore cargo registry cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: ~/.cargo/registry
           key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
@@ -306,7 +306,7 @@ jobs:
             ${{ runner.os }}-cargo-registry-
 
       - name: Restore cargo index cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: ~/.cargo/git
           key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
@@ -314,7 +314,7 @@ jobs:
             ${{ runner.os }}-cargo-git-
 
       - name: Restore cargo build cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
@@ -335,7 +335,7 @@ jobs:
           cp -R book/book/* site/
 
       - name: Upload documentation site
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: documentation-site
           path: site/
@@ -352,13 +352,13 @@ jobs:
     if: github.event_name == 'release' && github.event.action == 'published'
     steps:
       - name: Download documentation site
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: documentation-site
           path: docs/
 
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-pages-artifact@v5
         with:
           path: docs/
 
@@ -375,15 +375,15 @@ jobs:
     if: github.event_name == 'release' && github.event.action == 'published' && startsWith(github.event.release.tag_name, 'v')
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Set up Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
           toolchain: stable
 
       - name: Restore cargo registry cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: ~/.cargo/registry
           key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
@@ -391,7 +391,7 @@ jobs:
             ${{ runner.os }}-cargo-registry-
 
       - name: Restore cargo index cache
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: ~/.cargo/git
           key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}

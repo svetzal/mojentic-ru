@@ -7,7 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [3.0.2] - 2026-11-18
+## [3.0.2] - 2026-11-20
+
+### Changed
+
+- `tracing-subscriber` is now a dev-dependency used only by the examples. The
+  library emits `tracing` events and never installed a subscriber, so dependents
+  no longer compile `tracing-subscriber` through mojentic. A dependent that
+  relied on mojentic to enable `tracing-subscriber`'s `env-filter` feature must
+  enable it in its own manifest. Found by Rust 1.100's unused-dependency lint.
+- Verified on Rust stable 1.100.0. CI continues to build on the current stable
+  toolchain (no pin, no declared MSRV) and now uses current action majors
+  (`actions/checkout` v7, `actions/cache` v6, `setup-rust-toolchain` v2,
+  `upload-artifact` v7, `download-artifact` v8, `upload-pages-artifact` v5) and
+  `--locked` installs of the latest `cargo-audit`, `cargo-deny` and `mdbook`.
+
+### Fixed
+
+- Two broken rustdoc references (`RealtimeVoiceBroker::connect` link and an
+  unescaped `Arc<dyn LlmTool>`) now render; `cargo doc` is warning-free.
+- The packaged-consumer verifier compares resolved paths, so it also passes
+  where the temporary directory is a symlink (macOS `/var` → `/private/var`).
 
 ### Security
 

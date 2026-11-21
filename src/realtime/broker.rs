@@ -11,7 +11,7 @@ use uuid::Uuid;
 
 /// Long-lived broker that opens duplex realtime sessions against a
 /// gateway. Reusable across many concurrent sessions; the
-/// [`RealtimeSession`] returned by [`connect`] owns the socket
+/// [`RealtimeSession`] returned by [`connect`](Self::connect) owns the socket
 /// lifetime.
 pub struct RealtimeVoiceBroker {
     model: String,

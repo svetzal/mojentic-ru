@@ -83,7 +83,7 @@ impl Event for InvokeDecisioning {
 ///
 /// This event carries the information needed to execute a specific tool
 /// with given arguments, along with the reasoning behind the decision.
-/// Note: Cannot be cloned/serialized due to Arc<dyn LlmTool>.
+/// Note: Cannot be cloned/serialized due to `Arc<dyn LlmTool>`.
 pub struct InvokeToolCall {
     pub source: String,
     pub correlation_id: Option<String>,

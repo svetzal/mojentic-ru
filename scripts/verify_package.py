@@ -64,7 +64,7 @@ def main():
     dependency = next(d for d in next(p for p in metadata["packages"] if p["name"] == "mojentic-packaged-consumer")["dependencies"] if d["name"] == "mojentic")
     assert Path(dependency["path"]).resolve() == library.resolve(), dependency
     resolved = next(p for p in metadata["packages"] if p["name"] == "mojentic")
-    assert Path(resolved["manifest_path"]).resolve() == library / "Cargo.toml", resolved
+    assert Path(resolved["manifest_path"]).resolve() == library.resolve() / "Cargo.toml", resolved
     assert not str(library).startswith(str(ROOT)), "consumer must use extracted artifact"
     run("cargo", "test", "--offline", "--verbose", "--all-features", cwd=consumer)
     timing_contract = json.loads((library / "tests/contracts/stream_timing_v1.json").read_text())
