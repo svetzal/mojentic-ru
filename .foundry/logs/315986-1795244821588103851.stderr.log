@@ -1,0 +1,18 @@
+ Downloading crates ...
+  Downloaded regex v1.13.2
+  Downloaded regex-syntax v0.8.12
+  Downloaded regex-automata v0.4.19
+    Checking regex-syntax v0.8.12
+    Checking jiff-core v1.0.1
+    Checking uuid v1.29.3
+    Checking tempfile v3.27.0
+    Checking jiff v1.0.1
+    Checking regex-automata v0.4.19
+    Checking fancy-regex v0.19.2
+    Checking bstr v1.13.1
+    Checking regex v1.13.2
+    Checking matchers v0.2.0
+    Checking tracing-subscriber v0.3.23
+    Checking tiktoken-rs v0.12.1
+    Checking mojentic v3.0.2 (/home/svetzal/Work/Projects/Personal/mojentic-unify/mojentic-ru)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 44.11s

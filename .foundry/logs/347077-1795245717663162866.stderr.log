@@ -1,0 +1,204 @@
+warning[duplicate]: found 2 duplicate entries for crate 'base64'
+   ┌─ /home/svetzal/Work/Projects/Personal/mojentic-unify/mojentic-ru/Cargo.lock:9:1
+   │  
+ 9 │ ╭ base64 0.22.1 registry+https://github.com/rust-lang/crates.io-index
+10 │ │ base64 0.23.1 registry+https://github.com/rust-lang/crates.io-index
+   │ ╰───────────────────────────────────────────────────────────────────┘ lock entries
+   │  
+   ├ base64 v0.22.1
+     └── tiktoken-rs v0.12.1
+         └── mojentic v3.0.2
+   ├ base64 v0.23.1
+     ├── hyper-util v0.1.21
+     │   ├── hyper-rustls v0.27.10
+     │   │   └── reqwest v0.13.5
+     │   │       └── mojentic v3.0.2
+     │   └── reqwest v0.13.5 (*)
+     ├── mojentic v3.0.2 (*)
+     └── reqwest v0.13.5 (*)
+
+warning[duplicate]: found 2 duplicate entries for crate 'syn'
+    ┌─ /home/svetzal/Work/Projects/Personal/mojentic-unify/mojentic-ru/Cargo.lock:162:1
+    │  
+162 │ ╭ syn 2.0.119 registry+https://github.com/rust-lang/crates.io-index
+163 │ │ syn 3.0.6 registry+https://github.com/rust-lang/crates.io-index
+    │ ╰───────────────────────────────────────────────────────────────┘ lock entries
+    │  
+    ├ syn v2.0.119
+      ├── async-stream-impl v0.3.6
+      │   └── async-stream v0.3.6
+      │       └── mojentic v3.0.2
+      ├── jni-macros v0.22.4
+      │   └── jni v0.22.4
+      │       └── rustls-platform-verifier v0.7.1
+      │           └── reqwest v0.13.5
+      │               └── mojentic v3.0.2 (*)
+      ├── jni-sys-macros v0.4.1
+      │   └── jni-sys v0.4.1
+      │       └── jni v0.22.4 (*)
+      ├── openssl-macros v0.1.1
+      │   └── openssl v0.10.81
+      │       └── native-tls v0.2.18
+      │           ├── tokio-native-tls v0.3.1
+      │           │   └── tokio-tungstenite v0.30.0
+      │           │       └── mojentic v3.0.2 (*)
+      │           ├── tokio-tungstenite v0.30.0 (*)
+      │           └── tungstenite v0.30.0
+      │               └── tokio-tungstenite v0.30.0 (*)
+      └── tracing-attributes v0.1.31
+          └── tracing v0.1.44
+              ├── h2 v0.4.19
+              │   ├── hyper v1.11.1
+              │   │   ├── hyper-rustls v0.27.10
+              │   │   │   └── reqwest v0.13.5 (*)
+              │   │   ├── hyper-util v0.1.21
+              │   │   │   ├── hyper-rustls v0.27.10 (*)
+              │   │   │   └── reqwest v0.13.5 (*)
+              │   │   └── reqwest v0.13.5 (*)
+              │   └── reqwest v0.13.5 (*)
+              ├── hyper-util v0.1.21 (*)
+              ├── mojentic v3.0.2 (*)
+              └── tracing-subscriber v0.3.23
+                  └── (dev) mojentic v3.0.2 (*)
+    ├ syn v3.0.6
+      ├── async-trait v0.1.92
+      │   └── mojentic v3.0.2
+      ├── displaydoc v0.2.7
+      │   ├── icu_collections v2.3.0
+      │   │   ├── icu_normalizer v2.3.0
+      │   │   │   └── idna_adapter v1.2.2
+      │   │   │       └── idna v1.1.0
+      │   │   │           └── url v2.5.8
+      │   │   │               ├── reqwest v0.13.5
+      │   │   │               │   └── mojentic v3.0.2 (*)
+      │   │   │               └── tower-http v0.6.11
+      │   │   │                   └── reqwest v0.13.5 (*)
+      │   │   └── icu_properties v2.3.0
+      │   │       └── idna_adapter v1.2.2 (*)
+      │   ├── icu_locale_core v2.3.0
+      │   │   ├── icu_properties v2.3.0 (*)
+      │   │   └── icu_provider v2.3.1
+      │   │       ├── icu_normalizer v2.3.0 (*)
+      │   │       └── icu_properties v2.3.0 (*)
+      │   ├── icu_properties v2.3.0 (*)
+      │   ├── icu_provider v2.3.1 (*)
+      │   ├── tinystr v0.8.4
+      │   │   └── icu_locale_core v2.3.0 (*)
+      │   └── zerotrie v0.2.5
+      │       ├── icu_properties v2.3.0 (*)
+      │       └── icu_provider v2.3.1 (*)
+      ├── futures-macro v0.3.34
+      │   └── futures-util v0.3.34
+      │       ├── futures v0.3.34
+      │       │   └── mojentic v3.0.2 (*)
+      │       ├── futures-executor v0.3.34
+      │       │   └── futures v0.3.34 (*)
+      │       ├── hyper-util v0.1.21
+      │       │   ├── hyper-rustls v0.27.10
+      │       │   │   └── reqwest v0.13.5 (*)
+      │       │   └── reqwest v0.13.5 (*)
+      │       ├── js-sys v0.3.106
+      │       │   ├── reqwest v0.13.5 (*)
+      │       │   ├── wasm-bindgen-futures v0.4.79
+      │       │   │   ├── reqwest v0.13.5 (*)
+      │       │   │   └── wasm-streams v0.5.0
+      │       │   │       └── reqwest v0.13.5 (*)
+      │       │   ├── wasm-streams v0.5.0 (*)
+      │       │   └── web-sys v0.3.106
+      │       │       ├── reqwest v0.13.5 (*)
+      │       │       └── wasm-streams v0.5.0 (*)
+      │       ├── mojentic v3.0.2 (*)
+      │       ├── reqwest v0.13.5 (*)
+      │       ├── tokio-tungstenite v0.30.0
+      │       │   └── mojentic v3.0.2 (*)
+      │       ├── tokio-util v0.7.20
+      │       │   ├── h2 v0.4.19
+      │       │   │   ├── hyper v1.11.1
+      │       │   │   │   ├── hyper-rustls v0.27.10 (*)
+      │       │   │   │   ├── hyper-util v0.1.21 (*)
+      │       │   │   │   └── reqwest v0.13.5 (*)
+      │       │   │   └── reqwest v0.13.5 (*)
+      │       │   ├── mojentic v3.0.2 (*)
+      │       │   └── reqwest v0.13.5 (*)
+      │       ├── tower v0.5.3
+      │       │   ├── reqwest v0.13.5 (*)
+      │       │   └── tower-http v0.6.11 (*)
+      │       ├── tower-http v0.6.11 (*)
+      │       └── wasm-streams v0.5.0 (*)
+      ├── ref-cast-impl v1.0.27
+      │   └── ref-cast v1.0.27
+      │       └── schemars v1.2.3
+      │           └── mojentic v3.0.2 (*)
+      ├── schemars_derive v1.2.3
+      │   └── schemars v1.2.3 (*)
+      ├── serde_derive v1.0.229
+      │   └── serde v1.0.229
+      │       ├── mojentic v3.0.2 (*)
+      │       ├── reqwest v0.13.5 (*)
+      │       └── schemars v1.2.3 (*)
+      ├── serde_derive_internals v0.30.0
+      │   └── schemars_derive v1.2.3 (*)
+      ├── synstructure v0.14.0
+      │   ├── yoke-derive v0.8.4
+      │   │   └── yoke v0.8.3
+      │   │       ├── icu_collections v2.3.0 (*)
+      │   │       ├── icu_provider v2.3.1 (*)
+      │   │       ├── zerotrie v0.2.5 (*)
+      │   │       └── zerovec v0.11.8
+      │   │           ├── icu_collections v2.3.0 (*)
+      │   │           ├── icu_locale_core v2.3.0 (*)
+      │   │           ├── icu_normalizer v2.3.0 (*)
+      │   │           ├── icu_properties v2.3.0 (*)
+      │   │           ├── icu_provider v2.3.1 (*)
+      │   │           ├── potential_utf v0.1.6
+      │   │           │   └── icu_collections v2.3.0 (*)
+      │   │           └── tinystr v0.8.4 (*)
+      │   └── zerofrom-derive v0.1.8
+      │       └── zerofrom v0.1.8
+      │           ├── icu_collections v2.3.0 (*)
+      │           ├── icu_provider v2.3.1 (*)
+      │           ├── yoke v0.8.3 (*)
+      │           ├── zerotrie v0.2.5 (*)
+      │           └── zerovec v0.11.8 (*)
+      ├── thiserror-impl v2.0.21
+      │   └── thiserror v2.0.21
+      │       ├── jni v0.22.4
+      │       │   └── rustls-platform-verifier v0.7.1
+      │       │       └── reqwest v0.13.5 (*)
+      │       ├── mojentic v3.0.2 (*)
+      │       └── tungstenite v0.30.0
+      │           └── tokio-tungstenite v0.30.0 (*)
+      ├── tokio-macros v2.7.2
+      │   └── tokio v1.54.1
+      │       ├── h2 v0.4.19 (*)
+      │       ├── hyper v1.11.1 (*)
+      │       ├── hyper-rustls v0.27.10 (*)
+      │       ├── hyper-util v0.1.21 (*)
+      │       ├── mojentic v3.0.2 (*)
+      │       ├── reqwest v0.13.5 (*)
+      │       ├── tokio-native-tls v0.3.1
+      │       │   └── tokio-tungstenite v0.30.0 (*)
+      │       ├── tokio-rustls v0.26.5
+      │       │   ├── hyper-rustls v0.27.10 (*)
+      │       │   └── reqwest v0.13.5 (*)
+      │       ├── tokio-stream v0.1.19
+      │       │   └── tokio-test v0.4.6
+      │       │       └── (dev) mojentic v3.0.2 (*)
+      │       ├── tokio-test v0.4.6 (*)
+      │       ├── tokio-tungstenite v0.30.0 (*)
+      │       ├── tokio-util v0.7.20 (*)
+      │       ├── tower v0.5.3 (*)
+      │       └── wasm-bindgen-futures v0.4.79 (*)
+      ├── wasm-bindgen-macro-support v0.2.129
+      │   └── wasm-bindgen-macro v0.2.129
+      │       └── wasm-bindgen v0.2.129
+      │           ├── js-sys v0.3.106 (*)
+      │           ├── reqwest v0.13.5 (*)
+      │           ├── wasm-bindgen-futures v0.4.79 (*)
+      │           ├── wasm-streams v0.5.0 (*)
+      │           └── web-sys v0.3.106 (*)
+      ├── yoke-derive v0.8.4 (*)
+      ├── zerofrom-derive v0.1.8 (*)
+      └── zerovec-derive v0.11.6
+          └── zerovec v0.11.8 (*)
+

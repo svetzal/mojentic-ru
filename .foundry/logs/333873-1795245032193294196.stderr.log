@@ -1,0 +1,14 @@
+   Compiling regex-syntax v0.8.12
+   Compiling jiff-core v1.0.1
+   Compiling uuid v1.29.3
+   Compiling tempfile v3.27.0
+   Compiling jiff v1.0.1
+   Compiling regex-automata v0.4.19
+   Compiling regex v1.13.2
+   Compiling fancy-regex v0.19.2
+   Compiling bstr v1.13.1
+   Compiling matchers v0.2.0
+   Compiling tracing-subscriber v0.3.23
+   Compiling tiktoken-rs v0.12.1
+   Compiling mojentic v3.0.2 (/home/svetzal/Work/Projects/Personal/mojentic-unify/mojentic-ru)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 31.87s
